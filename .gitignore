@@ -1,0 +1,9 @@
+# KDevelop4
+*.kdev4
+*.kdev4/
+
+# SCons
+build/
+config.log
+.sconsign.dblite
+.sconf_temp/
