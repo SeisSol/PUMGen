@@ -21,6 +21,13 @@
 
 #include <hdf5.h>
 
+#include <moab/Core.hpp>
+#include <moab/ReadUtilIface.hpp>
+#include <moab/CN.hpp>
+#include <moab/ParallelComm.hpp>
+#include <moab/MergeMesh.hpp>
+#include <moab/ParallelMergeMesh.hpp>
+
 #include <apfMesh2.h>
 #include <apfNumbering.h>
 // #include <apfZoltan.h>
@@ -71,7 +78,9 @@ int main(int argc, char* argv[])
 	args.addOption("model", 0, "Dump/Load a specific model file",
 				   utils::Args::Required, false);
 	args.addOption("vtk", 0, "Dump mesh to VTK files",
-				   utils::Args::Required, false);
+			utils::Args::Required, false);
+	args.addOption("moab", 0, "Dump mesh to MOAB file",
+			utils::Args::Required, false);
 	args.addOption("license", 'l', "License file (only used by SimModSuite)",
 				   utils::Args::Required, false);
 	args.addOption("cad", 'c', "CAD file (only used by SimModSuite)",
@@ -199,6 +208,11 @@ int main(int argc, char* argv[])
 			   &min, 1, MPI_DOUBLE, MPI_MIN, 0, MPI_COMM_WORLD);
 	logInfo(rank) << "Minimum insphere found:" << min;
 
+	// Get tags
+	apf::MeshTag* groupTag = mesh->findTag("group");
+	apf::MeshTag* boundaryTag = mesh->findTag("boundary condition");
+	assert(boundaryTag);
+
 	// Get offsets
 	unsigned long offsets[2] = {localSize[0], localSize[1]};
 	MPI_Scan(MPI_IN_PLACE, offsets, 2, MPI_UNSIGNED_LONG, MPI_SUM, MPI_COMM_WORLD);
@@ -209,6 +223,90 @@ int main(int argc, char* argv[])
 	apf::GlobalNumbering* vertexNum = apf::makeGlobal(
 			apf::numberOwnedNodes(mesh, "vertices"));
 	apf::synchronize(vertexNum);
+
+	// Dump MOAB mesh
+	const char* moabMesh = args.getArgument<const char*>("moab", 0L);
+	if (moabMesh) {
+		logInfo(PCU_Comm_Self()) << "Writing MOAB mesh";
+
+		apf::MeshTag* localVertexNum = mesh->createIntTag("lvertices", 1);
+
+		moab::Interface* mb = new moab::Core;
+		moab::ReadUtilIface* iface;
+		mb->query_interface(iface);
+
+		moab::Tag mGroupTag, mBoundaryTag;
+		mb->tag_get_handle("GROUP", 1, moab::MB_TYPE_INTEGER, mGroupTag, moab::MB_TAG_DENSE | moab::MB_TAG_CREAT);
+		mb->tag_get_handle("BOUNDARY", 1, moab::MB_TYPE_INTEGER, mBoundaryTag, moab::MB_TAG_DENSE | moab::MB_TAG_CREAT);
+
+		unsigned int localVertexSize = mesh->count(0);
+
+		std::vector<double*> arrays;
+		moab::EntityHandle startv;
+		iface->get_node_coords(3, localVertexSize, 0, startv, arrays);
+
+		unsigned int idx = 0;
+		it = mesh->begin(0);
+		while (apf::MeshEntity* element = mesh->iterate(it)) {
+			int lid = idx;
+			mesh->setIntTag(element, localVertexNum, &lid);
+
+			apf::Vector3 point;
+			mesh->getPoint(element, 0, point);
+
+			arrays[0][idx] = point.x();
+			arrays[1][idx] = point.y();
+			arrays[2][idx] = point.z();
+
+			idx++;
+		}
+		mesh->end(it);
+
+		moab::EntityHandle starte;
+		moab::EntityHandle* conn;
+		iface->get_element_connect(localSize[0], 4, moab::MBTET, 0, starte, conn);
+
+		idx = 0;
+		it = mesh->begin(3);
+		while (apf::MeshEntity* element = mesh->iterate(it)) {
+			apf::Downward v;
+			mesh->getDownward(element, 0, v);
+
+			for (unsigned int i = 0; i < 4; i++) {
+				int vid;
+				mesh->getIntTag(v[i], localVertexNum, &vid);
+				assert(vid >= 0 && vid < static_cast<int>(localVertexSize));
+				conn[idx*4 + i] = startv + vid;
+			}
+
+			moab::EntityHandle e = starte + idx;
+			if (groupTag) {
+				int group;
+				mesh->getIntTag(element, groupTag, &group);
+				mb->tag_set_data(mGroupTag, &e, 1, &group);
+			}
+
+			// TODO set correct bounday
+			int boundary = 42;
+			mb->tag_set_data(mBoundaryTag, &e, 1, &boundary);
+
+			idx++;
+		}
+
+		moab::ParallelComm* pcomm = new moab::ParallelComm(mb, MPI_COMM_WORLD);
+
+		moab::ParallelMergeMesh pm(pcomm, 0.00001);
+		pm.merge();
+
+#if 1
+		moab::Range toDelete;
+		mb->get_entities_by_dimension(0, 1, toDelete);
+		mb->get_entities_by_dimension(0, 2, toDelete);
+		pcomm->delete_entities(toDelete);
+#endif
+
+		mb->write_file(moabMesh, 0, ";;PARALLEL=WRITE_PART");
+	}
 
 	// Create the H5 file
 	hid_t h5falist = H5Pcreate(H5P_FILE_ACCESS);
@@ -312,7 +410,6 @@ int main(int argc, char* argv[])
 	delete [] geometry;
 
 	// Group information
-	apf::MeshTag* groupTag = mesh->findTag("group");
 	if (groupTag) {
 		logInfo(rank) << "Writing group information";
 
@@ -355,8 +452,6 @@ int main(int argc, char* argv[])
 
 	// Write boundary condition
 	logInfo(rank) << "Writing boundary condition";
-	apf::MeshTag* boundaryTag = mesh->findTag("boundary condition");
-	assert(boundaryTag);
 
 	int* boundary = new int[localSize[0]];
 	memset(boundary, 0, localSize[0]*sizeof(int));
