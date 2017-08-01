@@ -232,6 +232,9 @@ int main(int argc, char* argv[])
 		apf::MeshTag* localVertexNum = mesh->createIntTag("lvertices", 1);
 
 		moab::Interface* mb = new moab::Core;
+		moab::EntityHandle fileset;
+		mb->create_meshset(moab::MESHSET_SET, fileset);
+
 		moab::ReadUtilIface* iface;
 		mb->query_interface(iface);
 
@@ -303,6 +306,7 @@ int main(int argc, char* argv[])
 		mb->get_entities_by_dimension(0, 1, toDelete);
 		mb->get_entities_by_dimension(0, 2, toDelete);
 		pcomm->delete_entities(toDelete);
+		mb->remove_entities(fileset, toDelete);
 #endif
 
 		mb->write_file(moabMesh, 0, ";;PARALLEL=WRITE_PART");
