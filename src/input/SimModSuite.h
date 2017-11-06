@@ -936,6 +936,11 @@ void analyse_mesh() {
 private:
 // Method for probing the locations of the model faces to facilitate parameter setup
 void probeFaceCoords(pGModel model) {
+    GRIter modelRegions;
+    pGRegion modelRegion;
+    int nfaces;
+    pPList FaceList;
+
     GFIter modelFaces;
     pGFace modelFace;
     int ID;
@@ -946,6 +951,23 @@ void probeFaceCoords(pGModel model) {
     int polypoint[maxPolyPoints];   // ID of the points of a polygon
     double pntlocation[3];
     double pntnormal[3];
+
+    modelRegions = GM_regionIter(model);
+    logInfo(PMU_rank()) << "There are" << GRIter_size(modelRegions) <<"regions in the model";
+
+    while(modelRegion=GRIter_next(modelRegions)) { // get the next model region
+        ID = GEN_tag(modelRegion);
+        FaceList  =   GR_faces(modelRegion);
+        nfaces = PList_size(FaceList);
+
+        logInfo(PMU_rank()) << "There are" << nfaces << "faces on model region" << ID << ":";
+        void *iter = 0; //
+        while((modelFace = (pGFace)PList_next(FaceList, &iter)) != 0) {
+           ID = GEN_tag(modelFace);
+           logInfo(PMU_rank()) << ID;
+        }
+    }
+
     modelFaces = GM_faceIter(model);
     logInfo(PMU_rank()) << "Face information:";
     while(modelFace=GFIter_next(modelFaces)) { // get the next model face
