@@ -14,6 +14,7 @@
 Import('env')
 
 env.sourceFiles.append(env.Object('ParallelVertexFilter.cpp'))
+env.sourceFiles.append(env.Object('../../../submodules/tinyxml2/tinyxml2.cpp'))
 
 if env['use_netcdf']:
 	env.sourceFiles.append(env.Object('NetCDFPartition.cpp'))
