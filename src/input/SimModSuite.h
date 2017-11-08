@@ -87,6 +87,7 @@ public:
 			int enforceSize = 0,
 			const char* xmlFile=0L,
          const bool probe_faces=false,
+         const bool analyseAR=false,
 			const char* logFile = 0L)
 	{
 		// Init SimModSuite
@@ -169,6 +170,10 @@ public:
 
 		Progress_delete(prog);
 
+      if (analyseAR) {
+        analyse_mesh();
+      }
+      
 		// Convert to APF mesh
 		apf::Mesh* tmpMesh = apf::createMesh(m_simMesh);
 		gmi_register_sim();
@@ -833,6 +838,68 @@ void loadCAD(const char* modFile, const char* cadFile){
             logError() << "Input model is not valid";
     PList_delete(modelErrors);
 }
+private:
+void analyse_mesh() {
+    int num_bins = 8;
+    double AR[8]={0,2,4,6,10,20,40,100};
+    long int AR_vol_bins[num_bins];
+    long int skew_area_bins[num_bins];
+    memset(AR_vol_bins, 0, num_bins*sizeof(long int));
+    memset(skew_area_bins, 0, num_bins*sizeof(long int));
+
+    // Accumulate equivolume AspectRatio data
+    RIter reg_it;
+    int num_partMeshes = PM_numParts(m_simMesh);
+    pRegion reg;
+    double maxAR=0, AR_global=0,elAR;
+    int kAR;
+    for(int i = 0; i < num_partMeshes; i++) {
+        reg_it = M_regionIter(PM_mesh(m_simMesh, i));
+        while (reg = RIter_next(reg_it)) {
+            kAR=num_bins;
+            for(int k = 1; k < num_bins; k++) {
+               elAR=R_aspectRatio(reg);
+               if (elAR<AR[k]) {
+               kAR=k;
+               break;
+               }
+            }
+            AR_vol_bins[kAR-1]++;
+            maxAR=std::max(maxAR,elAR);
+        }
+    }
+    RIter_delete(reg_it);
+    /*
+    // Accumulate equiarea skewness data
+    FIter face_it;
+    pFace face;
+    for(int i = 0; i < num_partMeshes; i++) {
+        face_it = M_faceIter(PM_mesh(m_simMesh, i));
+        while (face = FIter_next(face_it)) {
+            skew_area_bins[(int)(F_equiareaSkewness(face) * num_bins)]++; // because skewness lies in [0,1]
+        }
+    }
+    FIter_delete(face_it);
+    */
+    // Print the statistics
+    logInfo(PMU_rank()) << "AR statistics:";
+    MPI_Allreduce(&maxAR, &AR_global, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
+    logInfo(PMU_rank()) << "AR max:"<< AR_global;
+    logInfo(PMU_rank()) << "AR (target: < ~10):";
+    long int bin_global;
+    for(int i = 0; i < num_bins-1; i++) {
+        MPI_Allreduce(&AR_vol_bins[i], &bin_global, 1, MPI_LONG, MPI_SUM, MPI_COMM_WORLD);
+        logInfo(PMU_rank()) << std::fixed << std::setprecision(2) << "[" << AR[i] << "," << AR[i+1] << "):" << bin_global;
+    }
+    MPI_Allreduce(&AR_vol_bins[num_bins-1], &bin_global, 1, MPI_LONG, MPI_SUM, MPI_COMM_WORLD);
+    logInfo(PMU_rank()) << std::fixed << std::setprecision(2) << "[" << AR[num_bins-1] << ",inf):" << bin_global;
+    /*
+    logInfo(PMU_rank()) << "Equiarea skewness (target: < 0.8):";
+    for(int i = 0; i < num_bins; i++) {
+        logInfo(PMU_rank()) << std::fixed << std::setprecision(2) << "[" << i * 1.0 / num_bins << "," << (i + 1) * 1.0 / num_bins << "):" << skew_area_bins[i];
+    }*/
+}
+
 private:
 // Method for probing the locations of the model faces to facilitate parameter setup
 void probeFaceCoords(pGModel model) {

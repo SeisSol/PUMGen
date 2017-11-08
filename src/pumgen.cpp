@@ -84,6 +84,8 @@ int main(int argc, char* argv[])
          utils::Args::Required, false);
    args.addOption("prbfc", 0, "Probe the coordinates of the model's faces (only used by SimModSuite)",
          utils::Args::No, false);
+   args.addOption("analyseAR", 0, "produce an histogram of AR",
+         utils::Args::No, false);
 	const char* forces[] = {"0", "1", "2"};
 	args.addEnumOption("enforce-size", forces, 0, "Enforce mesh size (only used by SimModSuite, default: 0)", false);
 	args.addOption("sim_log", 0, "Create SimModSuite log", utils::Args::Required, false);
@@ -152,6 +154,7 @@ int main(int argc, char* argv[])
 				args.getArgument<int>("enforce-size", 0),
             args.getArgument<const char*>("xml",0L),
             args.isSet("prbfc"),
+            args.isSet("analyseAR"),
 				args.getArgument<const char*>("sim_log", 0L));
 #else // USE_SIMMOD
 			logError() << "SimModSuite is not supported in this version";
