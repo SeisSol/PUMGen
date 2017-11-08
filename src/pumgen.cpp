@@ -80,6 +80,8 @@ int main(int argc, char* argv[])
 				   utils::Args::Required, false);
 	args.addOption("analysis", 0, "Analysis attributes name (only used by SimModSuite, default: \"analysis\")",
 				   utils::Args::Required, false);
+   args.addOption("xml", 0, "Use mesh and attributes parameters from a xml file (only used by SimModSuite)",
+         utils::Args::Required, false);
 	const char* forces[] = {"0", "1", "2"};
 	args.addEnumOption("enforce-size", forces, 0, "Enforce mesh size (only used by SimModSuite, default: 0)", false);
 	args.addOption("sim_log", 0, "Create SimModSuite log", utils::Args::Required, false);
@@ -146,8 +148,8 @@ int main(int argc, char* argv[])
 				args.getArgument<const char*>("mesh", "mesh"),
 				args.getArgument<const char*>("analysis", "analysis"),
 				args.getArgument<int>("enforce-size", 0),
+            args.getArgument<const char*>("xml",0L),
 				args.getArgument<const char*>("sim_log", 0L));
-
 #else // USE_SIMMOD
 			logError() << "SimModSuite is not supported in this version";
 #endif // USE_SIMMOD
