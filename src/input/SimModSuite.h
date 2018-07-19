@@ -305,13 +305,13 @@ private:
 	 */
 	static unsigned int parseBoundary(const char* boundaryCondition)
 	{
-		if (strcmp(boundaryCondition, "freeSurface") == 0)
-			return 1;
-		if (strcmp(boundaryCondition, "dynamicRupture") == 0)
-			return 3;
-		if (strcmp(boundaryCondition, "absorbing") == 0)
-			return 5;
-
+                //check if boundaryCondition starts with pattern
+                std::string pattern="BC";
+                std::string sboundaryCondition(boundaryCondition,11);
+                if (sboundaryCondition.find(pattern) == 0) {
+                        std::string sNumber=sboundaryCondition.substr(pattern.length());
+	                return stoi(sNumber);
+                }
 		logError() << "Unknown boundary condition" << boundaryCondition;
 		return -1;
 	}
@@ -617,6 +617,21 @@ void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, const char*
            faceBound[std::atoi(tokens[i].c_str())-1] = 5;
        }
     }
+    //more general way of defining boundaryCondition
+    child = doc.FirstChildElement("boundaryCondition");
+    if (child) {
+       for (child; child; child = child->NextSiblingElement("boundaryCondition"))
+       {
+          sval = child->Attribute("tag");
+          int faultTag =  atoi(sval.c_str());
+          std::vector<std::string> tokens;
+          line =  pRoot-> GetText();
+          split(tokens, line, ',');
+          for(int i = 0; i < tokens.size(); i++) {
+              faceBound[std::atoi(tokens[i].c_str())-1] = faultTag;
+          }
+       }
+    }
 
     } else {
         logError() << "Unable to open or to parse file" << stl_ParFile;
@@ -645,23 +660,31 @@ void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, const char*
     // actual attribute for each geometric face from this attribute
     // information node. We name the attribute T1, and give it the
     // information type "boundaryCondition".
-    pAttInfoVoid iSurf = AMAN_newAttInfoVoid(attMngr,"BC","boundaryCondition");
-    AttNode_setImageClass((pANode)iSurf,"freeSurface");
-    pAttInfoVoid iDynRup = AMAN_newAttInfoVoid(attMngr,"BC","boundaryCondition");
-    AttNode_setImageClass((pANode)iDynRup,"dynamicRupture");
-    pAttInfoVoid iAbsorb = AMAN_newAttInfoVoid(attMngr,"BC","boundaryCondition");
-    AttNode_setImageClass((pANode)iAbsorb,"absorbing");
 
-    // We need to add the Attribute Information Nodes to the case
-    AttCase_addNode(analysisCase,(pANode)iSurf);
-    AttCase_addNode(analysisCase,(pANode)iDynRup);
-    AttCase_addNode(analysisCase,(pANode)iAbsorb);
 
-    // We need to associate the Attribute Information Nodes with the
-    // model. To do that we have to create a Model Association for the case
-    pModelAssoc aSurf = AttCase_newModelAssoc(analysisCase,(pANode)iSurf);
-    pModelAssoc aDynRup = AttCase_newModelAssoc(analysisCase,(pANode)iDynRup);
-    pModelAssoc aAbsorb = AttCase_newModelAssoc(analysisCase,(pANode)iAbsorb);
+    //With this code we can tag any BC, not only 1,3,5
+    std::set<int> UniquefaceBound(faceBound, faceBound + numFaces);
+    int numBC = UniquefaceBound.size();
+    pAttInfoVoid iBC[numBC];
+    pModelAssoc aBC[numBC];
+    std::set<int>::iterator it = UniquefaceBound.begin();
+
+    std::map<int,int> LUT;
+
+    for (int i = 0; i < numBC; i++) {
+       std::string strboundaryCondition="BC";
+       char buff[100];
+       snprintf(buff, sizeof(buff), "%09d", (*it));
+       std::string sNumber = buff;
+       //std::string sNumber = std::to_string((*it));
+       LUT[(*it)]=i;
+       it++;
+       iBC[i] = AMAN_newAttInfoVoid(attMngr,"BC","boundaryCondition");
+       strboundaryCondition.append(sNumber);
+       AttNode_setImageClass((pANode)iBC[i],strboundaryCondition.c_str());
+       AttCase_addNode(analysisCase,(pANode)iBC[i]);
+       aBC[i] = AttCase_newModelAssoc(analysisCase,(pANode)iBC[i]);
+    }
 
     pGEntity face;
     for (int i = 0; i < numFaces; i++) {
@@ -678,17 +701,10 @@ void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, const char*
         switch (faceBound[i]) {
             case 0:
                 break;
-            case 1:
-                AMA_addGEntity(aSurf,face);
-                break;
-            case 3:
-                AMA_addGEntity(aDynRup,face);
-                break;
-            case 5:
-                AMA_addGEntity(aAbsorb,face);
-                break;
             default:
-                logError() << "Unrecognised boundary type integer";
+                int index = LUT[faceBound[i]];
+                AMA_addGEntity(aBC[index],face);
+                break;
         }
     }
 
