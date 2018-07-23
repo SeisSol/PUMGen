@@ -42,7 +42,8 @@
 
 #include "MeshInput.h"
 
-
+#include "MeshAttributes.h"
+#include "AnalysisAttributes.h"
 
 #include <iostream>
 #include <fstream>
@@ -51,7 +52,6 @@
 #include <vector>
 #include <SimMeshTools.h>
 #include <SimDisplay.h>
-#include "tinyxml2/tinyxml2.h"
 #include <list>
 #include <SimExport.h>
 
@@ -72,13 +72,6 @@ private:
 
 	/** Enable Simmetrix logging file */
 	bool m_log;
-        int surfaceSmoothingLevel=2;
-        int surfaceSmoothingType=1;
-        double surfaceFaceRotationLimit=5.0;
-        int surfaceSnap=0;
-        int volumeSmoothingLevel=1;
-        int volumeSmoothingType=1;
-        int VolumeMesherOptimization=1;
 
 public:
 	SimModSuite(const char* modFile, const char* cadFile = 0L,
@@ -126,8 +119,16 @@ public:
       // Extract cases
       logInfo(PMU_rank()) << "Extracting cases";
       pACase meshCase, analysisCase;
+      MeshAttributes MeshAtt;
+
       if(stl_ParFile != NULL) {
-        setCases(m_model, meshCase, analysisCase, stl_ParFile);
+
+        //Read mesh Attributes from xml file
+        int numRegions = GM_numRegions(m_model);
+        int numFaces = GM_numFaces(m_model);
+        MeshAtt.init(stl_ParFile, numFaces, numRegions);
+        AnalysisAttributes AnalysisAtt(stl_ParFile, numFaces);
+        setCases(m_model, meshCase, analysisCase, MeshAtt, AnalysisAtt);
       } else {
         extractCases(m_model, meshCase, meshCaseName, analysisCase, analysisCaseName);
       }
@@ -145,10 +146,10 @@ public:
 		logInfo(PMU_rank()) << "Starting the surface mesher";
 		pSurfaceMesher surfaceMesher = SurfaceMesher_new(meshCase, m_simMesh);
                 if(stl_ParFile != NULL) {
-                   SurfaceMesher_setSmoothing(surfaceMesher, surfaceSmoothingLevel);
-                   SurfaceMesher_setSmoothType(surfaceMesher, surfaceSmoothingType);
-                   SurfaceMesher_setFaceRotationLimit(surfaceMesher, surfaceFaceRotationLimit);
-                   SurfaceMesher_setSnapForDiscrete(surfaceMesher,surfaceSnap);
+                   SurfaceMesher_setSmoothing(surfaceMesher, MeshAtt.surfaceSmoothingLevel);
+                   SurfaceMesher_setSmoothType(surfaceMesher, MeshAtt.surfaceSmoothingType);
+                   SurfaceMesher_setFaceRotationLimit(surfaceMesher, MeshAtt.surfaceFaceRotationLimit);
+                   SurfaceMesher_setSnapForDiscrete(surfaceMesher,MeshAtt.surfaceSnap);
                 }
 		progressBar.setTotal(26);
 		SurfaceMesher_execute(surfaceMesher, prog);
@@ -192,9 +193,9 @@ public:
 		logInfo(PMU_rank()) << "Starting the volume mesher";
 		pVolumeMesher volumeMesher = VolumeMesher_new(meshCase, m_simMesh);
                 if(stl_ParFile != NULL) {
-                   VolumeMesher_setSmoothing(volumeMesher, volumeSmoothingLevel);
-                   VolumeMesher_setSmoothType(volumeMesher, volumeSmoothingType);
-                   VolumeMesher_setOptimization(volumeMesher,VolumeMesherOptimization);
+                   VolumeMesher_setSmoothing(volumeMesher, MeshAtt.volumeSmoothingLevel);
+                   VolumeMesher_setSmoothType(volumeMesher, MeshAtt.volumeSmoothingType);
+                   VolumeMesher_setOptimization(volumeMesher,MeshAtt.VolumeMesherOptimization);
                 }
 		VolumeMesher_setEnforceSize(volumeMesher, enforceSize);
 		progressBar.setTotal(6);
@@ -361,14 +362,6 @@ private:
 
 
 
-std::vector<std::string> &split(std::vector<std::string> &elems, const std::string &s, char delim) {
-    std::stringstream ss(s);
-    std::string item;
-    while (std::getline(ss, item, delim)) {
-        elems.push_back(item);
-    }
-    return elems;
-}
 private:
 void extractCases(pGModel m_model, pACase &meshCase, const char *meshCaseName, pACase &analysisCase, const char *analysisCaseName) {
     logInfo(PMU_rank()) << "Extracting cases";
@@ -387,261 +380,9 @@ meshCase, &meshingOptions);
     PList_delete(children);
 }
 private:
-void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, const char* stl_ParFile) {
+void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, MeshAttributes &MeshAtt, AnalysisAttributes &AnalysisAtt) {
 
-    //Read settings from xml file
 
-    std::ifstream casefile(stl_ParFile);
-    std::string line,sval;
-    int numFaces = GM_numFaces(model);
-    int * faceBound = new int[numFaces];
-    std::fill_n(faceBound, numFaces, 0);
-    double globalMSize=0., faultMSize=0., gradation=0., vol_AspectRatio=0., area_AspectRatio=0.;
-    std::list<double> lsurfaceMSize;
-    std::list <std::list<int>> llsurfaceMSizeFaceId;
-    int numRegions = GM_numRegions(model);
-    std::list<double> lregionMSize;
-    std::list <std::list<int>> llregionMSizeRegionId;
-    double CubeMSize,CubeCenter[3],CubeWidth[3],CubeHeight[3],CubeDepth[3];
-    CubeMSize=0;
-    std::list<int> lFaceIdMeshSizePropagation;
-    std::list<int> lFaceIdUseDiscreteMesh;
-    int UseDiscreteMesh_noModification;
-    double MeshSizePropagationScalingFactor,MeshSizePropagationDistance=0.0;
-    int writeSmd;
-    double detectSmallFeaturesThreshold=0;
-
-    //TU 2.05.2007 use xml file for stl_ParFile
-    using namespace tinyxml2;
-    XMLDocument doc;
-    XMLElement* child;
-    if(doc.LoadFile(stl_ParFile) ==XML_SUCCESS)
-    {
-    XMLElement* pRoot;
-    pRoot = doc.FirstChildElement("gradation");
-    if(pRoot) {
-       sval = pRoot->Attribute("value");
-       gradation =  atof(sval.c_str());
-    }
-    pRoot = doc.FirstChildElement("writeSmd");
-    if(pRoot) {
-       writeSmd = 1; 
-    }
-    pRoot = doc.FirstChildElement("globalMSize");
-    if(pRoot) {
-       sval = pRoot->Attribute("value");
-       globalMSize =  atof(sval.c_str());
-    }
-    pRoot = doc.FirstChildElement("area_AspectRatio");
-    if(pRoot) {
-       sval = pRoot->Attribute("value");
-       area_AspectRatio =  atof(sval.c_str());
-    }
-    pRoot = doc.FirstChildElement("vol_AspectRatio");
-    if(pRoot) {
-       sval = pRoot->Attribute("value");
-       vol_AspectRatio =  atof(sval.c_str());
-    }
-
-    pRoot = doc.FirstChildElement("detectSmallFeatures");
-    if(pRoot) {
-       sval = pRoot->Attribute("value");
-       detectSmallFeaturesThreshold =  atof(sval.c_str());
-    }
-
-    pRoot = doc.FirstChildElement("MeshSizePropagation");
-    if(pRoot) {
-       sval = pRoot->Attribute("ScalingFactor");
-       MeshSizePropagationScalingFactor =  atof(sval.c_str());
-       sval = pRoot->Attribute("Distance");
-       MeshSizePropagationDistance =  atof(sval.c_str());
-       std::vector<std::string> tokens;
-       line =  pRoot-> GetText();
-       split(tokens, line, ',');
-       for(int i = 0; i < tokens.size(); i++) {
-           int faceid = std::atoi(tokens[i].c_str());
-           assert (faceid<=numFaces);
-           lFaceIdMeshSizePropagation.push_back(faceid);
-       }
-    }
-
-    pRoot = doc.FirstChildElement("UseDiscreteMesh");
-    if(pRoot) {
-       sval = pRoot->Attribute("noModification");
-       UseDiscreteMesh_noModification =  atoi(sval.c_str());
-       std::vector<std::string> tokens;
-       line =  pRoot-> GetText();
-       split(tokens, line, ',');
-       for(int i = 0; i < tokens.size(); i++) {
-           int faceid = std::atoi(tokens[i].c_str());
-           assert (faceid<=numFaces);
-           lFaceIdUseDiscreteMesh.push_back(faceid);
-       }
-    }
-
-    pRoot = doc.FirstChildElement("MeshRefinementZoneCube");
-    if(pRoot) {
-       sval = pRoot->Attribute("value");
-       CubeMSize =  atof(sval.c_str());
-
-       child = pRoot->FirstChildElement("Center");
-       sval = child->Attribute("x");
-       CubeCenter[0] =  atof(sval.c_str());
-       sval = child->Attribute("y");
-       CubeCenter[1] =  atof(sval.c_str());
-       sval = child->Attribute("z");
-       CubeCenter[2] =  atof(sval.c_str());
-
-       child = pRoot->FirstChildElement("Width");
-       sval = child->Attribute("x");
-       CubeWidth[0] =  atof(sval.c_str());
-       sval = child->Attribute("y");
-       CubeWidth[1] =  atof(sval.c_str());
-       sval = child->Attribute("z");
-       CubeWidth[2] =  atof(sval.c_str());
-
-       child = pRoot->FirstChildElement("Height");
-       sval = child->Attribute("x");
-       CubeHeight[0] =  atof(sval.c_str());
-       sval = child->Attribute("y");
-       CubeHeight[1] =  atof(sval.c_str());
-       sval = child->Attribute("z");
-       CubeHeight[2] =  atof(sval.c_str());
-
-       child = pRoot->FirstChildElement("Depth");
-       sval = child->Attribute("x");
-       CubeDepth[0] =  atof(sval.c_str());
-       sval = child->Attribute("y");
-       CubeDepth[1] =  atof(sval.c_str());
-       sval = child->Attribute("z");
-       CubeDepth[2] =  atof(sval.c_str());
-    }
-
-    pRoot = doc.FirstChildElement("SurfaceMeshing");
-    if(pRoot) {
-       sval = pRoot->Attribute("SmoothingLevel");
-       surfaceSmoothingLevel  =  atoi(sval.c_str());
-       sval = pRoot->Attribute("Snap");
-       surfaceSnap  =  atoi(sval.c_str());
-       sval = pRoot->Attribute("SmoothingType");
-       if (sval.compare("Laplacian")==0) {
-          surfaceSmoothingType=0;
-       } else if (sval.compare("Gradient")==0) {
-          surfaceSmoothingType=1;
-       } else {
-          logError() << "Unrecognised surfaceSmoothingType (Laplacian or Gradient)" << sval;
-       }
-       sval = pRoot->Attribute("DiscreteAngle");
-       surfaceFaceRotationLimit  =  atof(sval.c_str());
-       logInfo(PMU_rank()) << "surface smoothing option: surfaceSmoothingLevel surfaceSmoothingType surfaceFaceRotationLimit Snap"<<
-         surfaceSmoothingLevel<<" "<< surfaceSmoothingType<<" "<< surfaceFaceRotationLimit <<" "<<surfaceSnap;
-    }
-    pRoot = doc.FirstChildElement("VolumeMeshing");
-    if(pRoot) {
-       sval = pRoot->Attribute("SmoothingLevel");
-       volumeSmoothingLevel  =  atoi(sval.c_str());
-       sval = pRoot->Attribute("SetOptimisation");
-       VolumeMesherOptimization =  atoi(sval.c_str());
-       sval = pRoot->Attribute("SmoothingType");
-       if (sval.compare("Laplacian")==0) {
-          volumeSmoothingType=0;
-       } else if (sval.compare("Gradient")==0) {
-          volumeSmoothingType=1;
-       } else {
-          logError() << "Unrecognised volumeSmoothingType (Laplacian or Gradient)" << sval;
-       }
-       logInfo(PMU_rank()) << "volume smoothing option: volumeSmoothingLevel volumrSmoothingType"<< 
-         volumeSmoothingLevel<<" "<< volumeSmoothingType;
-    }
-
-    child = doc.FirstChildElement("surfaceMSize");
-    for (child; child; child = child->NextSiblingElement("surfaceMSize"))
-    {
-       sval = child->Attribute("value");
-       double surfaceMSize =  atof(sval.c_str());
-       lsurfaceMSize.push_back(surfaceMSize);
-       std::vector<std::string> tokens;
-       line =  child-> GetText();
-       split(tokens, line, ',');
-       std::list<int> lFaceId;
-       for(int i = 0; i < tokens.size(); i++) {
-           int faceid = std::atoi(tokens[i].c_str());
-           assert (faceid<=numFaces);
-           lFaceId.push_back(faceid);
-       }
-       llsurfaceMSizeFaceId.push_back(lFaceId);
-    }
-
-    child = doc.FirstChildElement("regionMSize");
-    for (child; child; child = child->NextSiblingElement("regionMSize"))
-    {
-       sval = child->Attribute("value");
-       double regionMSize =  atof(sval.c_str());
-       lregionMSize.push_back(regionMSize);
-       std::vector<std::string> tokens;
-       line =  child-> GetText();
-       split(tokens, line, ',');
-       std::list<int> lregionId;
-       for(int i = 0; i < tokens.size(); i++) {
-           int regionid = std::atoi(tokens[i].c_str());
-           assert (regionid<=numRegions);
-           lregionId.push_back(regionid);
-       }
-       llregionMSizeRegionId.push_back(lregionId);
-    }
-   
-    pRoot = doc.FirstChildElement("freeSurface");
-    if (pRoot) {
-       std::vector<std::string> tokens;
-       line =  pRoot-> GetText();
-       split(tokens, line, ',');
-       for(int i = 0; i < tokens.size(); i++) {
-           faceBound[std::atoi(tokens[i].c_str())-1] = 1;
-       }
-    }
-    pRoot = doc.FirstChildElement("dynamicRupture");
-    if (pRoot) {
-       std::vector<std::string> tokens;
-       line =  pRoot-> GetText();
-       split(tokens, line, ',');
-       for(int i = 0; i < tokens.size(); i++) {
-           faceBound[std::atoi(tokens[i].c_str())-1] = 3;
-       }
-    }
-    pRoot = doc.FirstChildElement("absorbing");
-    if (pRoot) {
-       std::vector<std::string> tokens;
-       line =  pRoot-> GetText();
-       split(tokens, line, ',');
-       for(int i = 0; i < tokens.size(); i++) {
-           faceBound[std::atoi(tokens[i].c_str())-1] = 5;
-       }
-    }
-    //more general way of defining boundaryCondition
-    child = doc.FirstChildElement("boundaryCondition");
-    if (child) {
-       for (child; child; child = child->NextSiblingElement("boundaryCondition"))
-       {
-          sval = child->Attribute("tag");
-          int faultTag =  atoi(sval.c_str());
-          std::vector<std::string> tokens;
-          line =  pRoot-> GetText();
-          split(tokens, line, ',');
-          for(int i = 0; i < tokens.size(); i++) {
-              faceBound[std::atoi(tokens[i].c_str())-1] = faultTag;
-          }
-       }
-    }
-
-    } else {
-        logError() << "Unable to open or to parse file" << stl_ParFile;
-        return;
-    }
-    if (detectSmallFeaturesThreshold>0) {
-       pSmallFeatureInfo smallFeats = GM_detectSmallFeatures(model,1,detectSmallFeaturesThreshold,0,0,0);
-       pPList lsmallFeats=GM_getSmallFeatures(smallFeats); 
-       logInfo(PMU_rank()) << "Number of small features returned: " <<PList_size(lsmallFeats);
-    }
     logInfo(PMU_rank()) << "Setting cases";
     // ------------------------------ Set boundary conditions ------------------------------
 
@@ -663,7 +404,8 @@ void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, const char*
 
 
     //With this code we can tag any BC, not only 1,3,5
-    std::set<int> UniquefaceBound(faceBound, faceBound + numFaces);
+    int numFaces = GM_numFaces(model);
+    std::set<int> UniquefaceBound(AnalysisAtt.faceBound, AnalysisAtt.faceBound + numFaces);
     int numBC = UniquefaceBound.size();
     pAttInfoVoid iBC[numBC];
     pModelAssoc aBC[numBC];
@@ -696,15 +438,10 @@ void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, const char*
         // at the time when the Model Association was created. That prepares
         // the creation of the AttributeVoid on the face as soon as the
         // association process is started
-        if (faceBound[i]!=0)
-           logInfo(PMU_rank()) << "faceBound[" << i + 1 <<"] =" << faceBound[i];
-        switch (faceBound[i]) {
-            case 0:
-                break;
-            default:
-                int index = LUT[faceBound[i]];
-                AMA_addGEntity(aBC[index],face);
-                break;
+        if (AnalysisAtt.faceBound[i]!=0) {
+           logInfo(PMU_rank()) << "faceBound[" << i + 1 <<"] =" << AnalysisAtt.faceBound[i];
+           int index = LUT[AnalysisAtt.faceBound[i]];
+           AMA_addGEntity(aBC[index],face);
         }
     }
 
@@ -714,17 +451,17 @@ void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, const char*
 
     // Set global mesh size
     pModelItem modelDomain = GM_domain(model);
-    if (globalMSize>0) {
-       logInfo(PMU_rank()) << "globalMSize =" << globalMSize;
+    if (MeshAtt.globalMSize>0) {
+       logInfo(PMU_rank()) << "globalMSize =" << MeshAtt.globalMSize;
        // ( <meshing case>, <entity>, <1=absolute, 2=relative>, <size>, <size expression> )
-       MS_setMeshSize(meshCase, modelDomain, 1, globalMSize, NULL);
+       MS_setMeshSize(meshCase, modelDomain, 1, MeshAtt.globalMSize, NULL);
     }
     
     // Set mesh size on surfaces
     std::list< std::list<int>>::iterator itr;
     std::list<double>::iterator itMeshSize;
-    itMeshSize = lsurfaceMSize.begin();
-    for (itr=llsurfaceMSizeFaceId.begin(); itr != llsurfaceMSizeFaceId.end(); itr++)
+    itMeshSize = MeshAtt.lsurfaceMSize.begin();
+    for (itr=MeshAtt.llsurfaceMSizeFaceId.begin(); itr != MeshAtt.llsurfaceMSizeFaceId.end(); itr++)
     {
        double surfaceMSize = *itMeshSize;
        std::list<int>tl=*itr;
@@ -739,8 +476,8 @@ void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, const char*
     }
 
     // Set mesh size on region
-    itMeshSize = lregionMSize.begin();
-    for (itr=llregionMSizeRegionId.begin(); itr != llregionMSizeRegionId.end(); itr++)
+    itMeshSize = MeshAtt.lregionMSize.begin();
+    for (itr=MeshAtt.llregionMSizeRegionId.begin(); itr != MeshAtt.llregionMSizeRegionId.end(); itr++)
     {
        double regionMSize = *itMeshSize;
        std::list<int>tl=*itr;
@@ -753,57 +490,52 @@ void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, const char*
        }
        itMeshSize++;
     }
-    if (gradation>0) {
+    if (MeshAtt.gradation>0) {
        // Set gradation relative
-       logInfo(PMU_rank()) << "Gradation rate =" << gradation;
-       MS_setGlobalSizeGradationRate(meshCase, gradation);
+       logInfo(PMU_rank()) << "Gradation rate =" << MeshAtt.gradation;
+       MS_setGlobalSizeGradationRate(meshCase, MeshAtt.gradation);
     }
-    if (vol_AspectRatio>0) {
+    if (MeshAtt.vol_AspectRatio>0) {
        // Set target equivolume AspectRatio
-       logInfo(PMU_rank()) << "Target equivolume AspectRatio =" << vol_AspectRatio;
-       MS_setVolumeShapeMetric(meshCase, modelDomain, ShapeMetricType_AspectRatio, vol_AspectRatio);
+       logInfo(PMU_rank()) << "Target equivolume AspectRatio =" << MeshAtt.vol_AspectRatio;
+       MS_setVolumeShapeMetric(meshCase, modelDomain, ShapeMetricType_AspectRatio, MeshAtt.vol_AspectRatio);
     }
-    if (area_AspectRatio>0) {
+    if (MeshAtt.area_AspectRatio>0) {
        // Set target equiarea AspectRatio
-       logInfo(PMU_rank()) << "Target equiarea AspectRatio =" << area_AspectRatio;
+       logInfo(PMU_rank()) << "Target equiarea AspectRatio =" << MeshAtt.area_AspectRatio;
        for (int i = 0; i < numFaces; i++) {
            face = GM_entityByTag(model, 2, i + 1);
-           MS_setSurfaceShapeMetric(meshCase, face, ShapeMetricType_AspectRatio, area_AspectRatio);
+           MS_setSurfaceShapeMetric(meshCase, face, ShapeMetricType_AspectRatio, MeshAtt.area_AspectRatio);
        }
     }
-    if (CubeMSize>0.0) {
-       logInfo(PMU_rank()) << "Cube mesh refinement: " <<CubeMSize;
-       logInfo(PMU_rank()) << "Center"<< CubeCenter[0]<<" "<<CubeCenter[1]<<" "<<CubeCenter[2];
-       logInfo(PMU_rank()) << "Width"<< CubeWidth[0]<<" "<<CubeWidth[1]<<" "<<CubeWidth[2];
-       logInfo(PMU_rank()) << "Height"<< CubeHeight[0]<<" "<<CubeHeight[1]<<" "<<CubeHeight[2];
-       logInfo(PMU_rank()) << "Depth"<< CubeDepth[0]<<" "<<CubeDepth[1]<<" "<<CubeDepth[2];
-       MS_addCubeRefinement (meshCase, CubeMSize, &CubeCenter[0], &CubeWidth[0], &CubeHeight[0], &CubeDepth[0]);
+    if (MeshAtt.CubeMSize>0.0) {
+       logInfo(PMU_rank()) << "Cube mesh refinement: " <<MeshAtt.CubeMSize;
+       logInfo(PMU_rank()) << "Center"<< MeshAtt.CubeCenter[0]<<" "<<MeshAtt.CubeCenter[1]<<" "<<MeshAtt.CubeCenter[2];
+       logInfo(PMU_rank()) << "Width"<< MeshAtt.CubeWidth[0]<<" "<<MeshAtt.CubeWidth[1]<<" "<<MeshAtt.CubeWidth[2];
+       logInfo(PMU_rank()) << "Height"<< MeshAtt.CubeHeight[0]<<" "<<MeshAtt.CubeHeight[1]<<" "<<MeshAtt.CubeHeight[2];
+       logInfo(PMU_rank()) << "Depth"<< MeshAtt.CubeDepth[0]<<" "<<MeshAtt.CubeDepth[1]<<" "<<MeshAtt.CubeDepth[2];
+       MS_addCubeRefinement (meshCase, MeshAtt.CubeMSize, &MeshAtt.CubeCenter[0], &MeshAtt.CubeWidth[0], &MeshAtt.CubeHeight[0], &MeshAtt.CubeDepth[0]);
     }
-    if (MeshSizePropagationDistance>0.0) {
+    if (MeshAtt.MeshSizePropagationDistance>0.0) {
        std::list<int>::iterator it;
-       for (it=lFaceIdMeshSizePropagation.begin(); it != lFaceIdMeshSizePropagation.end(); it++)
+       for (it=MeshAtt.lFaceIdMeshSizePropagation.begin(); it != MeshAtt.lFaceIdMeshSizePropagation.end(); it++)
        {
            face = GM_entityByTag(model, 2, *it);
-           logInfo(PMU_rank()) << "MeshSizeProp faceid:"<<*it <<", distance =" << MeshSizePropagationDistance << ", scaling factor =" << MeshSizePropagationScalingFactor;
-           MS_setMeshSizePropagation(meshCase,face,1,MeshSizePropagationDistance,MeshSizePropagationScalingFactor);
+           logInfo(PMU_rank()) << "MeshSizeProp faceid:"<<*it <<", distance =" << MeshAtt.MeshSizePropagationDistance << ", scaling factor =" << MeshAtt.MeshSizePropagationScalingFactor;
+           MS_setMeshSizePropagation(meshCase,face,1,MeshAtt.MeshSizePropagationDistance,MeshAtt.MeshSizePropagationScalingFactor);
        }
     }
-     if (lFaceIdUseDiscreteMesh.size()>0) {
+     if (MeshAtt.lFaceIdUseDiscreteMesh.size()>0) {
        std::list<int>::iterator it;
-       for (it=lFaceIdUseDiscreteMesh.begin(); it != lFaceIdUseDiscreteMesh.end(); it++)
+       for (it=MeshAtt.lFaceIdUseDiscreteMesh.begin(); it != MeshAtt.lFaceIdUseDiscreteMesh.end(); it++)
        {
            face = GM_entityByTag(model, 2, *it);
-           logInfo(PMU_rank()) << "UseDiscreteMesh; faceid, noModification:"<<*it, UseDiscreteMesh_noModification;
-           MS_useDiscreteGeometryMesh(meshCase,face,UseDiscreteMesh_noModification);
+           logInfo(PMU_rank()) << "UseDiscreteMesh; faceid, noModification:"<<*it, MeshAtt.UseDiscreteMesh_noModification;
+           MS_useDiscreteGeometryMesh(meshCase,face,MeshAtt.UseDiscreteMesh_noModification);
            //MS_limitSurfaceMeshModification(meshCase,face,UseDiscreteMesh_noModification);
        }
     } 
-    if (writeSmd>0) {
-	    logInfo(PMU_rank()) << "writing the smd";
-	    GM_setAttManager(model, attMngr);
-	    GM_write(model,"model.smd",0,0); // write out the model before the mesh!
-	    logInfo(PMU_rank()) << "done writing smd";
-    }
+
 }
 
 private:

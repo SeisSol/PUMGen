@@ -19,6 +19,4 @@
 <Height x="20e3" y="0" z="10e3"/>
 <Depth x="0e3" y="2e3" z="0"/>
 </MeshRefinementZoneCube>
-<writeSmd/>
 <UseDiscreteMesh noModification="1">1</UseDiscreteMesh>
-<detectSmallFeatures value="0.5e3"/>
