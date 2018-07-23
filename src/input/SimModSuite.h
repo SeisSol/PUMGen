@@ -72,6 +72,13 @@ private:
 
 	/** Enable Simmetrix logging file */
 	bool m_log;
+        int surfaceSmoothingLevel=2;
+        int surfaceSmoothingType=1;
+        double surfaceFaceRotationLimit=5.0;
+        int surfaceSnap=0;
+        int volumeSmoothingLevel=1;
+        int volumeSmoothingType=1;
+        int VolumeMesherOptimization=1;
 
 public:
 	SimModSuite(const char* modFile, const char* cadFile = 0L,
@@ -382,7 +389,6 @@ meshCase, &meshingOptions);
 private:
 void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, MeshAttributes &MeshAtt, AnalysisAttributes &AnalysisAtt) {
 
-
     logInfo(PMU_rank()) << "Setting cases";
     // ------------------------------ Set boundary conditions ------------------------------
 
@@ -535,7 +541,6 @@ void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, MeshAttribu
            //MS_limitSurfaceMeshModification(meshCase,face,UseDiscreteMesh_noModification);
        }
     } 
-
 }
 
 private:
