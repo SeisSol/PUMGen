@@ -79,7 +79,7 @@ public:
 			const char* meshCaseName = "mesh",
 			const char* analysisCaseName = "analysis",
 			int enforceSize = 0,
-         const char* stl_ParFile=0L,
+         const char* xmlFile=0L,
          const char* export_sxp_file=0L,
          const bool probe_faces=false,
          const bool analyseAR=false,
@@ -121,13 +121,13 @@ public:
       pACase meshCase, analysisCase;
       MeshAttributes MeshAtt;
 
-      if(stl_ParFile != NULL) {
+      if(xmlFile != NULL) {
 
         //Read mesh Attributes from xml file
         int numRegions = GM_numRegions(m_model);
         int numFaces = GM_numFaces(m_model);
-        MeshAtt.init(stl_ParFile, numFaces, numRegions);
-        AnalysisAttributes AnalysisAtt(stl_ParFile, numFaces);
+        MeshAtt.init(xmlFile, numFaces, numRegions);
+        AnalysisAttributes AnalysisAtt(xmlFile, numFaces);
         setCases(m_model, meshCase, analysisCase, MeshAtt, AnalysisAtt);
       } else {
         extractCases(m_model, meshCase, meshCaseName, analysisCase, analysisCaseName);
@@ -145,7 +145,7 @@ public:
 		// create the mesh
 		logInfo(PMU_rank()) << "Starting the surface mesher";
 		pSurfaceMesher surfaceMesher = SurfaceMesher_new(meshCase, m_simMesh);
-                if(stl_ParFile != NULL) {
+                if(xmlFile != NULL) {
                    SurfaceMesher_setSmoothing(surfaceMesher, MeshAtt.surfaceSmoothingLevel);
                    SurfaceMesher_setSmoothType(surfaceMesher, MeshAtt.surfaceSmoothingType);
                    SurfaceMesher_setFaceRotationLimit(surfaceMesher, MeshAtt.surfaceFaceRotationLimit);
@@ -192,7 +192,7 @@ public:
 
 		logInfo(PMU_rank()) << "Starting the volume mesher";
 		pVolumeMesher volumeMesher = VolumeMesher_new(meshCase, m_simMesh);
-                if(stl_ParFile != NULL) {
+                if(xmlFile != NULL) {
                    VolumeMesher_setSmoothing(volumeMesher, MeshAtt.volumeSmoothingLevel);
                    VolumeMesher_setSmoothType(volumeMesher, MeshAtt.volumeSmoothingType);
                    VolumeMesher_setOptimization(volumeMesher,MeshAtt.VolumeMesherOptimization);
