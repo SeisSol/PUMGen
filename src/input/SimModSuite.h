@@ -719,7 +719,7 @@ void probeFaceCoords(pGModel model) {
 
     GFIter modelFaces;
     pGFace modelFace;
-    int ID;
+    int ID, ID2;
     pPList edgeList;  // Edges bounding a face
     pGEdge thisEdge;
     pSimPolygons poly; // tessellation of a face
@@ -735,8 +735,8 @@ void probeFaceCoords(pGModel model) {
         ID = GEN_tag(modelRegion);
         FaceList  =   GR_faces(modelRegion);
         nfaces = PList_size(FaceList);
-
-        logInfo(PMU_rank()) << "There are" << nfaces << "faces on model region" << ID << ":";
+        double vol = GR_volume(modelRegion,0.6);
+        logInfo(PMU_rank()) << "There are" << nfaces << "faces on model region" << ID << ":"<<"volume:"<<vol;
         void *iter = 0; //
         while((modelFace = (pGFace)PList_next(FaceList, &iter)) != 0) {
            ID = GEN_tag(modelFace);
@@ -749,10 +749,20 @@ void probeFaceCoords(pGModel model) {
     while(modelFace=GFIter_next(modelFaces)) { // get the next model face
 
         ID = GEN_tag(modelFace);
+
+        pPList lregion = GF_regions(modelFace);
+        void *iter = 0; //
+        while((modelRegion = (pGRegion)PList_next(lregion, &iter)) != 0) {
+           ID2 = GEN_tag(modelRegion);
+           logInfo(PMU_rank()) << "model face" << ID << ": adjacent region" << ID2;
+        }
+
         poly = GF_displayRep(modelFace);
         int npolys = SimPolygons_numPolys(poly);
         int npolypnts = SimPolygons_numPoints(poly);
         logInfo(PMU_rank()) << "There are" << npolys << "polygons and" << npolypnts << "points on model face" << ID << ", e.g.:";
+
+
 
         int j;
         for (j=0; j<1; j++) { // loop over the polygons
@@ -769,7 +779,8 @@ void probeFaceCoords(pGModel model) {
 
             for (k=0; k<myPoints; k++) {
                 int hasnorm = SimPolygons_pointData(poly, polypoint[k], pntlocation, pntnormal);
-                logInfo(PMU_rank()) << " Point" << polypoint[k] << ": (" << pntlocation[0] << "," << pntlocation[1] << "," << pntlocation[2] << ")";
+                logInfo(PMU_rank()) << " Point" << polypoint[k] << ": (" << pntlocation[0] << "," << pntlocation[1] << "," << pntlocation[2] << ")" << 
+                                      ", normal: (" << pntnormal[0] << "," << pntnormal[1] << "," << pntnormal[2] << ")";
             }
         }
         SimPolygons_delete(poly); // cleanup
