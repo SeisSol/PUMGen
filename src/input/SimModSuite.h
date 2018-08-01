@@ -586,6 +586,36 @@ void loadSTL(const char *filename){
 
     m_model = d_model;
 
+    //detect small features
+    double detectSmallFeaturesThreshold=200;
+    pSmallFeatureInfo smallFeats = GM_detectSmallFeatures(m_model,1,detectSmallFeaturesThreshold,0,0,0);
+    pPList lsmallFeats=GM_getSmallFeatures(smallFeats);
+    logInfo(PMU_rank()) << "Number of small features returned: " <<PList_size(lsmallFeats);
+
+    pGEntity ent;
+    void *iter = 0; // must initialize to 0
+    while(ent = (pGEntity)PList_next(lsmallFeats,&iter)){
+      printf("Entity of type %d and tag %d marked as a small feature\n",GEN_type(ent),GEN_tag(ent));
+      // check if it is a face
+      if(GEN_type(ent) == 2) {
+        pGFace myface = (pGFace)ent;
+        printf("face area: %f\n",GF_area(myface,0.0));
+        //now list vertices
+        pPList vertices = GF_vertices(myface);
+        pGVertex vert;
+        void *iter2 = 0; // must initialize to 0
+        double * xyz;
+        while(vert = (pGVertex)PList_next(vertices,&iter2)){
+           GV_point(vert, xyz);
+           printf("vertices: (%g,%g,%g\n", xyz[0],xyz[1],xyz[2]);
+        }
+        PList_delete(vertices);
+      }
+    }
+    PList_delete(lsmallFeats);
+
+
+
     // Since we told the Discrete model to use the input mesh, we release our
     // pointer to it.  It will be fully released when the Discrete model is released.
     M_release(mesh);
