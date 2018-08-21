@@ -69,6 +69,7 @@ public:
 			const char* logFile = 0L)
 	{
 		// Init SimModSuite
+		SimModel_start();
 		SimPartitionedMesh_start(0L, 0L);
 		if (logFile) {
 			m_log = true;
@@ -112,15 +113,18 @@ public:
 		pAManager attMngr = SModel_attManager(m_model);
 
 		MeshingOptions meshingOptions;
+		pACase meshCaseFile = extractCase(attMngr, meshCaseName);
+		AttCase_associate(meshCaseFile, NULL);
 		pACase meshCase = MS_newMeshCase(m_model);
-		MS_processSimModelerMeshingAtts(extractCase(attMngr, meshCaseName),
-				meshCase, &meshingOptions);
+		MS_processSimModelerMeshingAtts(meshCaseFile, meshCase, &meshingOptions);
+		AttCase_setModel(meshCase, m_model);
 
 		pACase analysisCase = extractCase(attMngr, analysisCaseName);
 		pPList children = AttNode_children(analysisCase);
 		void* iter = 0L;
-		while (pANode child = static_cast<pANode>(PList_next(children, &iter)))
+		while (pANode child = static_cast<pANode>(PList_next(children, &iter))) {
 			AttCase_setModel(static_cast<pACase>(child), m_model);
+    }
 		PList_delete(children);
 
 		if (nativeModel)
@@ -229,6 +233,7 @@ public:
 		if (m_log)
 			Sim_logOff();
 		SimPartitionedMesh_stop();
+		SimModel_stop();
 	}
 
 private:
