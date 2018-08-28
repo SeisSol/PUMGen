@@ -308,13 +308,20 @@ private:
 	 */
 	static unsigned int parseBoundary(const char* boundaryCondition)
 	{
-                //check if boundaryCondition starts with pattern
-                std::string pattern="BC";
-                std::string sboundaryCondition(boundaryCondition,11);
-                if (sboundaryCondition.find(pattern) == 0) {
-                        std::string sNumber=sboundaryCondition.substr(pattern.length());
-	                return stoi(sNumber);
-                }
+      if (strcmp(boundaryCondition, "freeSurface") == 0)
+         return 1;
+      if (strcmp(boundaryCondition, "dynamicRupture") == 0)
+         return 3;
+      if (strcmp(boundaryCondition, "absorbing") == 0)
+         return 5;
+
+      //check if boundaryCondition starts with pattern
+      std::string pattern="BC";
+      std::string sboundaryCondition(boundaryCondition,11);
+      if (sboundaryCondition.find(pattern) == 0) {
+         std::string sNumber=sboundaryCondition.substr(pattern.length());
+         return stoi(sNumber);
+      }
 		logError() << "Unknown boundary condition" << boundaryCondition;
 		return -1;
 	}
