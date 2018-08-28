@@ -154,6 +154,7 @@ public:
 		progressBar.setTotal(26);
 		SurfaceMesher_execute(surfaceMesher, prog);
 		SurfaceMesher_delete(surfaceMesher);
+#ifdef BeforeSim11
       if(export_sxp_file != NULL) {
           SimExport_start();
 
@@ -185,6 +186,7 @@ public:
 
          exit(0);
       }
+#endif
 
 		//if (!nativeModel)
 			// Discrete model
@@ -504,7 +506,11 @@ void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, MeshAttribu
        logInfo(PMU_rank()) << "Target equiarea AspectRatio =" << MeshAtt.area_AspectRatio;
        for (int i = 0; i < numFaces; i++) {
            face = GM_entityByTag(model, 2, i + 1);
+#ifdef BeforeSim11
            MS_setSurfaceShapeMetric(meshCase, face, ShapeMetricType_AspectRatio, MeshAtt.area_AspectRatio);
+#else
+           MS_setSurfaceShapeMetric(meshCase, face, ShapeMetricType_AspectRatio, ElementType_Triangle ,MeshAtt.area_AspectRatio);
+#endif
        }
     }
     if (MeshAtt.CubeMSize>0.0) {

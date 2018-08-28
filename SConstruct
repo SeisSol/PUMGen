@@ -44,6 +44,10 @@ vars.AddVariables(
 		False,
 	),
 
+	BoolVariable( 'BeforeSim11', 'compile using simModeler up to 11 (enables  Mesh_Export and change call in setSurfaceShapeMetric)',
+		False,
+	),
+
 	BoolVariable( 'simModSuite', 'compile with support for simModSuite from Simmetrix',
 		False
 	),
@@ -142,6 +146,9 @@ if env['use_netcdf']:
 env['use_simmodsuite'] = libs.find(env, 'simmodsuite', required=env['simModSuite'], mpiLib=env['mpiLib'])
 if env['use_simmodsuite']:
 	env.Append(CPPDEFINES=['USE_SIMMOD'])
+
+if env['BeforeSim11']:
+   env.Append(CPPDEFINES=['BeforeSim11'])
 
 # get the source files
 env.sourceFiles = []
