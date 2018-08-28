@@ -371,8 +371,11 @@ void extractCases(pGModel m_model, pACase &meshCase, const char *meshCaseName, p
 
     MeshingOptions meshingOptions;
     meshCase = MS_newMeshCase(m_model);
-    MS_processSimModelerMeshingAtts(extractCase(attMngr, meshCaseName),
-meshCase, &meshingOptions); 
+
+    pACase meshCaseFile = extractCase(attMngr, meshCaseName);
+    AttCase_associate(meshCaseFile, NULL);
+    MS_processSimModelerMeshingAtts(meshCaseFile, meshCase, &meshingOptions);
+    AttCase_setModel(meshCase, m_model);
 
     analysisCase = extractCase(attMngr, analysisCaseName);
     pPList children = AttNode_children(analysisCase);
