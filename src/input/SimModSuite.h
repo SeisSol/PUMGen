@@ -614,6 +614,10 @@ void loadSTL(const char *filename){
     }
     PList_delete(lsmallFeats);
 
+    GM_write(m_model,"model.smd",0,0); // write out the model before the mesh!
+    logInfo(PMU_rank()) << "done writing model.smd";
+
+
 
 
     // Since we told the Discrete model to use the input mesh, we release our
