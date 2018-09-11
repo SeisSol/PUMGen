@@ -514,14 +514,11 @@ void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, MeshAttribu
     if (MeshAtt.area_AspectRatio>0) {
        // Set target equiarea AspectRatio
        logInfo(PMU_rank()) << "Target equiarea AspectRatio =" << MeshAtt.area_AspectRatio;
-       for (int i = 0; i < numFaces; i++) {
-           face = GM_entityByTag(model, 2, i + 1);
 #ifdef BeforeSim11
-           MS_setSurfaceShapeMetric(meshCase, face, ShapeMetricType_AspectRatio, MeshAtt.area_AspectRatio);
+       MS_setSurfaceShapeMetric(meshCase, modelDomain, ShapeMetricType_AspectRatio, MeshAtt.area_AspectRatio);
 #else
-           MS_setSurfaceShapeMetric(meshCase, face, ShapeMetricType_AspectRatio, ElementType_Triangle ,MeshAtt.area_AspectRatio);
+       MS_setSurfaceShapeMetric(meshCase, modelDomain, ShapeMetricType_AspectRatio, ElementType_Triangle ,MeshAtt.area_AspectRatio);
 #endif
-       }
     }
     if (MeshAtt.CubeMSize>0.0) {
        logInfo(PMU_rank()) << "Cube mesh refinement: " <<MeshAtt.CubeMSize;
