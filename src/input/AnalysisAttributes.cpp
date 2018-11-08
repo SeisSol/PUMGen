@@ -64,7 +64,7 @@ void AnalysisAttributes::set_BoundaryConditions() {
           sval = child->Attribute("tag");
           int faultTag =  atoi(sval.c_str());
           std::vector<std::string> tokens;
-          line =  pRoot-> GetText();
+          line =  child-> GetText();
           split(tokens, line, ',');
           for(int i = 0; i < tokens.size(); i++) {
               faceBound[std::atoi(tokens[i].c_str())-1] = faultTag;
