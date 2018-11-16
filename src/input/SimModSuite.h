@@ -520,14 +520,21 @@ void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, MeshAttribu
        MS_setSurfaceShapeMetric(meshCase, modelDomain, ShapeMetricType_AspectRatio, ElementType_Triangle ,MeshAtt.area_AspectRatio);
 #endif
     }
-    if (MeshAtt.CubeMSize>0.0) {
-       logInfo(PMU_rank()) << "Cube mesh refinement: " <<MeshAtt.CubeMSize;
-       logInfo(PMU_rank()) << "Center"<< MeshAtt.CubeCenter[0]<<" "<<MeshAtt.CubeCenter[1]<<" "<<MeshAtt.CubeCenter[2];
-       logInfo(PMU_rank()) << "Width"<< MeshAtt.CubeWidth[0]<<" "<<MeshAtt.CubeWidth[1]<<" "<<MeshAtt.CubeWidth[2];
-       logInfo(PMU_rank()) << "Height"<< MeshAtt.CubeHeight[0]<<" "<<MeshAtt.CubeHeight[1]<<" "<<MeshAtt.CubeHeight[2];
-       logInfo(PMU_rank()) << "Depth"<< MeshAtt.CubeDepth[0]<<" "<<MeshAtt.CubeDepth[1]<<" "<<MeshAtt.CubeDepth[2];
-       MS_addCubeRefinement (meshCase, MeshAtt.CubeMSize, &MeshAtt.CubeCenter[0], &MeshAtt.CubeWidth[0], &MeshAtt.CubeHeight[0], &MeshAtt.CubeDepth[0]);
+     if (MeshAtt.lCube.size()>0) {
+       std::list<Cube>::iterator it;
+       Cube mycube;
+       for (it=MeshAtt.lCube.begin(); it != MeshAtt.lCube.end(); it++)
+       {
+          mycube = *it;
+          logInfo(PMU_rank()) << "Cube mesh refinement: " <<mycube.CubeMSize;
+          logInfo(PMU_rank()) << "Center"<< mycube.CubeCenter[0]<<" "<<mycube.CubeCenter[1]<<" "<<mycube.CubeCenter[2];
+          logInfo(PMU_rank()) << "Width"<< mycube.CubeWidth[0]<<" "<<mycube.CubeWidth[1]<<" "<<mycube.CubeWidth[2];
+          logInfo(PMU_rank()) << "Height"<< mycube.CubeHeight[0]<<" "<<mycube.CubeHeight[1]<<" "<<mycube.CubeHeight[2];
+          logInfo(PMU_rank()) << "Depth"<< mycube.CubeDepth[0]<<" "<<mycube.CubeDepth[1]<<" "<<mycube.CubeDepth[2];
+          MS_addCubeRefinement (meshCase, mycube.CubeMSize, &mycube.CubeCenter[0], &mycube.CubeWidth[0], &mycube.CubeHeight[0], &mycube.CubeDepth[0]);
+       }
     }
+
     if (MeshAtt.MeshSizePropagationDistance>0.0) {
        std::list<int>::iterator it;
        for (it=MeshAtt.lFaceIdMeshSizePropagation.begin(); it != MeshAtt.lFaceIdMeshSizePropagation.end(); it++)

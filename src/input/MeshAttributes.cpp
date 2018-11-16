@@ -40,46 +40,48 @@ void MeshAttributes::readXmlFile(const char* xmlFilename) {
 void MeshAttributes::set_MeshRefinementZoneCube() {
     std::string sval;
     XMLElement* child;
-    XMLElement* pRoot;
-    pRoot = doc.FirstChildElement("MeshRefinementZoneCube");
-    if(pRoot) {
-       sval = pRoot->Attribute("value");
-       CubeMSize =  atof(sval.c_str());
+    XMLElement* child2;
+    child = doc.FirstChildElement("MeshRefinementZoneCube");
+    Cube mycube;
+    for (child; child; child = child->NextSiblingElement("MeshRefinementZoneCube"))
+       {
+       sval = child->Attribute("value");
+       mycube.CubeMSize =  atof(sval.c_str());
 
-       child = pRoot->FirstChildElement("Center");
-       sval = child->Attribute("x");
-       CubeCenter[0] =  atof(sval.c_str());
-       sval = child->Attribute("y");
-       CubeCenter[1] =  atof(sval.c_str());
-       sval = child->Attribute("z");
-       CubeCenter[2] =  atof(sval.c_str());
+       child2 = child->FirstChildElement("Center");
+       sval = child2->Attribute("x");
+       mycube.CubeCenter[0] =  atof(sval.c_str());
+       sval = child2->Attribute("y");
+       mycube.CubeCenter[1] =  atof(sval.c_str());
+       sval = child2->Attribute("z");
+       mycube.CubeCenter[2] =  atof(sval.c_str());
 
-       child = pRoot->FirstChildElement("Width");
-       sval = child->Attribute("x");
-       CubeWidth[0] =  atof(sval.c_str());
-       sval = child->Attribute("y");
-       CubeWidth[1] =  atof(sval.c_str());
-       sval = child->Attribute("z");
-       CubeWidth[2] =  atof(sval.c_str());
+       child2 = child->FirstChildElement("Width");
+       sval = child2->Attribute("x");
+       mycube.CubeWidth[0] =  atof(sval.c_str());
+       sval = child2->Attribute("y");
+       mycube.CubeWidth[1] =  atof(sval.c_str());
+       sval = child2->Attribute("z");
+       mycube.CubeWidth[2] =  atof(sval.c_str());
 
-       child = pRoot->FirstChildElement("Height");
-       sval = child->Attribute("x");
-       CubeHeight[0] =  atof(sval.c_str());
-       sval = child->Attribute("y");
-       CubeHeight[1] =  atof(sval.c_str());
-       sval = child->Attribute("z");
-       CubeHeight[2] =  atof(sval.c_str());
+       child2 = child->FirstChildElement("Height");
+       sval = child2->Attribute("x");
+       mycube.CubeHeight[0] =  atof(sval.c_str());
+       sval = child2->Attribute("y");
+       mycube.CubeHeight[1] =  atof(sval.c_str());
+       sval = child2->Attribute("z");
+       mycube.CubeHeight[2] =  atof(sval.c_str());
 
-       child = pRoot->FirstChildElement("Depth");
-       sval = child->Attribute("x");
-       CubeDepth[0] =  atof(sval.c_str());
-       sval = child->Attribute("y");
-       CubeDepth[1] =  atof(sval.c_str());
-       sval = child->Attribute("z");
-       CubeDepth[2] =  atof(sval.c_str());
+       child2 = child->FirstChildElement("Depth");
+       sval = child2->Attribute("x");
+       mycube.CubeDepth[0] =  atof(sval.c_str());
+       sval = child2->Attribute("y");
+       mycube.CubeDepth[1] =  atof(sval.c_str());
+       sval = child2->Attribute("z");
+       mycube.CubeDepth[2] =  atof(sval.c_str());
+       lCube.push_back(mycube);
     }
 }
-
 
 
 void MeshAttributes::set_SurfaceMeshingAttributes() {

@@ -23,6 +23,9 @@
 //for PMU_rank()
 #include <SimPartitionedMesh.h>
 
+struct Cube {
+  double CubeMSize=0,CubeCenter[3],CubeWidth[3],CubeHeight[3],CubeDepth[3];
+};
 
 using namespace tinyxml2;
 class MeshAttributes {
@@ -39,7 +42,7 @@ class MeshAttributes {
     std::list <std::list<int>> llsurfaceMSizeFaceId;
     std::list<double> lregionMSize;
     std::list <std::list<int>> llregionMSizeRegionId;
-    double CubeMSize=0,CubeCenter[3],CubeWidth[3],CubeHeight[3],CubeDepth[3];
+    std::list<Cube> lCube;
     std::list<int> lFaceIdMeshSizePropagation;
     std::list<int> lFaceIdUseDiscreteMesh;
     int UseDiscreteMesh_noModification;
