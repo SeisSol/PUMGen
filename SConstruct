@@ -136,6 +136,7 @@ env.Append(CPPPATH=['#/submodules'])
 
 # APF (one of the Zoltan functions is required)
 libs.find(env, 'apf', simmetrix=env['simModSuite'], zoltan=True)
+env.Tool('Hdf5Tool', required=True, parallel=True)
 
 # netCDF
 env['use_netcdf'] = libs.find(env, 'netcdf', required=env['netcdf'], parallel=True)
