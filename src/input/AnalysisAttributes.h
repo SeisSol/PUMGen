@@ -26,7 +26,7 @@ using namespace tinyxml2;
 class AnalysisAttributes {
   public:
     std::map<int, int> faceBound;
-    AnalysisAttributes(const char* xmlFilename, int numFaces);
+    AnalysisAttributes(const char* xmlFilename);
   private:
     XMLDocument doc;
     void readXmlFile(const char* xmlFilename);
