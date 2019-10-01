@@ -124,9 +124,8 @@ public:
       if(xmlFile != NULL) {
 
         //Read mesh Attributes from xml file
-        int numRegions = GM_numRegions(m_model);
         int numFaces = GM_numFaces(m_model);
-        MeshAtt.init(xmlFile, numFaces, numRegions);
+        MeshAtt.init(xmlFile);
         AnalysisAttributes AnalysisAtt(xmlFile, numFaces);
         setCases(m_model, meshCase, analysisCase, MeshAtt, AnalysisAtt);
       } else {
