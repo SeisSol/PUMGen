@@ -124,9 +124,8 @@ public:
       if(xmlFile != NULL) {
 
         //Read mesh Attributes from xml file
-        int numFaces = GM_numFaces(m_model);
         MeshAtt.init(xmlFile);
-        AnalysisAttributes AnalysisAtt(xmlFile, numFaces);
+        AnalysisAttributes AnalysisAtt(xmlFile);
         setCases(m_model, meshCase, analysisCase, MeshAtt, AnalysisAtt);
       } else {
         extractCases(m_model, meshCase, meshCaseName, analysisCase, analysisCaseName);
@@ -391,6 +390,17 @@ void extractCases(pGModel m_model, pACase &meshCase, const char *meshCaseName, p
     PList_delete(children);
 }
 private:
+
+//source: https://stackoverflow.com/questions/4195611/getting-a-list-of-values-from-a-map
+typedef std::map<int, int> MyMap;
+struct get_second : public std::unary_function<MyMap::value_type, int>
+{
+    int operator()(const MyMap::value_type& value) const
+    {
+        return value.second;
+    }
+};
+
 void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, MeshAttributes &MeshAtt, AnalysisAttributes &AnalysisAtt) {
 
     logInfo(PMU_rank()) << "Setting cases";
@@ -414,13 +424,18 @@ void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, MeshAttribu
 
 
     //With this code we can tag any BC, not only 1,3,5
-    int numFaces = GM_numFaces(model);
-    std::set<int> UniquefaceBound(AnalysisAtt.faceBound, AnalysisAtt.faceBound + numFaces);
+    //faceBound is a dictionnary faceBound[face id] = boundary id
+    //my_BC list all values in faceBound maps (e.g. 1, 1, 3, 5, 5...)
+    std::vector<int> my_BC;
+    transform(AnalysisAtt.faceBound.begin(), AnalysisAtt.faceBound.end(), back_inserter(my_BC), get_second() );
+    //list all unique boundary id 
+    std::set<int> UniquefaceBound(my_BC.begin(), my_BC.end());
     int numBC = UniquefaceBound.size();
     pAttInfoVoid iBC[numBC];
     pModelAssoc aBC[numBC];
     std::set<int>::iterator it = UniquefaceBound.begin();
 
+    //Lookup table: LUT[ boundary id] = id_BC (from 0 to numBC)
     std::map<int,int> LUT;
 
     for (int i = 0; i < numBC; i++) {
@@ -428,7 +443,6 @@ void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, MeshAttribu
        char buff[100];
        snprintf(buff, sizeof(buff), "%09d", (*it));
        std::string sNumber = buff;
-       //std::string sNumber = std::to_string((*it));
        LUT[(*it)]=i;
        it++;
        iBC[i] = AMAN_newAttInfoVoid(attMngr,"BC","boundaryCondition");
@@ -439,10 +453,11 @@ void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, MeshAttribu
     }
 
     pGEntity face;
-    for (int i = 0; i < numFaces; i++) {
-        // Get the face
-        face = GM_entityByTag(model, 2, i + 1);
-
+    GFIter modelFaces = GM_faceIter(model);  // initialize the iterator
+    pGFace modelFace;
+    while(modelFace=GFIter_next(modelFaces)){ // get next face
+       int i = GEN_tag(modelFace)-1;
+       face = GM_entityByTag(model, 2, i+1);
         // Add the face to the model association. Note that we passed
         // the Attribute Information Node into the Model Association
         // at the time when the Model Association was created. That prepares
@@ -454,6 +469,8 @@ void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, MeshAttribu
            AMA_addGEntity(aBC[index],face);
         }
     }
+    GFIter_delete(modelFaces);
+
 
     // ------------------------------ Set meshing parameters ------------------------------
 

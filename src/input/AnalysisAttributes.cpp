@@ -12,10 +12,8 @@
 
 #include "AnalysisAttributes.h"
 
-AnalysisAttributes::AnalysisAttributes(const char* xmlFilename, int numFaces) {
+AnalysisAttributes::AnalysisAttributes(const char* xmlFilename) {
     readXmlFile(xmlFilename);
-    faceBound = new int[numFaces];
-    std::fill_n(faceBound, numFaces, 0);
     set_BoundaryConditions();
 }
 

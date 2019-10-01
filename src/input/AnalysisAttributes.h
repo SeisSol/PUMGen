@@ -16,16 +16,16 @@
 #include "tinyxml2/tinyxml2.h"
 #include <string>
 #include <list>
+#include <map>
 #include "utils/logger.h"
 #include "split.h"
-
 
 
 
 using namespace tinyxml2;
 class AnalysisAttributes {
   public:
-    int * faceBound;
+    std::map<int, int> faceBound;
     AnalysisAttributes(const char* xmlFilename, int numFaces);
   private:
     XMLDocument doc;
