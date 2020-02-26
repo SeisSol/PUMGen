@@ -18,7 +18,7 @@ find_path(LION_INCLUDE_DIR lionCompress.h)
 find_path(MTH_INCLUDE_DIR mth.h)
 find_path(APF_ZOLTAN_INCLUDE_DIR apfZoltan.h)
 
-list(APPEND APF_INCLUDE_DIR
+set(APF_INCLUDE_DIR
   ${GMI_INCLUDE_DIR}
   ${MDS_INCLUDE_DIR}
   ${MA_INCLUDE_DIR}
@@ -38,7 +38,7 @@ find_library(LION_LIB lion)
 find_library(MTH_LIB mth)
 find_library(APF_ZOLTAN_LIB apf_zoltan)
 
-list(APPEND APF_LIBRARIES
+set(APF_LIBRARIES
   ${GMI_LIB}
   ${MDS_LIB}
   ${MA_LIB}

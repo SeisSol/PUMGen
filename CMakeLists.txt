@@ -2,6 +2,11 @@ cmake_minimum_required(VERSION 3.9)
 
 project(pumgen LANGUAGES C CXX)
 
+option(SIMMETRIX "Use simmetrix libraries" OFF)
+option(NETCDF "Use netcdf" OFF)
+set(LOG_LEVEL "info" CACHE STRING "Log level for the code")
+set_property(CACHE LOG_LEVEL PROPERTY STRINGS "debug" "info" "warning" "error")
+
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 
 set(CMAKE_CXX_STANDARD 11)
@@ -14,29 +19,27 @@ if(NOT CMAKE_BUILD_TYPE)
   message(STATUS "Set build type to Release as none was supplied.")
 endif()
 
-
 add_executable(pumgen
-  src/input/NetCDFPartition.cpp
   src/input/ParallelVertexFilter.cpp
-  #src/input/SimModSuite.cpp
   src/pumgen.cpp
   src/meshreader/GambitReader.cpp
   src/meshreader/FidapReader.cpp
 )
 
 target_include_directories(pumgen PUBLIC src
-  "${CMAKE_CURRENT_SOURCE_DIR}/src" # SeisSol :(
+  "${CMAKE_CURRENT_SOURCE_DIR}/src"
   "${CMAKE_CURRENT_SOURCE_DIR}/submodules/"
 )
 
-find_package(NetCDF REQUIRED)
-target_include_directories(pumgen PUBLIC ${NetCDF_INCLUDE_DIRS})
-target_link_libraries(pumgen PUBLIC ${NetCDF_LIBRARY})
-target_compile_definitions(pumgen PUBLIC USE_NETCDF)
+if (NETCDF)
+  find_package(NetCDF REQUIRED)
+  target_sources(pumgen PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src/input/NetCDFPartition.cpp)
+  target_include_directories(pumgen PUBLIC ${NetCDF_INCLUDE_DIRS})
+  target_link_libraries(pumgen PUBLIC ${NetCDF_LIBRARY})
+  target_compile_definitions(pumgen PUBLIC USE_NETCDF)
+endif()
 
-#if (MPI)
-    set(HDF5_PREFER_PARALLEL True)
-#endif()
+set(HDF5_PREFER_PARALLEL True)
 find_package(HDF5 REQUIRED COMPONENTS C HL)
 target_include_directories(pumgen PUBLIC ${HDF5_INCLUDE_DIRS})
 target_link_libraries(pumgen PUBLIC ${HDF5_C_HL_LIBRARIES} ${HDF5_C_LIBRARIES})
@@ -45,18 +48,39 @@ target_compile_definitions(pumgen PUBLIC USE_HDF)
 
 find_package(OpenMP REQUIRED)
 target_link_libraries(pumgen PUBLIC OpenMP::OpenMP_CXX)
-#set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} ${OpenMP_Fortran_FLAGS}")
-#target_compile_definitions(pumgen PUBLIC OMP OMPI_SKIP_MPICXX)
 
 find_package(MPI REQUIRED)
-
 target_include_directories(pumgen SYSTEM PUBLIC ${MPI_CXX_INCLUDE_PATH})
 target_link_libraries(pumgen PUBLIC MPI::MPI_C)
 
 #target_compile_definitions(pumgen PUBLIC USE_MPI PARALLEL)
 
 find_package(Apf REQUIRED)
-message(${APF_INCLUDE_DIR})
-message(${APF_LIBRARIES})
 target_include_directories(pumgen PUBLIC ${APF_INCLUDE_DIR})
 target_link_libraries(pumgen PUBLIC ${APF_LIBRARIES})
+
+if (SIMMETRIX)
+    find_package(Simmetrix REQUIRED)
+    target_sources(pumgen PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src/input/SimModSuite.cpp)
+    target_compile_definitions(pumgen PUBLIC USE_SIMMOD)
+    target_include_directories(pumgen PUBLIC ${SIMMETRIX_INCLUDE_DIR})
+    target_link_libraries(pumgen PUBLIC ${SIMMETRIX_LIBRARIES})
+endif()
+
+function(cast_log_level_to_int log_level_str log_level_int)
+  if (${log_level_str} STREQUAL "debug")
+    set(${log_level_int} 3 PARENT_SCOPE)
+  elseif (${log_level_str} STREQUAL "info")
+    set(${log_level_int} 2 PARENT_SCOPE)
+  elseif (${log_level_str} STREQUAL "warning")
+    set(${log_level_int} 1 PARENT_SCOPE)
+  elseif (${log_level_str} STREQUAL "error")
+    set(${log_level_int} 0 PARENT_SCOPE)
+  endif()
+endfunction()
+
+cast_log_level_to_int(LOG_LEVEL LOG_LEVEL)
+target_compile_definitions(pumgen PUBLIC LOG_LEVEL=${LOG_LEVEL})
+
+set_target_properties(pumgen PROPERTIES INSTALL_RPATH ${SIM_PS_KRNL_LIB_DIR})
+install(TARGETS pumgen DESTINATION ${CMAKE_INSTALL_BINDIR})
