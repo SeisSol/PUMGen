@@ -16,6 +16,8 @@
 #include "tinyxml2/tinyxml2.h"
 #include <string>
 #include <list>
+#include <vector>
+#include <utility>
 #include "utils/logger.h"
 #include "split.h"
 
@@ -25,7 +27,7 @@
 using namespace tinyxml2;
 class AnalysisAttributes {
   public:
-    int * faceBound;
+    std::vector<std::pair<int, int>> faceBound;
     AnalysisAttributes(const char* xmlFilename, int numFaces);
   private:
     XMLDocument doc;

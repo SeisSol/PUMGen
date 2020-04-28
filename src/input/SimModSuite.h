@@ -79,10 +79,10 @@ public:
 			const char* meshCaseName = "mesh",
 			const char* analysisCaseName = "analysis",
 			int enforceSize = 0,
-         const char* xmlFile=0L,
-         const char* export_sxp_file=0L,
-         const bool probe_faces=false,
-         const bool analyseAR=false,
+                        const char* xmlFile=0L,
+                        const char* export_sxp_file=0L,
+                        const bool probe_faces=false,
+                        const bool analyseAR=false,
 			const char* logFile = 0L)
 	{
 		// Init SimModSuite
@@ -101,37 +101,36 @@ public:
 		// Load CAD
 		logInfo(PMU_rank()) << "Loading model";
 
-      std::string smodFile = modFile;
-      if (cadFile!=0L) {
-         loadCAD(modFile, cadFile);
-      } else if(smodFile.substr(smodFile.find_last_of(".") + 1) == "smd") {
-         loadCAD(modFile, cadFile);
-      } else {
-         loadSTL(modFile);
-      }
+                std::string smodFile = modFile;
+                if (cadFile!=0L) {
+                  loadCAD(modFile, cadFile);
+                } else if(smodFile.substr(smodFile.find_last_of(".") + 1) == "smd") {
+                  loadCAD(modFile, cadFile);
+                } else {
+                  loadSTL(modFile);
+                }
 
 
-      // Probe faces
-      if(probe_faces) {
-         probeFaceCoords(m_model);
-      }
+                // Probe faces
+                if(probe_faces) {
+                  probeFaceCoords(m_model);
+                }
 
-      // Extract cases
-      logInfo(PMU_rank()) << "Extracting cases";
-      pACase meshCase, analysisCase;
-      MeshAttributes MeshAtt;
+                // Extract cases
+                logInfo(PMU_rank()) << "Extracting cases";
+                pACase meshCase, analysisCase;
+                MeshAttributes MeshAtt;
 
-      if(xmlFile != NULL) {
+                if(xmlFile != NULL) {
 
-        //Read mesh Attributes from xml file
-        int numRegions = GM_numRegions(m_model);
-        int numFaces = GM_numFaces(m_model);
-        MeshAtt.init(xmlFile, numFaces, numRegions);
-        AnalysisAttributes AnalysisAtt(xmlFile, numFaces);
-        setCases(m_model, meshCase, analysisCase, MeshAtt, AnalysisAtt);
-      } else {
-        extractCases(m_model, meshCase, meshCaseName, analysisCase, analysisCaseName);
-      }
+                  //Read mesh Attributes from xml file
+                  int numFaces = GM_numFaces(m_model);
+                  MeshAtt.init(xmlFile);
+                  AnalysisAttributes AnalysisAtt(xmlFile, numFaces);
+                  setCases(m_model, meshCase, analysisCase, MeshAtt, AnalysisAtt);
+                } else {
+                  extractCases(m_model, meshCase, meshCaseName, analysisCase, analysisCaseName);
+                }
 
 		//if (nativeModel)
 			m_simMesh = PM_new(0, m_model, PMU_size());
@@ -287,6 +286,7 @@ public:
 		if (m_log)
 			Sim_logOff();
 		SimPartitionedMesh_stop();
+		SimModel_stop();
 	}
 
 private:
@@ -416,7 +416,10 @@ void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, MeshAttribu
 
     //With this code we can tag any BC, not only 1,3,5
     int numFaces = GM_numFaces(model);
-    std::set<int> UniquefaceBound(AnalysisAtt.faceBound, AnalysisAtt.faceBound + numFaces);
+    std::set<int> UniquefaceBound;
+    for (auto const& f : AnalysisAtt.faceBound) {
+      UniquefaceBound.insert(f.second);
+    }
     int numBC = UniquefaceBound.size();
     pAttInfoVoid iBC[numBC];
     pModelAssoc aBC[numBC];
@@ -440,18 +443,18 @@ void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, MeshAttribu
     }
 
     pGEntity face;
-    for (int i = 0; i < numFaces; i++) {
+    for (auto const& f : AnalysisAtt.faceBound) {
         // Get the face
-        face = GM_entityByTag(model, 2, i + 1);
+        face = GM_entityByTag(model, 2, f.first + 1);
 
         // Add the face to the model association. Note that we passed
         // the Attribute Information Node into the Model Association
         // at the time when the Model Association was created. That prepares
         // the creation of the AttributeVoid on the face as soon as the
         // association process is started
-        if (AnalysisAtt.faceBound[i]!=0) {
-           logInfo(PMU_rank()) << "faceBound[" << i + 1 <<"] =" << AnalysisAtt.faceBound[i];
-           int index = LUT[AnalysisAtt.faceBound[i]];
+        if (f.second!=0) {
+           logInfo(PMU_rank()) << "faceBound[" << f.first + 1 <<"] =" << f.second;
+           int index = LUT[f.second];
            AMA_addGEntity(aBC[index],face);
         }
     }
@@ -541,7 +544,7 @@ void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, MeshAttribu
        {
            face = GM_entityByTag(model, 2, *it);
            logInfo(PMU_rank()) << "MeshSizeProp faceid:"<<*it <<", distance =" << MeshAtt.MeshSizePropagationDistance << ", scaling factor =" << MeshAtt.MeshSizePropagationScalingFactor;
-           MS_setMeshSizePropagation(meshCase,face,1,MeshAtt.MeshSizePropagationDistance,MeshAtt.MeshSizePropagationScalingFactor);
+           MS_setMeshSizePropagation(meshCase,face,2,1,MeshAtt.MeshSizePropagationDistance,MeshAtt.MeshSizePropagationScalingFactor);
        }
     }
      if (MeshAtt.lFaceIdUseDiscreteMesh.size()>0) {

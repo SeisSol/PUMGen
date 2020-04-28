@@ -12,19 +12,19 @@
 
 #include "MeshAttributes.h"
 
-MeshAttributes::MeshAttributes(const char* xmlFilename, int numFaces, int numRegions) {
-    init(xmlFilename, numFaces, numRegions);
+MeshAttributes::MeshAttributes(const char* xmlFilename) {
+    init(xmlFilename);
 }
 
-void MeshAttributes::init(const char* xmlFilename, int numFaces, int numRegions) {
+void MeshAttributes::init(const char* xmlFilename) {
     readXmlFile(xmlFilename);
     set_MeshRefinementZoneCube ();
     set_SurfaceMeshingAttributes();
     set_VolumeMeshingAttributes();
-    set_UseDiscreteMesh(numFaces);
-    set_surfaceMSize(numFaces);
-    set_MeshSizePropagation(numFaces);
-    set_regionMSize(numRegions);
+    set_UseDiscreteMesh();
+    set_surfaceMSize();
+    set_MeshSizePropagation();
+    set_regionMSize();
     set_gradation();
     set_globalMSize();
     set_area_AspectRatio();
@@ -130,7 +130,7 @@ void MeshAttributes::set_VolumeMeshingAttributes() {
     }
 }
 
-void MeshAttributes::set_UseDiscreteMesh(int numFaces) {
+void MeshAttributes::set_UseDiscreteMesh() {
     std::string line,sval;
     XMLElement* pRoot;
     pRoot = doc.FirstChildElement("UseDiscreteMesh");
@@ -142,13 +142,12 @@ void MeshAttributes::set_UseDiscreteMesh(int numFaces) {
        split(tokens, line, ',');
        for(int i = 0; i < tokens.size(); i++) {
            int faceid = std::atoi(tokens[i].c_str());
-           assert (faceid<=numFaces);
            lFaceIdUseDiscreteMesh.push_back(faceid);
        }
     }
 }
 
-void MeshAttributes::set_surfaceMSize(int numFaces) {
+void MeshAttributes::set_surfaceMSize() {
     std::string line,sval;
     XMLElement* pRoot;
     XMLElement* child;
@@ -164,14 +163,13 @@ void MeshAttributes::set_surfaceMSize(int numFaces) {
        std::list<int> lFaceId;
        for(int i = 0; i < tokens.size(); i++) {
            int faceid = std::atoi(tokens[i].c_str());
-           assert (faceid<=numFaces);
            lFaceId.push_back(faceid);
        }
        llsurfaceMSizeFaceId.push_back(lFaceId);
     }
 }
 
-void MeshAttributes::set_MeshSizePropagation(int numFaces) {
+void MeshAttributes::set_MeshSizePropagation() {
     std::string line,sval;
     XMLElement* pRoot;
     pRoot = doc.FirstChildElement("MeshSizePropagation");
@@ -185,14 +183,13 @@ void MeshAttributes::set_MeshSizePropagation(int numFaces) {
        split(tokens, line, ',');
        for(int i = 0; i < tokens.size(); i++) {
            int faceid = std::atoi(tokens[i].c_str());
-           assert (faceid<=numFaces);
            lFaceIdMeshSizePropagation.push_back(faceid);
        }
     }
 }
 
 
-void MeshAttributes::set_regionMSize(int numRegions) {
+void MeshAttributes::set_regionMSize() {
     std::string line,sval;
     XMLElement* child;
     XMLElement* pRoot;
@@ -208,7 +205,6 @@ void MeshAttributes::set_regionMSize(int numRegions) {
        std::list<int> lregionId;
        for(int i = 0; i < tokens.size(); i++) {
            int regionid = std::atoi(tokens[i].c_str());
-           assert (regionid<=numRegions);
            lregionId.push_back(regionid);
        }
        llregionMSizeRegionId.push_back(lregionId);

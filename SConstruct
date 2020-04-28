@@ -112,7 +112,7 @@ else:
 	assert(false)
 
 # compiler flags for generated kernels
-env.Append(CXXFLAGS = ['-Wall', '-ansi', '-std=c++0x'])
+env.Append(CXXFLAGS = ['-Wall', '-ansi', '-std=c++11'])
 if utils.compiler.optimizationEnabled(env):
 	env.Append(CPPDEFINES=['NDEBUG'])
 	env.Append(CXXFLAGS=['-O2'])

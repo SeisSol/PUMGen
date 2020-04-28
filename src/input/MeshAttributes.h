@@ -48,8 +48,8 @@ class MeshAttributes {
     int UseDiscreteMesh_noModification;
     double MeshSizePropagationScalingFactor,MeshSizePropagationDistance=0.0;
     MeshAttributes() {};
-    MeshAttributes(const char*, int , int);
-    void init(const char*, int , int);
+    MeshAttributes(const char*);
+    void init(const char*);
 
   private:
     XMLDocument doc;
@@ -57,10 +57,10 @@ class MeshAttributes {
     void set_MeshRefinementZoneCube ();
     void set_SurfaceMeshingAttributes();
     void set_VolumeMeshingAttributes();
-    void set_UseDiscreteMesh(int numFaces);
-    void set_surfaceMSize(int numFaces);
-    void set_MeshSizePropagation(int numFaces);
-    void set_regionMSize(int numRegions);
+    void set_UseDiscreteMesh();
+    void set_surfaceMSize();
+    void set_MeshSizePropagation();
+    void set_regionMSize();
     void set_gradation();
     void set_globalMSize();
     void set_area_AspectRatio();
