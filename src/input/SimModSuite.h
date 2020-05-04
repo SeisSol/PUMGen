@@ -86,6 +86,7 @@ public:
 			const char* logFile = 0L)
 	{
 		// Init SimModSuite
+		SimModel_start();
 		SimPartitionedMesh_start(0L, 0L);
 		if (logFile) {
 			m_log = true;
