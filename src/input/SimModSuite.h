@@ -539,7 +539,11 @@ void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, MeshAttribu
        {
            face = GM_entityByTag(model, 2, *it);
            logInfo(PMU_rank()) << "MeshSizeProp faceid:"<<*it <<", distance =" << MeshAtt.MeshSizePropagationDistance << ", scaling factor =" << MeshAtt.MeshSizePropagationScalingFactor;
+#ifdef BEFORE_SIM_14
+           MS_setMeshSizePropagation(meshCase,face,1,MeshAtt.MeshSizePropagationDistance,MeshAtt.MeshSizePropagationScalingFactor);
+#else
            MS_setMeshSizePropagation(meshCase,face,2,1,MeshAtt.MeshSizePropagationDistance,MeshAtt.MeshSizePropagationScalingFactor);
+#endif
        }
     }
      if (MeshAtt.lFaceIdUseDiscreteMesh.size()>0) {

@@ -48,6 +48,10 @@ vars.AddVariables(
 		False,
 	),
 
+	BoolVariable( 'BeforeSim14', 'compile using simModeler up to 14 (internal API changes)',
+		False,
+	),
+
 	BoolVariable( 'simModSuite', 'compile with support for simModSuite from Simmetrix',
 		False
 	),
@@ -153,6 +157,10 @@ if env['use_simmodsuite']:
 
 if env['BeforeSim11']:
    env.Append(CPPDEFINES=['BeforeSim11'])
+   env['BeforeSim14'] = True
+if env['BeforeSim14']:
+   env.Append(CPPDEFINES=['BeforeSim14'])
+
 
 # get the source files
 env.sourceFiles = []
