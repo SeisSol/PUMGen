@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.9)
 project(pumgen LANGUAGES C CXX)
 
 option(SIMMETRIX "Use simmetrix libraries" OFF)
+set(SIMMETRIX_ROOT "" CACHE STRING "Root directory of simmetrix dev files")
 option(NETCDF "Use netcdf" OFF)
 set(LOG_LEVEL "info" CACHE STRING "Log level for the code")
 set_property(CACHE LOG_LEVEL PROPERTY STRINGS "debug" "info" "warning" "error")
@@ -20,10 +21,15 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 add_executable(pumgen
-  src/input/ParallelVertexFilter.cpp
-  src/pumgen.cpp
-  src/meshreader/GambitReader.cpp
-  src/meshreader/FidapReader.cpp
+src/input/AnalysisAttributes.cpp
+src/input/MeshAttributes.cpp
+src/input/NetCDFPartition.cpp
+#src/input/ParallelVertexFilter.cpp
+src/input/SimModSuite.cpp
+src/input/split.cpp
+src/meshreader/FidapReader.cpp
+src/meshreader/GambitReader.cpp
+src/pumgen.cpp
 )
 
 target_include_directories(pumgen PUBLIC src
@@ -59,6 +65,9 @@ find_package(Apf REQUIRED)
 target_include_directories(pumgen PUBLIC ${APF_INCLUDE_DIR})
 target_link_libraries(pumgen PUBLIC ${APF_LIBRARIES})
 
+add_library(tinyxml2 submodules/tinyxml2/tinyxml2.cpp)
+target_link_libraries(pumgen PUBLIC tinyxml2)
+
 if (SIMMETRIX)
     find_package(Simmetrix REQUIRED)
     target_sources(pumgen PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src/input/SimModSuite.cpp)
@@ -81,6 +90,5 @@ endfunction()
 
 cast_log_level_to_int(LOG_LEVEL LOG_LEVEL)
 target_compile_definitions(pumgen PUBLIC LOG_LEVEL=${LOG_LEVEL})
-
 set_target_properties(pumgen PROPERTIES INSTALL_RPATH ${SIM_PS_KRNL_LIB_DIR})
 install(TARGETS pumgen DESTINATION ${CMAKE_INSTALL_BINDIR})

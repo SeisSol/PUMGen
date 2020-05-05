@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#!/usr/bin/env python
 
 # @file
 #  This file is part of PUMGen
@@ -139,14 +139,17 @@ libs.find(env, 'apf', simmetrix=env['simModSuite'], zoltan=True)
 libs.find(env, 'hdf5', required=True, parallel=True)
 
 # netCDF
-env['use_netcdf'] = libs.find(env, 'netcdf', required=env['netcdf'], parallel=True)
-if env['use_netcdf']:
-	env.Append(CPPDEFINES=['USE_NETCDF'])
+if env['netcdf']:
+    env['use_netcdf'] = libs.find(env, 'netcdf', required=env['netcdf'], parallel=True)
+    if env['use_netcdf']:
+        env.Append(CPPDEFINES=['USE_NETCDF'])
+else:
+    env['use_netcdf'] = False
 
 # SimModSuite
 env['use_simmodsuite'] = libs.find(env, 'simmodsuite', required=env['simModSuite'], mpiLib=env['mpiLib'])
 if env['use_simmodsuite']:
-	env.Append(CPPDEFINES=['USE_SIMMOD'])
+    env.Append(CPPDEFINES=['USE_SIMMOD'])
 
 if env['BeforeSim11']:
    env.Append(CPPDEFINES=['BeforeSim11'])

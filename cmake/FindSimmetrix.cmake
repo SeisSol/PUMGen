@@ -2,7 +2,7 @@ include(FindPackageHandleStandardArgs)
 
 find_path(GMI_SIM_INCLUDE_DIR gmi_sim.h)
 find_path(APF_SIM_INCLUDE_DIR apfSIM.h)
-find_path(MESH_SIM_INCLUDE_DIR MeshSim.h)
+find_path(MESH_SIM_INCLUDE_DIR MeshSim.h ${SIMMETRIX_ROOT}/include)
 
 list(APPEND SIMMETRIX_INCLUDE_DIR
   ${GMI_SIM_INCLUDE_DIR}
@@ -13,18 +13,20 @@ list(APPEND SIMMETRIX_INCLUDE_DIR
 find_library(GMI_SIM_LIB gmi_sim)
 find_library(APF_SIM_LIB apf_sim)
 
-find_library(SIM_ACIS_LIB SimAcis2017)
-find_library(SIM_DISCRETE_LIB SimDiscrete)
-find_library(SIM_EXPORT_LIB SimExport)
-find_library(SIM_MESHING_LIB SimMeshing)
-find_library(SIM_MESH_TOOLS_LIB SimMeshTools)
-find_library(SIM_MODEL_LIB SimModel)
-find_library(SIM_PARASOLID_LIB SimParasolid310)
-find_library(SIM_PARTITIONED_MESH_LIB SimPartitionedMesh)
-find_library(SIM_PARTITIONED_MESH_MPI_LIB SimPartitionedMesh-mpi)
-find_library(SIM_PARTITINED_WRAPPER_LIB SimPartitionWrapper-mpich)
-find_library(SIM_PS_KRNL_LIB pskernel)
+set(SIM_LIB_HINT ${SIMMETRIX_ROOT}/lib/x64_rhel6_gcc44)
 
+find_library(SIM_ACIS_LIB SimAcis2017 ${SIM_LIB_HINT})
+find_library(SIM_DISCRETE_LIB SimDiscrete ${SIM_LIB_HINT})
+find_library(SIM_EXPORT_LIB SimExport ${SIM_LIB_HINT})
+find_library(SIM_MESHING_LIB SimMeshing ${SIM_LIB_HINT})
+find_library(SIM_MESH_TOOLS_LIB SimMeshTools ${SIM_LIB_HINT})
+find_library(SIM_MODEL_LIB SimModel ${SIM_LIB_HINT})
+find_library(SIM_PARASOLID_LIB SimParasolid310 ${SIM_LIB_HINT})
+find_library(SIM_PARTITIONED_MESH_LIB SimPartitionedMesh ${SIM_LIB_HINT})
+find_library(SIM_PARTITIONED_MESH_MPI_LIB SimPartitionedMesh-mpi ${SIM_LIB_HINT})
+find_library(SIM_PARTITINED_WRAPPER_LIB SimPartitionWrapper-mpich ${SIM_LIB_HINT})
+find_library(SIM_PS_KRNL_LIB pskernel ${SIM_LIB_HINT}/psKrnl)
+  
 get_filename_component(SIM_PS_KRNL_LIB_DIR ${SIM_PS_KRNL_LIB} DIRECTORY)
 
 list(APPEND SIMMETRIX_LIBRARIES
