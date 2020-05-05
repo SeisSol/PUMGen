@@ -49,6 +49,7 @@
 #include <fstream>
 #include <string>
 #include <sstream>
+#include <iomanip>
 #include <vector>
 #include <SimMeshTools.h>
 #include <SimDisplay.h>
@@ -422,25 +423,19 @@ void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, MeshAttribu
       UniquefaceBound.insert(f.second);
     }
     int numBC = UniquefaceBound.size();
-    pAttInfoVoid iBC[numBC];
-    pModelAssoc aBC[numBC];
-    std::set<int>::iterator it = UniquefaceBound.begin();
+    std::map<int, pModelAssoc> aBC;
 
-    std::map<int,int> LUT;
-
-    for (int i = 0; i < numBC; i++) {
+    for (auto const& ufb : UniquefaceBound) {
        std::string strboundaryCondition="BC";
-       char buff[100];
-       snprintf(buff, sizeof(buff), "%09d", (*it));
-       std::string sNumber = buff;
-       //std::string sNumber = std::to_string((*it));
-       LUT[(*it)]=i;
-       it++;
-       iBC[i] = AMAN_newAttInfoVoid(attMngr,"BC","boundaryCondition");
+       std::ostringstream stringstream;
+       stringstream << std::setw(9) << std::setfill('0') << ufb;
+       std::string sNumber = stringstream.str();
+
+       pAttInfoVoid iBC = AMAN_newAttInfoVoid(attMngr,"BC","boundaryCondition");
        strboundaryCondition.append(sNumber);
-       AttNode_setImageClass((pANode)iBC[i],strboundaryCondition.c_str());
-       AttCase_addNode(analysisCase,(pANode)iBC[i]);
-       aBC[i] = AttCase_newModelAssoc(analysisCase,(pANode)iBC[i]);
+       AttNode_setImageClass((pANode)iBC,strboundaryCondition.c_str());
+       AttCase_addNode(analysisCase,(pANode)iBC);
+       aBC[ufb] = AttCase_newModelAssoc(analysisCase,(pANode)iBC);
     }
 
     pGEntity face;
@@ -455,8 +450,7 @@ void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, MeshAttribu
         // association process is started
         if (f.second!=0) {
            logInfo(PMU_rank()) << "faceBound[" << f.first + 1 <<"] =" << f.second;
-           int index = LUT[f.second];
-           AMA_addGEntity(aBC[index],face);
+           AMA_addGEntity(aBC[f.second],face);
         }
     }
 
