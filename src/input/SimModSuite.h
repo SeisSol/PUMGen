@@ -394,6 +394,17 @@ void extractCases(pGModel m_model, pACase &meshCase, const char *meshCaseName, p
     PList_delete(children);
 }
 private:
+
+//source: https://stackoverflow.com/questions/4195611/getting-a-list-of-values-from-a-map
+typedef std::map<int, int> MyMap;
+struct get_second : public std::unary_function<MyMap::value_type, int>
+{
+    int operator()(const MyMap::value_type& value) const
+    {
+        return value.second;
+    }
+};
+
 void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, MeshAttributes &MeshAtt, AnalysisAttributes &AnalysisAtt) {
 
     logInfo(PMU_rank()) << "Setting cases";
@@ -432,6 +443,7 @@ void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, MeshAttribu
        std::string sNumber = stringstream.str();
 
        pAttInfoVoid iBC = AMAN_newAttInfoVoid(attMngr,"BC","boundaryCondition");
+
        strboundaryCondition.append(sNumber);
        AttNode_setImageClass((pANode)iBC,strboundaryCondition.c_str());
        AttCase_addNode(analysisCase,(pANode)iBC);
@@ -452,6 +464,8 @@ void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, MeshAttribu
            AMA_addGEntity(aBC[fb.bcType],face);
         }
     }
+    GFIter_delete(modelFaces);
+
 
     // ------------------------------ Set meshing parameters ------------------------------
 

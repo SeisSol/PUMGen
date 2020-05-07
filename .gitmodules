@@ -1,9 +1,9 @@
 [submodule "submodules/scons-tools"]
 	path = submodules/scons-tools
-	url = https://github.com/TUM-I5/scons-tools.git
+	url = ../../TUM-I5/scons-tools.git
 [submodule "submodules/utils"]
 	path = submodules/utils
-	url = https://github.com/TUM-I5/utils.git
+	url = ../../TUM-I5/utils.git
 [submodule "submodules/tinyxml2"]
 	path = submodules/tinyxml2
-	url = https://github.com/leethomason/tinyxml2.git
+	url = ../../leethomason/tinyxml2.git
