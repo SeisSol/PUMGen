@@ -26,7 +26,7 @@ add_executable(pumgen
 src/input/AnalysisAttributes.cpp
 src/input/MeshAttributes.cpp
 src/input/NetCDFPartition.cpp
-#src/input/ParallelVertexFilter.cpp
+src/input/ParallelVertexFilter.cpp
 src/input/SimModSuite.cpp
 src/input/split.cpp
 src/meshreader/FidapReader.cpp
@@ -101,4 +101,4 @@ endfunction()
 cast_log_level_to_int(LOG_LEVEL LOG_LEVEL)
 target_compile_definitions(pumgen PUBLIC LOG_LEVEL=${LOG_LEVEL})
 set_target_properties(pumgen PROPERTIES INSTALL_RPATH ${SIM_PS_KRNL_LIB_DIR})
-install(TARGETS pumgen DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(TARGETS pumgen RUNTIME DESTINATION bin DESTINATION ${CMAKE_INSTALL_BINDIR})
