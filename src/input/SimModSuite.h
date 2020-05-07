@@ -80,10 +80,10 @@ public:
 			const char* meshCaseName = "mesh",
 			const char* analysisCaseName = "analysis",
 			int enforceSize = 0,
-                        const char* xmlFile=0L,
-                        const char* export_sxp_file=0L,
-                        const bool probe_faces=false,
-                        const bool analyseAR=false,
+         const char* xmlFile=0L,
+         const char* export_sxp_file=0L,
+         const bool probe_faces=false,
+         const bool analyseAR=false,
 			const char* logFile = 0L)
 	{
 		// Init SimModSuite
@@ -103,36 +103,36 @@ public:
 		// Load CAD
 		logInfo(PMU_rank()) << "Loading model";
 
-                std::string smodFile = modFile;
-                if (cadFile!=0L) {
-                  loadCAD(modFile, cadFile);
-                } else if(smodFile.substr(smodFile.find_last_of(".") + 1) == "smd") {
-                  loadCAD(modFile, cadFile);
-                } else {
-                  loadSTL(modFile);
-                }
+      std::string smodFile = modFile;
+      if (cadFile!=0L) {
+         loadCAD(modFile, cadFile);
+      } else if(smodFile.substr(smodFile.find_last_of(".") + 1) == "smd") {
+         loadCAD(modFile, cadFile);
+      } else {
+         loadSTL(modFile);
+      }
 
 
-                // Probe faces
-                if(probe_faces) {
-                  probeFaceCoords(m_model);
-                }
+      // Probe faces
+      if(probe_faces) {
+         probeFaceCoords(m_model);
+      }
 
-                // Extract cases
-                logInfo(PMU_rank()) << "Extracting cases";
-                pACase meshCase, analysisCase;
-                MeshAttributes MeshAtt;
+      // Extract cases
+      logInfo(PMU_rank()) << "Extracting cases";
+      pACase meshCase, analysisCase;
+      MeshAttributes MeshAtt;
 
-                if(xmlFile != NULL) {
+      if(xmlFile != NULL) {
 
-                  //Read mesh Attributes from xml file
-                  int numFaces = GM_numFaces(m_model);
-                  MeshAtt.init(xmlFile);
-                  AnalysisAttributes AnalysisAtt(xmlFile, numFaces);
-                  setCases(m_model, meshCase, analysisCase, MeshAtt, AnalysisAtt);
-                } else {
-                  extractCases(m_model, meshCase, meshCaseName, analysisCase, analysisCaseName);
-                }
+        //Read mesh Attributes from xml file
+        int numFaces = GM_numFaces(m_model);
+        MeshAtt.init(xmlFile);
+        AnalysisAttributes AnalysisAtt(xmlFile, numFaces);
+        setCases(m_model, meshCase, analysisCase, MeshAtt, AnalysisAtt);
+      } else {
+        extractCases(m_model, meshCase, meshCaseName, analysisCase, analysisCaseName);
+      }
 
 		//if (nativeModel)
 			m_simMesh = PM_new(0, m_model, PMU_size());
