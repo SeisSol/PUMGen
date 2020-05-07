@@ -13,6 +13,7 @@
 #include <mpi.h>
 
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <cstring>
 #include <fstream>
@@ -91,6 +92,8 @@ int main(int argc, char* argv[])
 	const char* forces[] = {"0", "1", "2"};
 	args.addEnumOption("enforce-size", forces, 0, "Enforce mesh size (only used by SimModSuite, default: 0)", false);
 	args.addOption("sim_log", 0, "Create SimModSuite log", utils::Args::Required, false);
+        args.addOption("recenter", 0, "Recenter the mesh around (0, 0, 0)", 
+            utils::Args::No, false);
 	args.addAdditionalOption("input", "Input file (mesh or model)");
 	args.addAdditionalOption("output", "Output parallel unstructured mesh file", false);
 
@@ -281,6 +284,7 @@ int main(int argc, char* argv[])
 	// Vertices
 	logInfo(rank) << "Writing vertices";
 
+
 	sizes[0] = globalSize[1]; sizes[1] = 3;
 	h5space = H5Screate_simple(2, sizes, 0L);
 	checkH5Err(h5space);
@@ -298,6 +302,40 @@ int main(int argc, char* argv[])
 
 	apf::Sharing* sharing = apf::getSharing(mesh);
 
+        std::array<double, 3> recenter;
+        recenter.fill(0.0);
+
+        if (args.isSet("recenter")) {
+          logInfo(rank) << "Calculate Bounding Box to recenter mesh";
+          it = mesh->begin(0);
+          std::array<std::pair<double, double>, 3> boundingBox;
+          boundingBox.fill(std::make_pair(std::numeric_limits<double>::max(),
+                std::numeric_limits<double>::min()));
+          auto updateBoundingBox = [&boundingBox](double val, unsigned i) {
+            boundingBox.at(i).first = std::min(boundingBox.at(i).first, val);
+            boundingBox.at(i).second = std::max(boundingBox.at(i).second, val);
+          };
+          while (apf::MeshEntity* element = mesh->iterate(it)) {
+		if (!sharing->isOwned(element))
+			continue;
+
+		apf::Vector3 point;
+		mesh->getPoint(element, 0, point);
+                updateBoundingBox(point.x(), 0);
+                updateBoundingBox(point.y(), 1);
+                updateBoundingBox(point.z(), 2);
+          }
+          logInfo(rank) << "BoundingBox:" <<
+          "[" << boundingBox.at(0).first << "," << boundingBox.at(0).second << "] x" <<
+          "[" << boundingBox.at(1).first << "," << boundingBox.at(1).second << "] x" <<
+          "[" << boundingBox.at(2).first << "," << boundingBox.at(2).second << "]";
+          for (int i = 0; i < 3; i++) {
+            recenter.at(i) = 0.5 * (boundingBox.at(i).first + boundingBox.at(i).second);
+          }
+          logInfo(rank) << "Move mesh by (" << recenter.at(0) << ", " 
+            << recenter.at(1) << ", " << recenter.at(2) << ")";
+        }
+
 	double* geometry = new double[localSize[1] * 3];
 	it = mesh->begin(0);
 	index = 0;
@@ -313,6 +351,9 @@ int main(int argc, char* argv[])
 		apf::Vector3 point;
 		mesh->getPoint(element, 0, point);
 		point.toArray(&geometry[index*3]);
+                for (int i = 0; i < 3; i++) {
+                  geometry[index*3+i] -= recenter.at(i);
+                }
 
 		index++;
 	}
