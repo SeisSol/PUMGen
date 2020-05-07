@@ -141,7 +141,7 @@ public:
 			//m_simMesh = PM_new(0, m_model, 1);
 
 		pProgress prog = Progress_new();
-		Progress_setCallback(prog, progressHandler);
+		//Progress_setCallback(prog, progressHandler);
 
 		// create the mesh
 		logInfo(PMU_rank()) << "Starting the surface mesher";
@@ -420,7 +420,7 @@ void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, MeshAttribu
     int numFaces = GM_numFaces(model);
     std::set<int> UniquefaceBound;
     for (auto const& f : AnalysisAtt.faceBound) {
-      UniquefaceBound.insert(f.second);
+      UniquefaceBound.insert(f.bcType);
     }
     int numBC = UniquefaceBound.size();
     std::map<int, pModelAssoc> aBC;
@@ -438,19 +438,18 @@ void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, MeshAttribu
        aBC[ufb] = AttCase_newModelAssoc(analysisCase,(pANode)iBC);
     }
 
-    pGEntity face;
-    for (auto const& f : AnalysisAtt.faceBound) {
+    for (auto const& fb : AnalysisAtt.faceBound) {
         // Get the face
-        face = GM_entityByTag(model, 2, f.first + 1);
+        pGEntity face = GM_entityByTag(model, 2, fb.faceID + 1);
 
         // Add the face to the model association. Note that we passed
         // the Attribute Information Node into the Model Association
         // at the time when the Model Association was created. That prepares
         // the creation of the AttributeVoid on the face as soon as the
         // association process is started
-        if (f.second!=0) {
-           logInfo(PMU_rank()) << "faceBound[" << f.first + 1 <<"] =" << f.second;
-           AMA_addGEntity(aBC[f.second],face);
+        if (fb.bcType!=0) {
+           logInfo(PMU_rank()) << "faceBound[" << fb.faceID+ 1 <<"] =" << fb.bcType;
+           AMA_addGEntity(aBC[fb.bcType],face);
         }
     }
 
@@ -477,7 +476,7 @@ void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, MeshAttribu
        std::list<int>::iterator it;
        for (it=tl.begin(); it != tl.end(); it++)
        {
-           face = GM_entityByTag(model, 2, *it);
+           pGEntity face = GM_entityByTag(model, 2, *it);
            MS_setMeshSize(meshCase, face, 1, surfaceMSize, NULL);
            logInfo(PMU_rank()) << "faceid:"<<*it <<", surfaceMSize =" << surfaceMSize;
        }
@@ -537,7 +536,7 @@ void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, MeshAttribu
        std::list<int>::iterator it;
        for (it=MeshAtt.lFaceIdMeshSizePropagation.begin(); it != MeshAtt.lFaceIdMeshSizePropagation.end(); it++)
        {
-           face = GM_entityByTag(model, 2, *it);
+           pGEntity face = GM_entityByTag(model, 2, *it);
            logInfo(PMU_rank()) << "MeshSizeProp faceid:"<<*it <<", distance =" << MeshAtt.MeshSizePropagationDistance << ", scaling factor =" << MeshAtt.MeshSizePropagationScalingFactor;
 #ifdef BEFORE_SIM_14
            MS_setMeshSizePropagation(meshCase,face,1,MeshAtt.MeshSizePropagationDistance,MeshAtt.MeshSizePropagationScalingFactor);
@@ -550,7 +549,7 @@ void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, MeshAttribu
        std::list<int>::iterator it;
        for (it=MeshAtt.lFaceIdUseDiscreteMesh.begin(); it != MeshAtt.lFaceIdUseDiscreteMesh.end(); it++)
        {
-           face = GM_entityByTag(model, 2, *it);
+           pGEntity face = GM_entityByTag(model, 2, *it);
            logInfo(PMU_rank()) << "UseDiscreteMesh; faceid, noModification:"<<*it, MeshAtt.UseDiscreteMesh_noModification;
            MS_useDiscreteGeometryMesh(meshCase,face,MeshAtt.UseDiscreteMesh_noModification);
            //MS_limitSurfaceMeshModification(meshCase,face,UseDiscreteMesh_noModification);

@@ -25,9 +25,16 @@
 
 
 using namespace tinyxml2;
+
+struct faceBoundary {
+  faceBoundary(int faceID, int bcType) : faceID(faceID), bcType(bcType) {};
+  int faceID;
+  int bcType;
+};
+
 class AnalysisAttributes {
   public:
-    std::vector<std::pair<int, int>> faceBound;
+    std::vector<faceBoundary> faceBound;
     AnalysisAttributes(const char* xmlFilename, int numFaces);
   private:
     XMLDocument doc;
