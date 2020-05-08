@@ -12,7 +12,7 @@
 
 #include "AnalysisAttributes.h"
 
-AnalysisAttributes::AnalysisAttributes(const char* xmlFilename) {
+AnalysisAttributes::AnalysisAttributes(const char* xmlFilename, int numFaces) {
     readXmlFile(xmlFilename);
     faceBound.reserve(numFaces);
 }

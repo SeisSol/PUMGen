@@ -464,7 +464,6 @@ void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, MeshAttribu
            AMA_addGEntity(aBC[fb.bcType],face);
         }
     }
-    GFIter_delete(modelFaces);
 
 
     // ------------------------------ Set meshing parameters ------------------------------
