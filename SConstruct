@@ -156,10 +156,10 @@ if env['use_simmodsuite']:
     env.Append(CPPDEFINES=['USE_SIMMOD'])
 
 if env['BeforeSim11']:
-   env.Append(CPPDEFINES=['BeforeSim11'])
+   env.Append(CPPDEFINES=['BEFORE_SIM_11'])
    env['BeforeSim14'] = True
 if env['BeforeSim14']:
-   env.Append(CPPDEFINES=['BeforeSim14'])
+   env.Append(CPPDEFINES=['BEFORE_SIM_14'])
 
 
 # get the source files

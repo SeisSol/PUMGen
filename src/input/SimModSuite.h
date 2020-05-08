@@ -155,7 +155,7 @@ public:
 		progressBar.setTotal(26);
 		SurfaceMesher_execute(surfaceMesher, prog);
 		SurfaceMesher_delete(surfaceMesher);
-#ifdef BeforeSim11
+#ifdef BEFORE_SIM_11
       if(export_sxp_file != NULL) {
           SimExport_start();
 
@@ -524,7 +524,7 @@ void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, MeshAttribu
     if (MeshAtt.area_AspectRatio>0) {
        // Set target equiarea AspectRatio
        logInfo(PMU_rank()) << "Target equiarea AspectRatio =" << MeshAtt.area_AspectRatio;
-#ifdef BeforeSim11
+#ifdef BEFORE_SIM_11
        MS_setSurfaceShapeMetric(meshCase, modelDomain, ShapeMetricType_AspectRatio, MeshAtt.area_AspectRatio);
 #else
        MS_setSurfaceShapeMetric(meshCase, modelDomain, ShapeMetricType_AspectRatio, ElementType_Triangle ,MeshAtt.area_AspectRatio);
