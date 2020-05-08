@@ -15,7 +15,7 @@
 #include <unordered_map>
 #include "tinyxml2/tinyxml2.h"
 #include <string>
-#include <list>t
+#include <list>
 #include <vector>
 #include "utils/logger.h"
 #include "split.h"
