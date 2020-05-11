@@ -4,8 +4,6 @@ project(pumgen LANGUAGES C CXX)
 
 option(SIMMETRIX "Use simmetrix libraries" OFF)
 set(SIMMETRIX_ROOT "" CACHE STRING "Root directory of simmetrix dev files")
-set(BEFORE_SIM_11 OFF CACHE BOOL "Use SimModSuite older than version 11.")
-set(BEFORE_SIM_14 OFF CACHE BOOL "Use SimModSuite older than version 14.")
 option(NETCDF "Use netcdf" OFF)
 set(LOG_LEVEL "info" CACHE STRING "Log level for the code")
 set_property(CACHE LOG_LEVEL PROPERTY STRINGS "debug" "info" "warning" "error")
@@ -22,17 +20,12 @@ if(NOT CMAKE_BUILD_TYPE)
   message(STATUS "Set build type to Release as none was supplied.")
 endif()
 
-add_executable(pumgen
-src/input/AnalysisAttributes.cpp
-src/input/MeshAttributes.cpp
-src/input/NetCDFPartition.cpp
-src/input/ParallelVertexFilter.cpp
-src/input/SimModSuite.cpp
-src/input/split.cpp
-src/meshreader/FidapReader.cpp
-src/meshreader/GambitReader.cpp
-src/pumgen.cpp
-)
+
+add_executable(pumgen 
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/pumgen.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/meshreader/FidapReader.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/meshreader/GambitReader.cpp
+  )
 
 target_include_directories(pumgen PUBLIC src
   "${CMAKE_CURRENT_SOURCE_DIR}/src"
@@ -72,18 +65,22 @@ target_link_libraries(pumgen PUBLIC tinyxml2)
 
 if (SIMMETRIX)
     find_package(Simmetrix REQUIRED)
-    target_sources(pumgen PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src/input/SimModSuite.cpp)
-    target_compile_definitions(pumgen PUBLIC USE_SIMMOD)
+    target_sources(pumgen PUBLIC 
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/input/SimModSuite.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/input/AnalysisAttributes.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/input/MeshAttributes.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/input/ParallelVertexFilter.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/input/SimModSuite.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/input/split.cpp
+    )
+    message(${SIM_MAJOR_VER})
+    if(${SIM_MAJOR_VER} LESS 11)
+      target_compile_definitions(pumgen PUBLIC BEFORE_SIM_11)
+    elseif(${SIM_MAJOR_VER} LESS 15)
+      target_compile_definitions(pumgen PUBLIC BEFORE_SIM_15)
+    endif()
     target_include_directories(pumgen PUBLIC ${SIMMETRIX_INCLUDE_DIR})
     target_link_libraries(pumgen PUBLIC ${SIMMETRIX_LIBRARIES})
-endif()
-
-if (BEFORE_SIM_11)
-  target_compile_definitions(pumgen PUBLIC BEFORE_SIM_11)
-  set(BEFORE_SIM_14 ON)
-endif()
-if (BEFORE_SIM_14)
-  target_compile_definitions(pumgen PUBLIC BEFORE_SIM_14)
 endif()
 
 function(cast_log_level_to_int log_level_str log_level_int)
@@ -100,5 +97,7 @@ endfunction()
 
 cast_log_level_to_int(LOG_LEVEL LOG_LEVEL)
 target_compile_definitions(pumgen PUBLIC LOG_LEVEL=${LOG_LEVEL})
-set_target_properties(pumgen PROPERTIES INSTALL_RPATH ${SIM_PS_KRNL_LIB_DIR})
+if(SIMMETRIX)
+  set_target_properties(pumgen PROPERTIES INSTALL_RPATH ${SIM_PS_KRNL_LIB_DIR})
+endif()
 install(TARGETS pumgen RUNTIME DESTINATION bin DESTINATION ${CMAKE_INSTALL_BINDIR})

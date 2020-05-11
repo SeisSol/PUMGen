@@ -48,7 +48,7 @@ vars.AddVariables(
 		False,
 	),
 
-	BoolVariable( 'BeforeSim14', 'compile using simModeler up to 14 (internal API changes)',
+	BoolVariable( 'BeforeSim15', 'compile using simModeler up to 15 (internal API changes)',
 		False,
 	),
 
@@ -157,9 +157,9 @@ if env['use_simmodsuite']:
 
 if env['BeforeSim11']:
    env.Append(CPPDEFINES=['BEFORE_SIM_11'])
-   env['BeforeSim14'] = True
-if env['BeforeSim14']:
-   env.Append(CPPDEFINES=['BEFORE_SIM_14'])
+   env['BeforeSim15'] = True
+if env['BeforeSim15']:
+   env.Append(CPPDEFINES=['BEFORE_SIM_15'])
 
 
 # get the source files
