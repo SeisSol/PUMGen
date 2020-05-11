@@ -141,7 +141,7 @@ public:
 			//m_simMesh = PM_new(0, m_model, 1);
 
 		pProgress prog = Progress_new();
-		//Progress_setCallback(prog, progressHandler);
+		Progress_setCallback(prog, progressHandler);
 
 		// create the mesh
 		logInfo(PMU_rank()) << "Starting the surface mesher";
