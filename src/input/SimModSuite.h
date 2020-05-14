@@ -49,6 +49,7 @@
 #include <fstream>
 #include <string>
 #include <sstream>
+#include <iomanip>
 #include <vector>
 #include <SimMeshTools.h>
 #include <SimDisplay.h>
@@ -86,6 +87,7 @@ public:
 			const char* logFile = 0L)
 	{
 		// Init SimModSuite
+		SimModel_start();
 		SimPartitionedMesh_start(0L, 0L);
 		if (logFile) {
 			m_log = true;
@@ -124,8 +126,9 @@ public:
       if(xmlFile != NULL) {
 
         //Read mesh Attributes from xml file
+        int numFaces = GM_numFaces(m_model);
         MeshAtt.init(xmlFile);
-        AnalysisAttributes AnalysisAtt(xmlFile);
+        AnalysisAttributes AnalysisAtt(xmlFile, numFaces);
         setCases(m_model, meshCase, analysisCase, MeshAtt, AnalysisAtt);
       } else {
         extractCases(m_model, meshCase, meshCaseName, analysisCase, analysisCaseName);
@@ -152,7 +155,7 @@ public:
 		progressBar.setTotal(26);
 		SurfaceMesher_execute(surfaceMesher, prog);
 		SurfaceMesher_delete(surfaceMesher);
-#ifdef BeforeSim11
+#ifdef BEFORE_SIM_11
       if(export_sxp_file != NULL) {
           SimExport_start();
 
@@ -285,6 +288,7 @@ public:
 		if (m_log)
 			Sim_logOff();
 		SimPartitionedMesh_stop();
+		SimModel_stop();
 	}
 
 private:
@@ -424,52 +428,42 @@ void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, MeshAttribu
 
 
     //With this code we can tag any BC, not only 1,3,5
-    //faceBound is a dictionnary faceBound[face id] = boundary id
-    //my_BC list all values in faceBound maps (e.g. 1, 1, 3, 5, 5...)
-    std::vector<int> my_BC;
-    transform(AnalysisAtt.faceBound.begin(), AnalysisAtt.faceBound.end(), back_inserter(my_BC), get_second() );
-    //list all unique boundary id 
-    std::set<int> UniquefaceBound(my_BC.begin(), my_BC.end());
+    int numFaces = GM_numFaces(model);
+    std::set<int> UniquefaceBound;
+    for (auto const& f : AnalysisAtt.faceBound) {
+      UniquefaceBound.insert(f.bcType);
+    }
     int numBC = UniquefaceBound.size();
-    pAttInfoVoid iBC[numBC];
-    pModelAssoc aBC[numBC];
-    std::set<int>::iterator it = UniquefaceBound.begin();
+    std::map<int, pModelAssoc> aBC;
 
-    //Lookup table: LUT[ boundary id] = id_BC (from 0 to numBC)
-    std::map<int,int> LUT;
-
-    for (int i = 0; i < numBC; i++) {
+    for (auto const& ufb : UniquefaceBound) {
        std::string strboundaryCondition="BC";
-       char buff[100];
-       snprintf(buff, sizeof(buff), "%09d", (*it));
-       std::string sNumber = buff;
-       LUT[(*it)]=i;
-       it++;
-       iBC[i] = AMAN_newAttInfoVoid(attMngr,"BC","boundaryCondition");
+       std::ostringstream stringstream;
+       stringstream << std::setw(9) << std::setfill('0') << ufb;
+       std::string sNumber = stringstream.str();
+
+       pAttInfoVoid iBC = AMAN_newAttInfoVoid(attMngr,"BC","boundaryCondition");
+
        strboundaryCondition.append(sNumber);
-       AttNode_setImageClass((pANode)iBC[i],strboundaryCondition.c_str());
-       AttCase_addNode(analysisCase,(pANode)iBC[i]);
-       aBC[i] = AttCase_newModelAssoc(analysisCase,(pANode)iBC[i]);
+       AttNode_setImageClass((pANode)iBC,strboundaryCondition.c_str());
+       AttCase_addNode(analysisCase,(pANode)iBC);
+       aBC[ufb] = AttCase_newModelAssoc(analysisCase,(pANode)iBC);
     }
 
-    pGEntity face;
-    GFIter modelFaces = GM_faceIter(model);  // initialize the iterator
-    pGFace modelFace;
-    while(modelFace=GFIter_next(modelFaces)){ // get next face
-       int i = GEN_tag(modelFace)-1;
-       face = GM_entityByTag(model, 2, i+1);
+    for (auto const& fb : AnalysisAtt.faceBound) {
+        // Get the face
+        pGEntity face = GM_entityByTag(model, 2, fb.faceID + 1);
+
         // Add the face to the model association. Note that we passed
         // the Attribute Information Node into the Model Association
         // at the time when the Model Association was created. That prepares
         // the creation of the AttributeVoid on the face as soon as the
         // association process is started
-        if (AnalysisAtt.faceBound[i]!=0) {
-           logInfo(PMU_rank()) << "faceBound[" << i + 1 <<"] =" << AnalysisAtt.faceBound[i];
-           int index = LUT[AnalysisAtt.faceBound[i]];
-           AMA_addGEntity(aBC[index],face);
+        if (fb.bcType!=0) {
+           logInfo(PMU_rank()) << "faceBound[" << fb.faceID+ 1 <<"] =" << fb.bcType;
+           AMA_addGEntity(aBC[fb.bcType],face);
         }
     }
-    GFIter_delete(modelFaces);
 
 
     // ------------------------------ Set meshing parameters ------------------------------
@@ -495,7 +489,7 @@ void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, MeshAttribu
        std::list<int>::iterator it;
        for (it=tl.begin(); it != tl.end(); it++)
        {
-           face = GM_entityByTag(model, 2, *it);
+           pGEntity face = GM_entityByTag(model, 2, *it);
            MS_setMeshSize(meshCase, face, 1, surfaceMSize, NULL);
            logInfo(PMU_rank()) << "faceid:"<<*it <<", surfaceMSize =" << surfaceMSize;
        }
@@ -530,7 +524,7 @@ void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, MeshAttribu
     if (MeshAtt.area_AspectRatio>0) {
        // Set target equiarea AspectRatio
        logInfo(PMU_rank()) << "Target equiarea AspectRatio =" << MeshAtt.area_AspectRatio;
-#ifdef BeforeSim11
+#ifdef BEFORE_SIM_11
        MS_setSurfaceShapeMetric(meshCase, modelDomain, ShapeMetricType_AspectRatio, MeshAtt.area_AspectRatio);
 #else
        MS_setSurfaceShapeMetric(meshCase, modelDomain, ShapeMetricType_AspectRatio, ElementType_Triangle ,MeshAtt.area_AspectRatio);
@@ -555,16 +549,20 @@ void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, MeshAttribu
        std::list<int>::iterator it;
        for (it=MeshAtt.lFaceIdMeshSizePropagation.begin(); it != MeshAtt.lFaceIdMeshSizePropagation.end(); it++)
        {
-           face = GM_entityByTag(model, 2, *it);
+           pGEntity face = GM_entityByTag(model, 2, *it);
            logInfo(PMU_rank()) << "MeshSizeProp faceid:"<<*it <<", distance =" << MeshAtt.MeshSizePropagationDistance << ", scaling factor =" << MeshAtt.MeshSizePropagationScalingFactor;
+#ifdef BEFORE_SIM_15
            MS_setMeshSizePropagation(meshCase,face,1,MeshAtt.MeshSizePropagationDistance,MeshAtt.MeshSizePropagationScalingFactor);
+#else
+           MS_setMeshSizePropagation(meshCase,face,2,1,MeshAtt.MeshSizePropagationDistance,MeshAtt.MeshSizePropagationScalingFactor);
+#endif
        }
     }
      if (MeshAtt.lFaceIdUseDiscreteMesh.size()>0) {
        std::list<int>::iterator it;
        for (it=MeshAtt.lFaceIdUseDiscreteMesh.begin(); it != MeshAtt.lFaceIdUseDiscreteMesh.end(); it++)
        {
-           face = GM_entityByTag(model, 2, *it);
+           pGEntity face = GM_entityByTag(model, 2, *it);
            logInfo(PMU_rank()) << "UseDiscreteMesh; faceid, noModification:"<<*it, MeshAtt.UseDiscreteMesh_noModification;
            MS_useDiscreteGeometryMesh(meshCase,face,MeshAtt.UseDiscreteMesh_noModification);
            //MS_limitSurfaceMeshModification(meshCase,face,UseDiscreteMesh_noModification);

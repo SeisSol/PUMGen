@@ -16,17 +16,24 @@
 #include "tinyxml2/tinyxml2.h"
 #include <string>
 #include <list>
-#include <map>
+#include <vector>
 #include "utils/logger.h"
 #include "split.h"
 
 
 
 using namespace tinyxml2;
+
+struct faceBoundary {
+  faceBoundary(int faceID, int bcType) : faceID(faceID), bcType(bcType) {};
+  int faceID;
+  int bcType;
+};
+
 class AnalysisAttributes {
   public:
-    std::map<int, int> faceBound;
-    AnalysisAttributes(const char* xmlFilename);
+    std::vector<faceBoundary> faceBound;
+    AnalysisAttributes(const char* xmlFilename, int numFaces);
   private:
     XMLDocument doc;
     void readXmlFile(const char* xmlFilename);

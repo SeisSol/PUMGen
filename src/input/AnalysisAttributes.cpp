@@ -12,9 +12,9 @@
 
 #include "AnalysisAttributes.h"
 
-AnalysisAttributes::AnalysisAttributes(const char* xmlFilename) {
+AnalysisAttributes::AnalysisAttributes(const char* xmlFilename, int numFaces) {
     readXmlFile(xmlFilename);
-    set_BoundaryConditions();
+    faceBound.reserve(numFaces);
 }
 
 void AnalysisAttributes::readXmlFile(const char* xmlFilename) {
@@ -33,7 +33,7 @@ void AnalysisAttributes::set_BoundaryConditions() {
        line =  pRoot-> GetText();
        split(tokens, line, ',');
        for(int i = 0; i < tokens.size(); i++) {
-           faceBound[std::atoi(tokens[i].c_str())-1] = 1;
+           faceBound.emplace_back( faceBoundary(std::atoi(tokens[i].c_str())-1, 1));
        }
     }
     pRoot = doc.FirstChildElement("dynamicRupture");
@@ -42,7 +42,7 @@ void AnalysisAttributes::set_BoundaryConditions() {
        line =  pRoot-> GetText();
        split(tokens, line, ',');
        for(int i = 0; i < tokens.size(); i++) {
-           faceBound[std::atoi(tokens[i].c_str())-1] = 3;
+           faceBound.emplace_back( faceBoundary(std::atoi(tokens[i].c_str())-1, 3));
        }
     }
     pRoot = doc.FirstChildElement("absorbing");
@@ -51,7 +51,7 @@ void AnalysisAttributes::set_BoundaryConditions() {
        line =  pRoot-> GetText();
        split(tokens, line, ',');
        for(int i = 0; i < tokens.size(); i++) {
-           faceBound[std::atoi(tokens[i].c_str())-1] = 5;
+           faceBound.emplace_back( faceBoundary(std::atoi(tokens[i].c_str())-1, 5));
        }
     }
     //more general way of defining boundaryCondition
@@ -65,7 +65,7 @@ void AnalysisAttributes::set_BoundaryConditions() {
           line =  child-> GetText();
           split(tokens, line, ',');
           for(int i = 0; i < tokens.size(); i++) {
-              faceBound[std::atoi(tokens[i].c_str())-1] = faultTag;
+              faceBound.emplace_back( faceBoundary(std::atoi(tokens[i].c_str())-1, faultTag));
           }
        }
     }

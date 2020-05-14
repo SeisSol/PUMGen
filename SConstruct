@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#!/usr/bin/env python
 
 # @file
 #  This file is part of PUMGen
@@ -45,6 +45,10 @@ vars.AddVariables(
 	),
 
 	BoolVariable( 'BeforeSim11', 'compile using simModeler up to 11 (enables  Mesh_Export and change call in setSurfaceShapeMetric)',
+		False,
+	),
+
+	BoolVariable( 'BeforeSim15', 'compile using simModeler up to 15 (internal API changes)',
 		False,
 	),
 
@@ -112,7 +116,7 @@ else:
 	assert(false)
 
 # compiler flags for generated kernels
-env.Append(CXXFLAGS = ['-Wall', '-ansi', '-std=c++0x'])
+env.Append(CXXFLAGS = ['-Wall', '-ansi', '-std=c++11'])
 if utils.compiler.optimizationEnabled(env):
 	env.Append(CPPDEFINES=['NDEBUG'])
 	env.Append(CXXFLAGS=['-O2'])
@@ -139,17 +143,24 @@ libs.find(env, 'apf', simmetrix=env['simModSuite'], zoltan=True)
 libs.find(env, 'hdf5', required=True, parallel=True)
 
 # netCDF
-env['use_netcdf'] = libs.find(env, 'netcdf', required=env['netcdf'], parallel=True)
-if env['use_netcdf']:
-	env.Append(CPPDEFINES=['USE_NETCDF'])
+if env['netcdf']:
+    env['use_netcdf'] = libs.find(env, 'netcdf', required=env['netcdf'], parallel=True)
+    if env['use_netcdf']:
+        env.Append(CPPDEFINES=['USE_NETCDF'])
+else:
+    env['use_netcdf'] = False
 
 # SimModSuite
 env['use_simmodsuite'] = libs.find(env, 'simmodsuite', required=env['simModSuite'], mpiLib=env['mpiLib'])
 if env['use_simmodsuite']:
-	env.Append(CPPDEFINES=['USE_SIMMOD'])
+    env.Append(CPPDEFINES=['USE_SIMMOD'])
 
 if env['BeforeSim11']:
-   env.Append(CPPDEFINES=['BeforeSim11'])
+   env.Append(CPPDEFINES=['BEFORE_SIM_11'])
+   env['BeforeSim15'] = True
+if env['BeforeSim15']:
+   env.Append(CPPDEFINES=['BEFORE_SIM_15'])
+
 
 # get the source files
 env.sourceFiles = []
