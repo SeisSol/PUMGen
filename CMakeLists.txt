@@ -73,6 +73,7 @@ if (SIMMETRIX)
       ${CMAKE_CURRENT_SOURCE_DIR}/src/input/SimModSuite.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/src/input/split.cpp
     )
+    target_compile_definitions(pumgen PUBLIC USE_SIMMOD)
     if(${SIM_MAJOR_VER} LESS 11)
       target_compile_definitions(pumgen PUBLIC BEFORE_SIM_11)
     elseif(${SIM_MAJOR_VER} LESS 15)
