@@ -453,15 +453,18 @@ void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, MeshAttribu
     for (auto const& fb : AnalysisAtt.faceBound) {
         // Get the face
         pGEntity face = GM_entityByTag(model, 2, fb.faceID + 1);
-
-        // Add the face to the model association. Note that we passed
-        // the Attribute Information Node into the Model Association
-        // at the time when the Model Association was created. That prepares
-        // the creation of the AttributeVoid on the face as soon as the
-        // association process is started
-        if (fb.bcType!=0) {
-           logInfo(PMU_rank()) << "faceBound[" << fb.faceID+ 1 <<"] =" << fb.bcType;
-           AMA_addGEntity(aBC[fb.bcType],face);
+        if (face == NULL) {
+         logError() << "faceid:"<<fb.faceID+1 <<"not found in model.";
+        } else {
+          // Add the face to the model association. Note that we passed
+          // the Attribute Information Node into the Model Association
+          // at the time when the Model Association was created. That prepares
+          // the creation of the AttributeVoid on the face as soon as the
+          // association process is started
+          if (fb.bcType!=0) {
+             logInfo(PMU_rank()) << "faceBound[" << fb.faceID+ 1 <<"] =" << fb.bcType;
+             AMA_addGEntity(aBC[fb.bcType],face);
+          }
         }
     }
 
@@ -490,8 +493,12 @@ void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, MeshAttribu
        for (it=tl.begin(); it != tl.end(); it++)
        {
            pGEntity face = GM_entityByTag(model, 2, *it);
-           MS_setMeshSize(meshCase, face, 1, surfaceMSize, NULL);
-           logInfo(PMU_rank()) << "faceid:"<<*it <<", surfaceMSize =" << surfaceMSize;
+           if (face == NULL) {
+            logError() << "faceid:"<<*it <<"not found in model.";
+           } else {
+             MS_setMeshSize(meshCase, face, 1, surfaceMSize, NULL);
+             logInfo(PMU_rank()) << "faceid:"<<*it <<", surfaceMSize =" << surfaceMSize;
+           }
        }
        itMeshSize++;
     }
@@ -506,8 +513,12 @@ void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, MeshAttribu
        for (it=tl.begin(); it != tl.end(); it++)
        {
            pGRegion region = (pGRegion) GM_entityByTag(model, 3, *it);
-           MS_setMeshSize(meshCase, region, 1, regionMSize, NULL);
-           logInfo(PMU_rank()) << "regionid:"<<*it <<", regionMSize =" << regionMSize;
+           if (region == NULL) {
+             logError() << "regionid:"<<*it <<"not found in model.";
+           } else {
+             MS_setMeshSize(meshCase, region, 1, regionMSize, NULL);
+             logInfo(PMU_rank()) << "regionid:"<<*it <<", regionMSize =" << regionMSize;
+           }
        }
        itMeshSize++;
     }
@@ -549,13 +560,17 @@ void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, MeshAttribu
        std::list<int>::iterator it;
        for (it=MeshAtt.lFaceIdMeshSizePropagation.begin(); it != MeshAtt.lFaceIdMeshSizePropagation.end(); it++)
        {
-           pGEntity face = GM_entityByTag(model, 2, *it);
+         pGEntity face = GM_entityByTag(model, 2, *it);
+         if (face == NULL) {
+           logError() << "MeshSizeProp faceid:"<<*it <<"not found in model.";
+         } else {
            logInfo(PMU_rank()) << "MeshSizeProp faceid:"<<*it <<", distance =" << MeshAtt.MeshSizePropagationDistance << ", scaling factor =" << MeshAtt.MeshSizePropagationScalingFactor;
 #ifdef BEFORE_SIM_15
            MS_setMeshSizePropagation(meshCase,face,1,MeshAtt.MeshSizePropagationDistance,MeshAtt.MeshSizePropagationScalingFactor);
 #else
            MS_setMeshSizePropagation(meshCase,face,2,1,MeshAtt.MeshSizePropagationDistance,MeshAtt.MeshSizePropagationScalingFactor);
 #endif
+           }
        }
     }
      if (MeshAtt.lFaceIdUseDiscreteMesh.size()>0) {
@@ -563,9 +578,13 @@ void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, MeshAttribu
        for (it=MeshAtt.lFaceIdUseDiscreteMesh.begin(); it != MeshAtt.lFaceIdUseDiscreteMesh.end(); it++)
        {
            pGEntity face = GM_entityByTag(model, 2, *it);
-           logInfo(PMU_rank()) << "UseDiscreteMesh; faceid, noModification:"<<*it, MeshAtt.UseDiscreteMesh_noModification;
-           MS_useDiscreteGeometryMesh(meshCase,face,MeshAtt.UseDiscreteMesh_noModification);
+           if (face == NULL) {
+            logError() << "UseDiscreteMesh; faceid:"<<*it <<"not found in model.";
+           } else {
+             logInfo(PMU_rank()) << "UseDiscreteMesh; faceid, noModification:"<<*it, MeshAtt.UseDiscreteMesh_noModification;
+             MS_useDiscreteGeometryMesh(meshCase,face,MeshAtt.UseDiscreteMesh_noModification);
            //MS_limitSurfaceMeshModification(meshCase,face,UseDiscreteMesh_noModification);
+           }
        }
     } 
 }
