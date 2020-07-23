@@ -15,6 +15,7 @@
 AnalysisAttributes::AnalysisAttributes(const char* xmlFilename, int numFaces) {
     readXmlFile(xmlFilename);
     faceBound.reserve(numFaces);
+    set_BoundaryConditions();
 }
 
 void AnalysisAttributes::readXmlFile(const char* xmlFilename) {
