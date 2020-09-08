@@ -54,7 +54,6 @@
 #include <SimMeshTools.h>
 #include <SimDisplay.h>
 #include <list>
-#include <SimExport.h>
 
 //forward declare
 pAManager SModel_attManager(pModel model);
