@@ -402,7 +402,7 @@ int main(int argc, char* argv[])
 				int b;
 				mesh->getIntTag(faces[i], boundaryTag, &b);
 
-				if (b <= 0 || b > std::numeric_limits<char>::max())
+				if (b <= 0 || b > std::numeric_limits<unsigned char>::max())
 					logError() << "Cannot handle boundary condition" << b;
 
 				boundary[index] += b << (i*8);
