@@ -80,7 +80,6 @@ public:
 			const char* analysisCaseName = "analysis",
 			int enforceSize = 0,
          const char* xmlFile=0L,
-         const bool probe_faces=false,
          const bool analyseAR=false,
 			const char* logFile = 0L)
 	{
@@ -108,12 +107,6 @@ public:
          loadCAD(modFile, cadFile);
       } else {
          loadSTL(modFile);
-      }
-
-
-      // Probe faces
-      if(probe_faces) {
-         probeFaceCoords(m_model);
       }
 
       // Extract cases
@@ -729,85 +722,6 @@ void analyse_mesh() {
     for(int i = 0; i < num_bins; i++) {
         logInfo(PMU_rank()) << std::fixed << std::setprecision(2) << "[" << i * 1.0 / num_bins << "," << (i + 1) * 1.0 / num_bins << "):" << skew_area_bins[i];
     }*/
-}
-
-private:
-// Method for probing the locations of the model faces to facilitate parameter setup
-void probeFaceCoords(pGModel model) {
-    GRIter modelRegions;
-    pGRegion modelRegion;
-    int nfaces;
-    pPList FaceList;
-
-    GFIter modelFaces;
-    pGFace modelFace;
-    int ID, ID2;
-    pPList edgeList;  // Edges bounding a face
-    pGEdge thisEdge;
-    pSimPolygons poly; // tessellation of a face
-    const int maxPolyPoints = 100;
-    int polypoint[maxPolyPoints];   // ID of the points of a polygon
-    double pntlocation[3];
-    double pntnormal[3];
-
-    modelRegions = GM_regionIter(model);
-    logInfo(PMU_rank()) << "There are" << GRIter_size(modelRegions) <<"regions in the model";
-
-    while(modelRegion=GRIter_next(modelRegions)) { // get the next model region
-        ID = GEN_tag(modelRegion);
-        FaceList  =   GR_faces(modelRegion);
-        nfaces = PList_size(FaceList);
-        double vol = GR_volume(modelRegion,0.6);
-        logInfo(PMU_rank()) << "There are" << nfaces << "faces on model region" << ID << ":"<<"volume:"<<vol;
-        void *iter = 0; //
-        while((modelFace = (pGFace)PList_next(FaceList, &iter)) != 0) {
-           ID = GEN_tag(modelFace);
-           logInfo(PMU_rank()) << ID;
-        }
-    }
-
-    modelFaces = GM_faceIter(model);
-    logInfo(PMU_rank()) << "Face information:";
-    while(modelFace=GFIter_next(modelFaces)) { // get the next model face
-
-        ID = GEN_tag(modelFace);
-
-        pPList lregion = GF_regions(modelFace);
-        void *iter = 0; //
-        while((modelRegion = (pGRegion)PList_next(lregion, &iter)) != 0) {
-           ID2 = GEN_tag(modelRegion);
-           logInfo(PMU_rank()) << "model face" << ID << ": adjacent region" << ID2;
-        }
-
-        poly = GF_displayRep(modelFace);
-        int npolys = SimPolygons_numPolys(poly);
-        int npolypnts = SimPolygons_numPoints(poly);
-        logInfo(PMU_rank()) << "There are" << npolys << "polygons and" << npolypnts << "points on model face" << ID << ", e.g.:";
-
-
-
-        int j;
-        for (j=0; j<1; j++) { // loop over the polygons
-
-            int myPoints = SimPolygons_polySize(poly, j);
-            SimPolygons_poly(poly, j, polypoint);
-
-            std::stringstream polygon_str;
-            polygon_str << "Polygon " << j << " has the following points:";
-            int k;
-            for (k=0; k<myPoints; k++)
-                polygon_str << " " << polypoint[k];
-            logInfo(PMU_rank()) << polygon_str.str().c_str();
-
-            for (k=0; k<myPoints; k++) {
-                int hasnorm = SimPolygons_pointData(poly, polypoint[k], pntlocation, pntnormal);
-                logInfo(PMU_rank()) << " Point" << polypoint[k] << ": (" << pntlocation[0] << "," << pntlocation[1] << "," << pntlocation[2] << ")" << 
-                                      ", normal: (" << pntnormal[0] << "," << pntnormal[1] << "," << pntnormal[2] << ")";
-            }
-        }
-        SimPolygons_delete(poly); // cleanup
-    }
-    GFIter_delete(modelFaces); // cleanup
 }
 
 
