@@ -13,18 +13,17 @@ list(APPEND SIMMETRIX_INCLUDE_DIR
 find_library(GMI_SIM_LIB gmi_sim)
 find_library(APF_SIM_LIB apf_sim)
 
-set(SIM_LIB_HINT ${SIMMETRIX_ROOT}/lib/x64_rhel6_gcc44)
+set(SIM_LIB_HINT ${SIMMETRIX_ROOT}/lib/x64_rhel7_gcc48)
 
-find_library(SIM_ACIS_LIB SimAcis2017 ${SIM_LIB_HINT})
+find_library(SIM_ACIS_LIB NAMES SimAcis2019 SimAcis2020 PATHS ${SIM_LIB_HINT})
 find_library(SIM_DISCRETE_LIB SimDiscrete ${SIM_LIB_HINT})
-find_library(SIM_EXPORT_LIB SimExport ${SIM_LIB_HINT})
 find_library(SIM_MESHING_LIB SimMeshing ${SIM_LIB_HINT})
 find_library(SIM_MESH_TOOLS_LIB SimMeshTools ${SIM_LIB_HINT})
 find_library(SIM_MODEL_LIB SimModel ${SIM_LIB_HINT})
-find_library(SIM_PARASOLID_LIB SimParasolid310 ${SIM_LIB_HINT})
+find_library(SIM_PARASOLID_LIB NAMES SimParasolid310 SimParasolid320 PATHS ${SIM_LIB_HINT})
 find_library(SIM_PARTITIONED_MESH_LIB SimPartitionedMesh ${SIM_LIB_HINT})
 find_library(SIM_PARTITIONED_MESH_MPI_LIB SimPartitionedMesh-mpi ${SIM_LIB_HINT})
-find_library(SIM_PARTITINED_WRAPPER_LIB SimPartitionWrapper-mpich ${SIM_LIB_HINT})
+find_library(SIM_PARTITINED_WRAPPER_LIB SimPartitionWrapper-mpich3 ${SIM_LIB_HINT})
 find_library(SIM_PS_KRNL_LIB pskernel ${SIM_LIB_HINT}/psKrnl)
   
 get_filename_component(SIM_PS_KRNL_LIB_DIR ${SIM_PS_KRNL_LIB} DIRECTORY)
