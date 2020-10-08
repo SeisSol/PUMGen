@@ -54,7 +54,6 @@
 #include <SimMeshTools.h>
 #include <SimDisplay.h>
 #include <list>
-#include <SimExport.h>
 
 //forward declare
 pAManager SModel_attManager(pModel model);
@@ -81,7 +80,6 @@ public:
 			const char* analysisCaseName = "analysis",
 			int enforceSize = 0,
          const char* xmlFile=0L,
-         const char* export_sxp_file=0L,
          const bool probe_faces=false,
          const bool analyseAR=false,
 			const char* logFile = 0L)
@@ -155,39 +153,6 @@ public:
 		progressBar.setTotal(26);
 		SurfaceMesher_execute(surfaceMesher, prog);
 		SurfaceMesher_delete(surfaceMesher);
-#ifdef BEFORE_SIM_11
-      if(export_sxp_file != NULL) {
-          SimExport_start();
-
-          // Instantiate Exporter
-          pExporter exporter = Exporter_new();
-
-          // Load Nastran pattern file
-          pCompiledPattern pattern = CompiledPattern_createFromFile(export_sxp_file);
-
-          // Set inputs:
-          //  1. mesh
-          //  2. AttCase (set to null)
-          pMesh mesh = M_createFromParMesh(m_simMesh,2,prog);
-          Exporter_setInputs(exporter, mesh, 0);
-
-          // Set outputs:
-          //  1. output file
-          //  2. output directory (set to null - will use local directory
-          Exporter_setOutputs(exporter, "out.ts", "");
-
-          // Run Exporter
-          Exporter_executeCompiledPattern(exporter, pattern, prog);
-          logInfo(PMU_rank()) <<"Export complete\n";
-
-          // Release resources
-          CompiledPattern_release(pattern);
-          Exporter_delete(exporter);
-          M_release(mesh);
-
-         exit(0);
-      }
-#endif
 
 		//if (!nativeModel)
 			// Discrete model
