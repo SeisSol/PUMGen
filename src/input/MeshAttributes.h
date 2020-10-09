@@ -61,10 +61,11 @@ class MeshAttributes {
     void set_surfaceMSize();
     void set_MeshSizePropagation();
     void set_regionMSize();
-    void set_gradation();
-    void set_globalMSize();
-    void set_area_AspectRatio();
-    void set_vol_AspectRatio();
+    void set_global_mesh_attributes();
+    void retrieve_attribute_and_update_class_member(XMLNode* element, const char* sElementName, const char* sAttributeName, double* MeshAttributesMember);
+    void retrieve_attribute_and_update_class_member(XMLNode* element, const char* sElementName, const char* sAttributeName, int* MeshAttributesMember);
+    std::string retrieve_text_from_xml(XMLNode* element, const char* sElementName);
+    std::list<int>  parse_string_and_fill_list(std::string line);
 };
 
 
