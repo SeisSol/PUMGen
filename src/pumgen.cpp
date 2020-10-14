@@ -26,7 +26,6 @@
 // #include <apfZoltan.h>
 #include <maMesh.h>
 
-#include "meshreader/ParallelGMSHReader.h"
 #include "utils/args.h"
 #include "utils/logger.h"
 
