@@ -106,7 +106,7 @@ public:
       } else if(smodFile.substr(smodFile.find_last_of(".") + 1) == "smd") {
          loadCAD(modFile, cadFile);
       } else {
-         loadSTL(modFile);
+		 logError() << "unsupported model file";
       }
 
       // Extract cases
@@ -547,94 +547,6 @@ void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, MeshAttribu
     } 
 }
 
-private:
-void loadSTL(const char *filename){
-    pMesh mesh = M_new(0,0);
-    pDiscreteModel d_model = 0;
-    if(M_importFromSTLFile(mesh, filename, 0L)) { //check for error
-        logError() << "Error importing file";
-        M_release(mesh);
-        return;
-    }
-    logInfo(PMU_rank()) <<"done importing stl";
-    // check the input mesh for intersections
-    // this call must occur before the discrete model is created
-    if(MS_checkMeshIntersections(mesh, 0, 0L)) {
-        logError() << "There are intersections in the input mesh";
-        M_release(mesh);
-        return;
-    }
-    logInfo(PMU_rank()) <<"done checking for intersections";
-
-    // create the discrete model
-    d_model = DM_createFromMesh(mesh, 1, 0L);
-    if(!d_model) { //check for error
-        logError() << "Error creating Discrete model from mesh";
-        M_release(mesh);
-        return;
-    }
-    logInfo(PMU_rank()) <<"done creating the discrete mesh";
-
-
-    // define the discrete model
-    //DM_findEdgesByFaceNormalsDegrees(d_model, 70, 0L);
-    DM_eliminateDanglingEdges(d_model, 0L);
-    logInfo(PMU_rank()) <<"done eliminating Dangling edges";
-
-    if(DM_completeTopology(d_model, 0L)) { //check for error
-        logError() << "Error completing Discrete model topology";
-        M_release(mesh);
-        GM_release(d_model);
-        return;
-    }
-    logInfo(PMU_rank()) <<"done checking topology";
-
-    // Print out information about the model
-    logInfo(PMU_rank()) << "Number of model vertices: " << GM_numVertices(d_model);
-    logInfo(PMU_rank()) << "Number of model edges: " << GM_numEdges(d_model);
-    logInfo(PMU_rank()) << "Number of model faces: " << GM_numFaces(d_model);
-    logInfo(PMU_rank()) << "Number of model regions: " << GM_numRegions(d_model);
-
-    m_model = d_model;
-
-    //detect small features
-    double detectSmallFeaturesThreshold=200;
-    pSmallFeatureInfo smallFeats = GM_detectSmallFeatures(m_model,1,detectSmallFeaturesThreshold,0,0,0);
-    pPList lsmallFeats=GM_getSmallFeatures(smallFeats);
-    logInfo(PMU_rank()) << "Number of small features returned: " <<PList_size(lsmallFeats);
-
-    pGEntity ent;
-    void *iter = 0; // must initialize to 0
-    while(ent = (pGEntity)PList_next(lsmallFeats,&iter)){
-      printf("Entity of type %d and tag %d marked as a small feature\n",GEN_type(ent),GEN_tag(ent));
-      // check if it is a face
-      if(GEN_type(ent) == 2) {
-        pGFace myface = (pGFace)ent;
-        printf("face area: %f\n",GF_area(myface,0.0));
-        //now list vertices
-        pPList vertices = GF_vertices(myface);
-        pGVertex vert;
-        void *iter2 = 0; // must initialize to 0
-        double * xyz;
-        while(vert = (pGVertex)PList_next(vertices,&iter2)){
-           GV_point(vert, xyz);
-           printf("vertices: (%g,%g,%g\n", xyz[0],xyz[1],xyz[2]);
-        }
-        PList_delete(vertices);
-      }
-    }
-    PList_delete(lsmallFeats);
-
-    GM_write(m_model,"model.smd",0,0); // write out the model before the mesh!
-    logInfo(PMU_rank()) << "done writing model.smd";
-
-
-
-
-    // Since we told the Discrete model to use the input mesh, we release our
-    // pointer to it.  It will be fully released when the Discrete model is released.
-    M_release(mesh);
-}
 
 private:
 void loadCAD(const char* modFile, const char* cadFile){
