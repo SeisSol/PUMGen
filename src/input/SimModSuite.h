@@ -54,7 +54,6 @@
 #include <SimMeshTools.h>
 #include <SimDisplay.h>
 #include <list>
-#include <SimExport.h>
 
 //forward declare
 pAManager SModel_attManager(pModel model);
@@ -81,8 +80,6 @@ public:
 			const char* analysisCaseName = "analysis",
 			int enforceSize = 0,
          const char* xmlFile=0L,
-         const char* export_sxp_file=0L,
-         const bool probe_faces=false,
          const bool analyseAR=false,
 			const char* logFile = 0L)
 	{
@@ -109,13 +106,7 @@ public:
       } else if(smodFile.substr(smodFile.find_last_of(".") + 1) == "smd") {
          loadCAD(modFile, cadFile);
       } else {
-         loadSTL(modFile);
-      }
-
-
-      // Probe faces
-      if(probe_faces) {
-         probeFaceCoords(m_model);
+		 logError() << "unsupported model file";
       }
 
       // Extract cases
@@ -148,46 +139,13 @@ public:
 		pSurfaceMesher surfaceMesher = SurfaceMesher_new(meshCase, m_simMesh);
                 if(xmlFile != NULL) {
                    SurfaceMesher_setSmoothing(surfaceMesher, MeshAtt.surfaceSmoothingLevel);
-                   SurfaceMesher_setSmoothType(surfaceMesher, MeshAtt.surfaceSmoothingType);
+                   SurfaceMesher_setSmoothType(surfaceMesher, static_cast<int> (MeshAtt.surfaceSmoothingType));
                    SurfaceMesher_setFaceRotationLimit(surfaceMesher, MeshAtt.surfaceFaceRotationLimit);
                    SurfaceMesher_setSnapForDiscrete(surfaceMesher,MeshAtt.surfaceSnap);
                 }
 		progressBar.setTotal(26);
 		SurfaceMesher_execute(surfaceMesher, prog);
 		SurfaceMesher_delete(surfaceMesher);
-#ifdef BEFORE_SIM_11
-      if(export_sxp_file != NULL) {
-          SimExport_start();
-
-          // Instantiate Exporter
-          pExporter exporter = Exporter_new();
-
-          // Load Nastran pattern file
-          pCompiledPattern pattern = CompiledPattern_createFromFile(export_sxp_file);
-
-          // Set inputs:
-          //  1. mesh
-          //  2. AttCase (set to null)
-          pMesh mesh = M_createFromParMesh(m_simMesh,2,prog);
-          Exporter_setInputs(exporter, mesh, 0);
-
-          // Set outputs:
-          //  1. output file
-          //  2. output directory (set to null - will use local directory
-          Exporter_setOutputs(exporter, "out.ts", "");
-
-          // Run Exporter
-          Exporter_executeCompiledPattern(exporter, pattern, prog);
-          logInfo(PMU_rank()) <<"Export complete\n";
-
-          // Release resources
-          CompiledPattern_release(pattern);
-          Exporter_delete(exporter);
-          M_release(mesh);
-
-         exit(0);
-      }
-#endif
 
 		//if (!nativeModel)
 			// Discrete model
@@ -197,7 +155,7 @@ public:
 		pVolumeMesher volumeMesher = VolumeMesher_new(meshCase, m_simMesh);
                 if(xmlFile != NULL) {
                    VolumeMesher_setSmoothing(volumeMesher, MeshAtt.volumeSmoothingLevel);
-                   VolumeMesher_setSmoothType(volumeMesher, MeshAtt.volumeSmoothingType);
+                   VolumeMesher_setSmoothType(volumeMesher, static_cast<int> (MeshAtt.volumeSmoothingType));
                    VolumeMesher_setOptimization(volumeMesher,MeshAtt.VolumeMesherOptimization);
                 }
 		VolumeMesher_setEnforceSize(volumeMesher, enforceSize);
@@ -589,94 +547,6 @@ void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, MeshAttribu
     } 
 }
 
-private:
-void loadSTL(const char *filename){
-    pMesh mesh = M_new(0,0);
-    pDiscreteModel d_model = 0;
-    if(M_importFromSTLFile(mesh, filename, 0L)) { //check for error
-        logError() << "Error importing file";
-        M_release(mesh);
-        return;
-    }
-    logInfo(PMU_rank()) <<"done importing stl";
-    // check the input mesh for intersections
-    // this call must occur before the discrete model is created
-    if(MS_checkMeshIntersections(mesh, 0, 0L)) {
-        logError() << "There are intersections in the input mesh";
-        M_release(mesh);
-        return;
-    }
-    logInfo(PMU_rank()) <<"done checking for intersections";
-
-    // create the discrete model
-    d_model = DM_createFromMesh(mesh, 1, 0L);
-    if(!d_model) { //check for error
-        logError() << "Error creating Discrete model from mesh";
-        M_release(mesh);
-        return;
-    }
-    logInfo(PMU_rank()) <<"done creating the discrete mesh";
-
-
-    // define the discrete model
-    //DM_findEdgesByFaceNormalsDegrees(d_model, 70, 0L);
-    DM_eliminateDanglingEdges(d_model, 0L);
-    logInfo(PMU_rank()) <<"done eliminating Dangling edges";
-
-    if(DM_completeTopology(d_model, 0L)) { //check for error
-        logError() << "Error completing Discrete model topology";
-        M_release(mesh);
-        GM_release(d_model);
-        return;
-    }
-    logInfo(PMU_rank()) <<"done checking topology";
-
-    // Print out information about the model
-    logInfo(PMU_rank()) << "Number of model vertices: " << GM_numVertices(d_model);
-    logInfo(PMU_rank()) << "Number of model edges: " << GM_numEdges(d_model);
-    logInfo(PMU_rank()) << "Number of model faces: " << GM_numFaces(d_model);
-    logInfo(PMU_rank()) << "Number of model regions: " << GM_numRegions(d_model);
-
-    m_model = d_model;
-
-    //detect small features
-    double detectSmallFeaturesThreshold=200;
-    pSmallFeatureInfo smallFeats = GM_detectSmallFeatures(m_model,1,detectSmallFeaturesThreshold,0,0,0);
-    pPList lsmallFeats=GM_getSmallFeatures(smallFeats);
-    logInfo(PMU_rank()) << "Number of small features returned: " <<PList_size(lsmallFeats);
-
-    pGEntity ent;
-    void *iter = 0; // must initialize to 0
-    while(ent = (pGEntity)PList_next(lsmallFeats,&iter)){
-      printf("Entity of type %d and tag %d marked as a small feature\n",GEN_type(ent),GEN_tag(ent));
-      // check if it is a face
-      if(GEN_type(ent) == 2) {
-        pGFace myface = (pGFace)ent;
-        printf("face area: %f\n",GF_area(myface,0.0));
-        //now list vertices
-        pPList vertices = GF_vertices(myface);
-        pGVertex vert;
-        void *iter2 = 0; // must initialize to 0
-        double * xyz;
-        while(vert = (pGVertex)PList_next(vertices,&iter2)){
-           GV_point(vert, xyz);
-           printf("vertices: (%g,%g,%g\n", xyz[0],xyz[1],xyz[2]);
-        }
-        PList_delete(vertices);
-      }
-    }
-    PList_delete(lsmallFeats);
-
-    GM_write(m_model,"model.smd",0,0); // write out the model before the mesh!
-    logInfo(PMU_rank()) << "done writing model.smd";
-
-
-
-
-    // Since we told the Discrete model to use the input mesh, we release our
-    // pointer to it.  It will be fully released when the Discrete model is released.
-    M_release(mesh);
-}
 
 private:
 void loadCAD(const char* modFile, const char* cadFile){
@@ -764,85 +634,6 @@ void analyse_mesh() {
     for(int i = 0; i < num_bins; i++) {
         logInfo(PMU_rank()) << std::fixed << std::setprecision(2) << "[" << i * 1.0 / num_bins << "," << (i + 1) * 1.0 / num_bins << "):" << skew_area_bins[i];
     }*/
-}
-
-private:
-// Method for probing the locations of the model faces to facilitate parameter setup
-void probeFaceCoords(pGModel model) {
-    GRIter modelRegions;
-    pGRegion modelRegion;
-    int nfaces;
-    pPList FaceList;
-
-    GFIter modelFaces;
-    pGFace modelFace;
-    int ID, ID2;
-    pPList edgeList;  // Edges bounding a face
-    pGEdge thisEdge;
-    pSimPolygons poly; // tessellation of a face
-    const int maxPolyPoints = 100;
-    int polypoint[maxPolyPoints];   // ID of the points of a polygon
-    double pntlocation[3];
-    double pntnormal[3];
-
-    modelRegions = GM_regionIter(model);
-    logInfo(PMU_rank()) << "There are" << GRIter_size(modelRegions) <<"regions in the model";
-
-    while(modelRegion=GRIter_next(modelRegions)) { // get the next model region
-        ID = GEN_tag(modelRegion);
-        FaceList  =   GR_faces(modelRegion);
-        nfaces = PList_size(FaceList);
-        double vol = GR_volume(modelRegion,0.6);
-        logInfo(PMU_rank()) << "There are" << nfaces << "faces on model region" << ID << ":"<<"volume:"<<vol;
-        void *iter = 0; //
-        while((modelFace = (pGFace)PList_next(FaceList, &iter)) != 0) {
-           ID = GEN_tag(modelFace);
-           logInfo(PMU_rank()) << ID;
-        }
-    }
-
-    modelFaces = GM_faceIter(model);
-    logInfo(PMU_rank()) << "Face information:";
-    while(modelFace=GFIter_next(modelFaces)) { // get the next model face
-
-        ID = GEN_tag(modelFace);
-
-        pPList lregion = GF_regions(modelFace);
-        void *iter = 0; //
-        while((modelRegion = (pGRegion)PList_next(lregion, &iter)) != 0) {
-           ID2 = GEN_tag(modelRegion);
-           logInfo(PMU_rank()) << "model face" << ID << ": adjacent region" << ID2;
-        }
-
-        poly = GF_displayRep(modelFace);
-        int npolys = SimPolygons_numPolys(poly);
-        int npolypnts = SimPolygons_numPoints(poly);
-        logInfo(PMU_rank()) << "There are" << npolys << "polygons and" << npolypnts << "points on model face" << ID << ", e.g.:";
-
-
-
-        int j;
-        for (j=0; j<1; j++) { // loop over the polygons
-
-            int myPoints = SimPolygons_polySize(poly, j);
-            SimPolygons_poly(poly, j, polypoint);
-
-            std::stringstream polygon_str;
-            polygon_str << "Polygon " << j << " has the following points:";
-            int k;
-            for (k=0; k<myPoints; k++)
-                polygon_str << " " << polypoint[k];
-            logInfo(PMU_rank()) << polygon_str.str().c_str();
-
-            for (k=0; k<myPoints; k++) {
-                int hasnorm = SimPolygons_pointData(poly, polypoint[k], pntlocation, pntnormal);
-                logInfo(PMU_rank()) << " Point" << polypoint[k] << ": (" << pntlocation[0] << "," << pntlocation[1] << "," << pntlocation[2] << ")" << 
-                                      ", normal: (" << pntnormal[0] << "," << pntnormal[1] << "," << pntnormal[2] << ")";
-            }
-        }
-        SimPolygons_delete(poly); // cleanup
-    }
-    GFIter_delete(modelFaces); // cleanup
 }
 
 
