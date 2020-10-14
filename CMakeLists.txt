@@ -10,7 +10,7 @@ set_property(CACHE LOG_LEVEL PROPERTY STRINGS "debug" "info" "warning" "error")
 
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
@@ -25,6 +25,9 @@ add_executable(pumgen
   ${CMAKE_CURRENT_SOURCE_DIR}/src/pumgen.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/meshreader/FidapReader.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/meshreader/GambitReader.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/meshreader/ParallelGMSHReader.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/third_party/GMSHLexer.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/third_party/GMSHParser.cpp
   )
 
 target_include_directories(pumgen PUBLIC src
@@ -51,10 +54,9 @@ find_package(OpenMP REQUIRED)
 target_link_libraries(pumgen PUBLIC OpenMP::OpenMP_CXX)
 
 find_package(MPI REQUIRED)
-target_include_directories(pumgen SYSTEM PUBLIC ${MPI_CXX_INCLUDE_PATH})
-target_link_libraries(pumgen PUBLIC MPI::MPI_C)
+target_link_libraries(pumgen PUBLIC MPI::MPI_CXX)
 
-#target_compile_definitions(pumgen PUBLIC USE_MPI PARALLEL)
+target_compile_definitions(pumgen PUBLIC PARALLEL)
 
 find_package(Apf REQUIRED)
 target_include_directories(pumgen PUBLIC ${APF_INCLUDE_DIR})

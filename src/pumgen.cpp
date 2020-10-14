@@ -26,6 +26,7 @@
 // #include <apfZoltan.h>
 #include <maMesh.h>
 
+#include "meshreader/ParallelGMSHReader.h"
 #include "utils/args.h"
 #include "utils/logger.h"
 
@@ -39,6 +40,7 @@
 #endif // USE_SIMMOD
 #include "meshreader/ParallelGambitReader.h"
 #include "meshreader/ParallelFidapReader.h"
+#include "meshreader/ParallelGMSHReader.h"
 
 template<typename TT>
 static void _checkH5Err(TT status, const char* file, int line)
@@ -64,7 +66,7 @@ int main(int argc, char* argv[])
 
 	// Parse command line arguments
 	utils::Args args;
-	const char* source[] = {"gambit", "fidap", "netcdf", "apf", "simmodsuite"};
+	const char* source[] = {"gambit", "fidap", "msh2", "netcdf", "apf", "simmodsuite"};
 	args.addEnumOption("source", source, 's', "Mesh source (default: gambit)", false);
 	args.addOption("dump", 'd', "Dump APF mesh before partitioning it",
 				   utils::Args::Required, false);
@@ -127,7 +129,11 @@ int main(int argc, char* argv[])
 			logInfo(rank) << "Using Fidap mesh";
 			meshInput = new SerialMeshFile<ParallelFidapReader>(inputFile);
 			break;
-		case 2:
+        case 2:
+            logInfo(rank) << "Using GMSH mesh format 2 (msh2) mesh";
+            meshInput = new SerialMeshFile<puml::ParallelGMSHReader>(inputFile);
+            break;
+		case 3:
 #ifdef USE_NETCDF
 			logInfo(rank) << "Using netCDF mesh";
 			meshInput = new NetCDFMesh(inputFile);
@@ -135,12 +141,12 @@ int main(int argc, char* argv[])
 			logError() << "netCDF is not supported in this version";
 #endif // USE_NETCDF
 			break;
-		case 3:
+		case 4:
 			logInfo(rank) << "Using APF native format";
 			meshInput = new ApfNative(inputFile,
 									  args.getArgument<const char*>("model", 0L));
 			break;
-		case 4:
+		case 5:
 #ifdef USE_SIMMOD
 			logInfo(rank) << "Using SimModSuite";
 
