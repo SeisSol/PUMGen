@@ -27,6 +27,7 @@ struct Cube {
   double CubeMSize=0,CubeCenter[3],CubeWidth[3],CubeHeight[3],CubeDepth[3];
 };
 
+
 using namespace tinyxml2;
 class MeshAttributes {
   public:
@@ -62,11 +63,12 @@ class MeshAttributes {
     void set_MeshSizePropagation();
     void set_regionMSize();
     void set_global_mesh_attributes();
-    void retrieve_attribute_and_update_class_member(XMLNode* element, const char* sElementName, const char* sAttributeName, double* MeshAttributesMember);
-    void retrieve_attribute_and_update_class_member(XMLNode* element, const char* sElementName, const char* sAttributeName, int* MeshAttributesMember);
+    void update_attribute_from_xml(XMLNode& element, const char* sElementName, const char* sAttributeName, int& MeshAttributesMember);
+    void update_attribute_from_xml(XMLNode& element, const char* sElementName, const char* sAttributeName, double& MeshAttributesMember);
     std::string retrieve_text_from_xml(XMLNode* element, const char* sElementName);
-    std::list<int>  parse_string_and_fill_list(std::string line);
+    std::list<int>  fill_list_using_parsed_string(std::string line);
 };
+
 
 
 #endif
