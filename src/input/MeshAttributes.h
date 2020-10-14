@@ -31,12 +31,16 @@ struct Cube {
 using namespace tinyxml2;
 class MeshAttributes {
   public:
+    enum class SmoothingType {
+      Laplacian = 0,
+      Gradient = 1
+    };
     int surfaceSmoothingLevel=2;
-    int surfaceSmoothingType=1;
+    SmoothingType surfaceSmoothingType = SmoothingType::Gradient;
     double surfaceFaceRotationLimit=5.0;
     int surfaceSnap=0;
     int volumeSmoothingLevel=1;
-    int volumeSmoothingType=1;
+    SmoothingType volumeSmoothingType = SmoothingType::Gradient;
     int VolumeMesherOptimization=1;
     double globalMSize=0., faultMSize=0., gradation=0., vol_AspectRatio=0., area_AspectRatio=0.;
     std::list<double> lsurfaceMSize;

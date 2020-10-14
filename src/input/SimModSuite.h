@@ -139,7 +139,7 @@ public:
 		pSurfaceMesher surfaceMesher = SurfaceMesher_new(meshCase, m_simMesh);
                 if(xmlFile != NULL) {
                    SurfaceMesher_setSmoothing(surfaceMesher, MeshAtt.surfaceSmoothingLevel);
-                   SurfaceMesher_setSmoothType(surfaceMesher, MeshAtt.surfaceSmoothingType);
+                   SurfaceMesher_setSmoothType(surfaceMesher, static_cast<int> (MeshAtt.surfaceSmoothingType));
                    SurfaceMesher_setFaceRotationLimit(surfaceMesher, MeshAtt.surfaceFaceRotationLimit);
                    SurfaceMesher_setSnapForDiscrete(surfaceMesher,MeshAtt.surfaceSnap);
                 }
@@ -155,7 +155,7 @@ public:
 		pVolumeMesher volumeMesher = VolumeMesher_new(meshCase, m_simMesh);
                 if(xmlFile != NULL) {
                    VolumeMesher_setSmoothing(volumeMesher, MeshAtt.volumeSmoothingLevel);
-                   VolumeMesher_setSmoothType(volumeMesher, MeshAtt.volumeSmoothingType);
+                   VolumeMesher_setSmoothType(volumeMesher, static_cast<int> (MeshAtt.volumeSmoothingType));
                    VolumeMesher_setOptimization(volumeMesher,MeshAtt.VolumeMesherOptimization);
                 }
 		VolumeMesher_setEnforceSize(volumeMesher, enforceSize);

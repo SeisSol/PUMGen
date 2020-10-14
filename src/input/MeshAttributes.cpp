@@ -58,14 +58,14 @@ void MeshAttributes::set_SurfaceMeshingAttributes() {
     if (auto pRoot = doc.FirstChildElement("SurfaceMeshing")) {
         std::string sSmoothingType = pRoot->Attribute("SmoothingType");
         if (sSmoothingType.compare("Laplacian")==0) {
-           surfaceSmoothingType=0;
+           surfaceSmoothingType = SmoothingType::Laplacian;
         } else if (sSmoothingType.compare("Gradient")==0) {
-           surfaceSmoothingType=1;
+           surfaceSmoothingType = SmoothingType::Gradient;
         } else {
            logError() << "Unrecognised surfaceSmoothingType (Laplacian or Gradient)" << sSmoothingType;
         } 
         logInfo(PMU_rank()) << "surface smoothing option: surfaceSmoothingLevel surfaceSmoothingType surfaceFaceRotationLimit Snap"<<
-            surfaceSmoothingLevel<<" "<< surfaceSmoothingType<<" "<< surfaceFaceRotationLimit <<" "<<surfaceSnap;
+            surfaceSmoothingLevel<<" "<< static_cast<int> (surfaceSmoothingType) <<" "<< surfaceFaceRotationLimit <<" "<<surfaceSnap;
     }
 }
 
@@ -75,14 +75,14 @@ void MeshAttributes::set_VolumeMeshingAttributes() {
     if (auto pRoot = doc.FirstChildElement("VolumeMeshing")) {
         std::string sSmoothingType = pRoot->Attribute("SmoothingType");
         if (sSmoothingType.compare("Laplacian")==0) {
-           volumeSmoothingType = 0;
+           volumeSmoothingType = SmoothingType::Laplacian;
         } else if (sSmoothingType.compare("Gradient")==0) {
-           volumeSmoothingType = 1;
+           volumeSmoothingType = SmoothingType::Gradient;
         } else {
            logError() << "Unrecognised volumeSmoothingType (Laplacian or Gradient)" << sSmoothingType;
         }
         logInfo(PMU_rank()) << "volume smoothing option: volumeSmoothingLevel volumeSmoothingType"<< 
-            volumeSmoothingLevel<<" "<< volumeSmoothingType;
+            volumeSmoothingLevel<<" "<< static_cast<int> (volumeSmoothingType);
     }
 }
 
