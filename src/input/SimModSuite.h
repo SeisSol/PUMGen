@@ -125,11 +125,7 @@ public:
         extractCases(m_model, meshCase, meshCaseName, analysisCase, analysisCaseName);
       }
 
-		//if (nativeModel)
-			m_simMesh = PM_new(0, m_model, PMU_size());
-		//else
-			// Discrete model
-			//m_simMesh = PM_new(0, m_model, 1);
+		m_simMesh = PM_new(0, m_model, PMU_size());
 
 		pProgress prog = Progress_new();
 		Progress_setCallback(prog, progressHandler);
@@ -147,9 +143,7 @@ public:
 		SurfaceMesher_execute(surfaceMesher, prog);
 		SurfaceMesher_delete(surfaceMesher);
 
-		//if (!nativeModel)
-			// Discrete model
-			PM_setTotalNumParts(m_simMesh, PMU_size());
+		PM_setTotalNumParts(m_simMesh, PMU_size());
 
 		logInfo(PMU_rank()) << "Starting the volume mesher";
 		pVolumeMesher volumeMesher = VolumeMesher_new(meshCase, m_simMesh);
@@ -563,6 +557,7 @@ void loadCAD(const char* modFile, const char* cadFile){
         nativeModel = ParasolidNM_createFromFile(sCadFile.c_str(), 0);
 
     m_model = GM_load(modFile, nativeModel, 0L);
+    nativeModel = GM_nativeModel(m_model);
 
     if (nativeModel)
         NM_release(nativeModel);
@@ -605,18 +600,7 @@ void analyse_mesh() {
         }
     }
     RIter_delete(reg_it);
-    /*
-    // Accumulate equiarea skewness data
-    FIter face_it;
-    pFace face;
-    for(int i = 0; i < num_partMeshes; i++) {
-        face_it = M_faceIter(PM_mesh(m_simMesh, i));
-        while (face = FIter_next(face_it)) {
-            skew_area_bins[(int)(F_equiareaSkewness(face) * num_bins)]++; // because skewness lies in [0,1]
-        }
-    }
-    FIter_delete(face_it);
-    */
+
     // Print the statistics
     logInfo(PMU_rank()) << "AR statistics:";
     MPI_Allreduce(&maxAR, &AR_global, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
@@ -629,11 +613,6 @@ void analyse_mesh() {
     }
     MPI_Allreduce(&AR_vol_bins[num_bins-1], &bin_global, 1, MPI_LONG, MPI_SUM, MPI_COMM_WORLD);
     logInfo(PMU_rank()) << std::fixed << std::setprecision(2) << "[" << AR[num_bins-1] << ",inf):" << bin_global;
-    /*
-    logInfo(PMU_rank()) << "Equiarea skewness (target: < 0.8):";
-    for(int i = 0; i < num_bins; i++) {
-        logInfo(PMU_rank()) << std::fixed << std::setprecision(2) << "[" << i * 1.0 / num_bins << "," << (i + 1) * 1.0 / num_bins << "):" << skew_area_bins[i];
-    }*/
 }
 
 
