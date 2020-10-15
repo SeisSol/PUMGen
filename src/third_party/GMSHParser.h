@@ -46,6 +46,7 @@ private:
     bool parse_();
 
 public:
+    // Look-up table from gmsh type to number of nodes
     static constexpr std::size_t NumNodes[] = {
         2,  // line
         3,  // triangle,

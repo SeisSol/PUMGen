@@ -42,6 +42,12 @@ public:
 private:
     void convertBoundaryConditions();
     int adjustBoundaryCondition(int bc) const {
+        /**
+         * Boundary conditions in SeisSol used to start at 100, e.g. 101 = free surface.
+         * In the hdf5 format one starts counting from 0, e.g. 1 = free surface.
+         * In order to be compatible with legacy gmsh scripts we subtract 100 here if
+         * the boundary condition is larger or equal 100.
+         */
         if (bc >= BoundaryConditionOffset) {
             bc -= BoundaryConditionOffset;
         }

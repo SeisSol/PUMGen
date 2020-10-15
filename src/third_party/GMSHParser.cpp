@@ -151,7 +151,7 @@ bool GMSHParser::parseElements() {
     if (curTok != GMSHToken::integer || lexer.getInteger() < 0) {
         return logErrorAnnotated<bool>("Expected positive integer");
     }
-    auto numElements = lexer.getInteger();
+    const auto numElements = lexer.getInteger();
 
     constexpr std::size_t MaxNodes = sizeof(NumNodes) / sizeof(std::size_t);
     long tag;

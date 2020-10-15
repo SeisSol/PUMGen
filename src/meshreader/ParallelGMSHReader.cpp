@@ -12,10 +12,9 @@ void ParallelGMSHReader::open(char const* meshFile) {
     int rank;
     MPI_Comm_rank(comm_, &rank);
 
-    bool ok = false;
     if (rank == 0) {
         tndm::GMSHParser parser(&builder_);
-        ok = parser.parseFile(meshFile);
+        bool ok = parser.parseFile(meshFile);
         if (!ok) {
             logError() << meshFile << std::endl << parser.getErrorMessage();
         }
@@ -43,15 +42,19 @@ void ParallelGMSHReader::convertBoundaryConditions() {
     // vertex to triangle map
     std::vector<std::vector<std::size_t>> vertex2facets(nVerts);
     for (std::size_t fctNo = 0; fctNo < nFacets; ++fctNo) {
-        for (std::size_t localNo = 0; localNo < nVertsPerTri; ++localNo) {
-            const auto vtxNo = builder_.facets[fctNo][localNo];
+        for (auto const& vtxNo : builder_.facets[fctNo]) {
             vertex2facets[vtxNo].push_back(fctNo);
         }
     }
-    for (unsigned vNo = 0; vNo < nVerts; ++vNo) {
-        std::sort(vertex2facets[vNo].begin(), vertex2facets[vNo].end());
+    for (auto& v2f : vertex2facets) {
+        std::sort(v2f.begin(), v2f.end());
     }
 
+    /**
+     * GMSH stores boundary conditions on a surface mesh whereas SeisSol expects boundary conditions
+     * to be stored per element. In the following we convert the boundary condition representation
+     * by matching the 4 faces of an element with the surface mesh.
+     */
     for (unsigned elNo = 0; elNo < nElements; ++elNo) {
         for (unsigned localFctNo = 0; localFctNo < nFacetsPerTet; ++localFctNo) {
             unsigned nodes[nVertsPerTri];

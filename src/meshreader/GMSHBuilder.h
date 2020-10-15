@@ -10,9 +10,9 @@
 namespace puml {
 
 template <std::size_t D> struct GMSHSimplexType {};
-template <> struct GMSHSimplexType<1u> { static constexpr long type = 1; };
-template <> struct GMSHSimplexType<2u> { static constexpr long type = 2; };
-template <> struct GMSHSimplexType<3u> { static constexpr long type = 4; };
+template <> struct GMSHSimplexType<1u> { static constexpr long type = 1; }; // 1 -> line
+template <> struct GMSHSimplexType<2u> { static constexpr long type = 2; }; // 2 -> triangle
+template <> struct GMSHSimplexType<3u> { static constexpr long type = 4; }; // 4 -> tetrahedron
 
 template <std::size_t D> class GMSHBuilder : public tndm::GMSHMeshBuilder {
 public:

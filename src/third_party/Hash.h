@@ -6,6 +6,7 @@
 
 namespace tndm {
 
+// https://de.wikipedia.org/wiki/FNV_(Informatik)
 constexpr uint64_t fnv1a0() { return 0xcbf29ce484222325; }
 constexpr uint64_t fnv1a_step(uint64_t hash, char c) { return (hash ^ c) * 0x00000100000001b3; }
 constexpr uint64_t fnv1a(char const* s, std::size_t len) {
