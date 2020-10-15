@@ -1,0 +1,22 @@
+<freeSurface>1</freeSurface>
+<dynamicRupture>2</dynamicRupture>
+<absorbing>3,4</absorbing>
+<boundaryCondition tag="7">7</boundaryCondition>
+<boundaryCondition tag="8">8,9</boundaryCondition>
+<globalMSize value="100e3"/>
+<surfaceMSize value="20e3">1,2</surfaceMSize>
+<surfaceMSize value="10e3">3,4</surfaceMSize>
+<regionMSize value="15e3">1</regionMSize>
+<MeshSizePropagation Distance="1e3" ScalingFactor="1.0">1</MeshSizePropagation>
+<gradation value="0.3"/>
+<area_AspectRatio value="4"/>
+<vol_AspectRatio value="6"/>
+<SurfaceMeshing SmoothingLevel="3" SmoothingType="Gradient" DiscreteAngle="1.0" Snap="0"></SurfaceMeshing>
+<VolumeMeshing  SmoothingLevel="2" SmoothingType="Laplacian" SetOptimisation="1"></VolumeMeshing>
+<MeshRefinementZoneCube value="1000">
+<Center x="0" y="0" z="-10e3"/>
+<Width x="20e3" y="0" z="0"/>
+<Height x="20e3" y="0" z="10e3"/>
+<Depth x="0e3" y="2e3" z="0"/>
+</MeshRefinementZoneCube>
+<UseDiscreteMesh noModification="1">1</UseDiscreteMesh>

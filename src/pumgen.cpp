@@ -80,6 +80,10 @@ int main(int argc, char* argv[])
 				   utils::Args::Required, false);
 	args.addOption("analysis", 0, "Analysis attributes name (only used by SimModSuite, default: \"analysis\")",
 				   utils::Args::Required, false);
+   args.addOption("xml", 0, "Use mesh and attributes parameters from a xml file (only used by SimModSuite)",
+         utils::Args::Required, false);
+   args.addOption("analyseAR", 0, "produce an histogram of AR",
+         utils::Args::No, false);
 	const char* forces[] = {"0", "1", "2"};
 	args.addEnumOption("enforce-size", forces, 0, "Enforce mesh size (only used by SimModSuite, default: 0)", false);
 	args.addOption("sim_log", 0, "Create SimModSuite log", utils::Args::Required, false);
@@ -146,8 +150,9 @@ int main(int argc, char* argv[])
 				args.getArgument<const char*>("mesh", "mesh"),
 				args.getArgument<const char*>("analysis", "analysis"),
 				args.getArgument<int>("enforce-size", 0),
+            args.getArgument<const char*>("xml",0L),
+            args.isSet("analyseAR"),
 				args.getArgument<const char*>("sim_log", 0L));
-
 #else // USE_SIMMOD
 			logError() << "SimModSuite is not supported in this version";
 #endif // USE_SIMMOD
@@ -213,7 +218,11 @@ int main(int argc, char* argv[])
 	// Create the H5 file
 	hid_t h5falist = H5Pcreate(H5P_FILE_ACCESS);
 	checkH5Err(h5falist);
+#ifdef H5F_LIBVER_V18
+	checkH5Err(H5Pset_libver_bounds(h5falist, H5F_LIBVER_V18, H5F_LIBVER_V18));
+#else
 	checkH5Err(H5Pset_libver_bounds(h5falist, H5F_LIBVER_LATEST, H5F_LIBVER_LATEST));
+#endif
 	checkH5Err(H5Pset_fapl_mpio(h5falist, MPI_COMM_WORLD, MPI_INFO_NULL));
 	hid_t h5file = H5Fcreate(outputFile.c_str(), H5F_ACC_TRUNC, H5P_DEFAULT, h5falist);
 	checkH5Err(h5file);
@@ -387,7 +396,7 @@ int main(int argc, char* argv[])
 				int b;
 				mesh->getIntTag(faces[i], boundaryTag, &b);
 
-				if (b <= 0 || b > std::numeric_limits<char>::max())
+				if (b <= 0 || b > std::numeric_limits<unsigned char>::max())
 					logError() << "Cannot handle boundary condition" << b;
 
 				boundary[index] += b << (i*8);
