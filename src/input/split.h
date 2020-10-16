@@ -1,5 +1,5 @@
-#ifndef MYSPLIT_H
-#define MYSPLIT_H
+#ifndef INPUT_SPLIT_H
+#define INPUT_SPLIT_H
 
 #include <algorithm>
 #include <cstring>

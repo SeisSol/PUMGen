@@ -1,15 +1,3 @@
-/**
- * @file
- *  This file is part of PUMGen
- *
- *  For conditions of distribution and use, please see the copyright
- *  notice in the file 'COPYING' at the root directory of this package
- *  and the copyright notice at https://github.com/SeisSol/PUMGen
- *
- * @copyright 2018 LMU-TUM 
- * @author Thomas Ulrich
- */
-
 #include "AnalysisAttributes.h"
 
 AnalysisAttributes::AnalysisAttributes(const char* xmlFilename, int numFaces) {
