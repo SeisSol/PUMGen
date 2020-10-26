@@ -25,16 +25,16 @@ void MeshAttributes::readXmlFile(const char* xmlFilename) {
 }
 
 void MeshAttributes::set_MeshRefinementZoneCube() {
-    std::string xyz = "xyz";
     for (auto child = doc.FirstChildElement("MeshRefinementZoneCube"); child; child = child->NextSiblingElement("MeshRefinementZoneCube"))
        {
        Cube mycube;
        mycube.CubeMSize =  std::atof(child->Attribute("value"));
-       for (std::string::size_type i = 0; i < xyz.size(); i++) {
-           update_attribute_from_xml(*child, "Center", &xyz[i], mycube.CubeCenter[i]);
-           update_attribute_from_xml(*child, "Width", &xyz[i], mycube.CubeWidth[i]);
-           update_attribute_from_xml(*child, "Height", &xyz[i], mycube.CubeHeight[i]);
-           update_attribute_from_xml(*child, "Depth", &xyz[i], mycube.CubeDepth[i]);
+       for (int i = 0; i < 3; i++) {
+           char xyz[] = {'x' + i, '\0'};
+           update_attribute_from_xml(*child, "Center", xyz, mycube.CubeCenter[i]);
+           update_attribute_from_xml(*child, "Width", xyz, mycube.CubeWidth[i]);
+           update_attribute_from_xml(*child, "Height", xyz, mycube.CubeHeight[i]);
+           update_attribute_from_xml(*child, "Depth", xyz, mycube.CubeDepth[i]);
        }
        lCube.push_back(mycube);
     }
