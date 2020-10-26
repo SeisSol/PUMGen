@@ -10,6 +10,8 @@ void MeshAttributes::init(const char* xmlFilename) {
     set_SurfaceMeshingAttributes();
     set_VolumeMeshingAttributes();
     set_UseDiscreteMesh();
+    set_vertexMSize();
+    set_edgeMSize();
     set_surfaceMSize();
     set_MeshSizePropagation();
     set_regionMSize();
@@ -81,12 +83,24 @@ void MeshAttributes::set_UseDiscreteMesh() {
     }
 }
 
+void MeshAttributes::set_vertexMSize() {
+    for (auto child = doc.FirstChildElement("vertexMSize"); child; child = child->NextSiblingElement("vertexMSize"))
+    {
+       lpair_lVertexId_MSize.push_back(std::make_pair(fill_list_using_parsed_string(child-> GetText()), std::atof(child->Attribute("value"))));
+    }
+}
+
+void MeshAttributes::set_edgeMSize() {
+    for (auto child = doc.FirstChildElement("edgeMSize"); child; child = child->NextSiblingElement("edgeMSize"))
+    {
+       lpair_lEdgeId_MSize.push_back(std::make_pair(fill_list_using_parsed_string(child-> GetText()), std::atof(child->Attribute("value"))));
+    }
+}
 
 void MeshAttributes::set_surfaceMSize() {
     for (auto child = doc.FirstChildElement("surfaceMSize"); child; child = child->NextSiblingElement("surfaceMSize"))
     {
-       lsurfaceMSize.push_back( std::atof(child->Attribute("value")));
-       llsurfaceMSizeFaceId.push_back(fill_list_using_parsed_string(child-> GetText()));
+       lpair_lFaceId_MSize.push_back(std::make_pair(fill_list_using_parsed_string(child-> GetText()), std::atof(child->Attribute("value"))));
     }
 }
 
@@ -103,8 +117,7 @@ void MeshAttributes::set_MeshSizePropagation() {
 void MeshAttributes::set_regionMSize() {
     for (auto child = doc.FirstChildElement("regionMSize"); child; child = child->NextSiblingElement("regionMSize"))
     {
-       lregionMSize.push_back( std::atof(child->Attribute("value")));
-       llregionMSizeRegionId.push_back(fill_list_using_parsed_string(child-> GetText()));
+       lpair_lRegionId_MSize.push_back(std::make_pair(fill_list_using_parsed_string(child-> GetText()), std::atof(child->Attribute("value"))));
     }
 }
 
