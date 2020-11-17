@@ -18,18 +18,14 @@
 /**
  * Interface for mesh input
  */
-class MeshInput
-{
+class MeshInput {
 protected:
-	apf::Mesh2* m_mesh;
+  apf::Mesh2 *m_mesh;
 
 public:
-	virtual ~MeshInput() {}
+  virtual ~MeshInput() {}
 
-	apf::Mesh2* getMesh()
-	{
-		return m_mesh;
-	}
+  apf::Mesh2 *getMesh() { return m_mesh; }
 };
 
 #endif // MESH_INPUT_H
