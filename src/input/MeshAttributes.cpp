@@ -34,8 +34,8 @@ void MeshAttributes::set_MeshRefinementZoneCube() {
        {
        Cube mycube;
        mycube.CubeMSize =  std::atof(child->Attribute("value"));
-       for (int i = 0; i < 3; i++) {
-           char xyz[] = {'x' + i, '\0'};
+       for (char i = 0; i < 3; i++) {
+           char xyz[] = {static_cast<char>('x' + i), '\0'};
            update_attribute_from_xml(*child, "Center", xyz, mycube.CubeCenter[i]);
            update_attribute_from_xml(*child, "Width", xyz, mycube.CubeWidth[i]);
            update_attribute_from_xml(*child, "Height", xyz, mycube.CubeHeight[i]);
