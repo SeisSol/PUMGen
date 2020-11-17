@@ -23,15 +23,15 @@
 
 class ApfNative : public MeshInput {
 public:
-  ApfNative(const char *mesh, const char *model = 0L) {
-    if (model)
-      gmi_register_mesh();
-    else {
-      gmi_register_null();
-      model = ".null";
+    ApfNative(const char* mesh, const char* model = 0L) {
+        if (model)
+            gmi_register_mesh();
+        else {
+            gmi_register_null();
+            model = ".null";
+        }
+        m_mesh = apf::loadMdsMesh(model, mesh);
     }
-    m_mesh = apf::loadMdsMesh(model, mesh);
-  }
 };
 
 #endif // APF_NATIVE_H

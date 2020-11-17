@@ -20,72 +20,72 @@
  */
 class Partition {
 private:
-  unsigned int m_nElements;
-  unsigned int m_nVertices;
+    unsigned int m_nElements;
+    unsigned int m_nVertices;
 
-  int *m_elements;
-  double *m_vertices;
-  int *m_boundaries;
-  int *m_groups;
+    int* m_elements;
+    double* m_vertices;
+    int* m_boundaries;
+    int* m_groups;
 
 public:
-  Partition()
-      : m_nElements(0), m_nVertices(0), m_elements(0L), m_vertices(0L),
-        m_boundaries(0L), m_groups(0L) {}
+    Partition()
+        : m_nElements(0), m_nVertices(0), m_elements(0L), m_vertices(0L), m_boundaries(0L),
+          m_groups(0L) {}
 
-  ~Partition() {
-    delete[] m_elements;
-    delete[] m_vertices;
-    delete[] m_boundaries;
-    delete[] m_groups;
-  }
-
-  void setElemSize(unsigned int nElements) {
-    if (m_nElements != 0)
-      return;
-
-    m_nElements = nElements;
-
-    m_elements = new int[nElements * 4];
-    m_boundaries = new int[nElements * 4];
-    m_groups = new int[nElements];
-    // Set default value for groups
-    memset(m_groups, 0, nElements * sizeof(int));
-  }
-
-  void setVrtxSize(unsigned int nVertices) {
-    if (m_nVertices != 0)
-      return;
-
-    m_nVertices = nVertices;
-
-    m_vertices = new double[nVertices * 3];
-  }
-
-  void convertBoundary() {
-    int ncBoundaries[4];
-
-    for (unsigned int i = 0; i < m_nElements * 4; i += 4) {
-      memcpy(ncBoundaries, &m_boundaries[i], 4 * sizeof(int));
-      for (unsigned int j = 0; j < 4; j++)
-        m_boundaries[i + j] = ncBoundaries[INTERNAL2EX_ORDER[j]];
+    ~Partition() {
+        delete[] m_elements;
+        delete[] m_vertices;
+        delete[] m_boundaries;
+        delete[] m_groups;
     }
-  }
 
-  unsigned int nElements() const { return m_nElements; }
+    void setElemSize(unsigned int nElements) {
+        if (m_nElements != 0)
+            return;
 
-  unsigned int nVertices() const { return m_nVertices; }
+        m_nElements = nElements;
 
-  int *elements() { return m_elements; }
+        m_elements = new int[nElements * 4];
+        m_boundaries = new int[nElements * 4];
+        m_groups = new int[nElements];
+        // Set default value for groups
+        memset(m_groups, 0, nElements * sizeof(int));
+    }
 
-  double *vertices() { return m_vertices; }
+    void setVrtxSize(unsigned int nVertices) {
+        if (m_nVertices != 0)
+            return;
 
-  int *boundaries() { return m_boundaries; }
+        m_nVertices = nVertices;
 
-  int *groups() { return m_groups; }
+        m_vertices = new double[nVertices * 3];
+    }
+
+    void convertBoundary() {
+        int ncBoundaries[4];
+
+        for (unsigned int i = 0; i < m_nElements * 4; i += 4) {
+            memcpy(ncBoundaries, &m_boundaries[i], 4 * sizeof(int));
+            for (unsigned int j = 0; j < 4; j++)
+                m_boundaries[i + j] = ncBoundaries[INTERNAL2EX_ORDER[j]];
+        }
+    }
+
+    unsigned int nElements() const { return m_nElements; }
+
+    unsigned int nVertices() const { return m_nVertices; }
+
+    int* elements() { return m_elements; }
+
+    double* vertices() { return m_vertices; }
+
+    int* boundaries() { return m_boundaries; }
+
+    int* groups() { return m_groups; }
 
 private:
-  const static int INTERNAL2EX_ORDER[4];
+    const static int INTERNAL2EX_ORDER[4];
 };
 
 #endif // PARTITION_H
