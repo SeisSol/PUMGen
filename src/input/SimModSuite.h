@@ -366,19 +366,16 @@ void setMeshSize(pGModel model, pACase &meshCase, MeshAttributes &MeshAtt) {
     for (int element_type_id = 0; element_type_id < 4; element_type_id ++)
     {
         std::list <std::pair <std::list<int>, double>> lpair_lId_MSize = MeshAtt.getMSizeList(element_type[element_type_id]);
-
-        for (auto itr = lpair_lId_MSize.begin(); itr != lpair_lId_MSize.end(); itr++)
-        {
-           double MSize = (*itr).second;
-           std::list<int> tl = (*itr).first;
-           for (auto it=tl.begin(); it != tl.end(); it++)
-           {
-               pGEntity face = GM_entityByTag(model, element_type_id, *it);
-               if (face == NULL) {
-                logError() << element_name[element_type_id] << "id:" << *it << "not found in model.";
+        for (const auto& pair_lId_MSize : lpair_lId_MSize) {
+           double MSize = pair_lId_MSize.second;
+           std::list<int> lElements = pair_lId_MSize.first;
+           for (const auto& element_id : lElements) {
+               pGEntity entity = GM_entityByTag(model, element_type_id, element_id);
+               if (entity == NULL) {
+                   logError() << element_name[element_type_id] << "id:" << element_id << "not found in model.";
                } else {
-                 MS_setMeshSize(meshCase, face, 1, MSize, NULL);
-                 logInfo(PMU_rank()) << element_name[element_type_id] << "id:"<<*it <<", MSize =" << MSize;
+                   MS_setMeshSize(meshCase, entity, 1, MSize, NULL);
+                   logInfo(PMU_rank()) << element_name[element_type_id] << "id:"<<element_id <<", MSize =" << MSize;
                }
            }
         }
