@@ -1,5 +1,10 @@
 #include "MeshAttributes.h"
 
+
+MeshAttributes::MeshAttributes():
+  lpair_lVertexId_MSize(), lpair_lEdgeId_MSize(), lpair_lFaceId_MSize(), lpair_lRegionId_MSize() {
+}
+
 MeshAttributes::MeshAttributes(const char* xmlFilename) {
     init(xmlFilename);
 }
@@ -130,6 +135,22 @@ void MeshAttributes::set_global_mesh_attributes() {
 
 }
 
+const std::list<std::pair<std::list<int>, double>>& MeshAttributes::getMSizeList(ElementType type) {
+  switch(type) {
+    case ElementType::vertex:
+      return lpair_lVertexId_MSize;
+      break;
+    case ElementType::edge:
+      return lpair_lEdgeId_MSize;
+      break;
+    case ElementType::face:
+      return lpair_lFaceId_MSize;
+      break;
+    case ElementType::region:
+      return lpair_lRegionId_MSize;
+      break;
+  }
+}
 
 void MeshAttributes::update_attribute_from_xml(XMLNode& element, const char* sElementName, const char* sAttributeName, double& MeshAttributesMember) {
     if (auto child = element.FirstChildElement(sElementName)) {

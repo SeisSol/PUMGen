@@ -357,34 +357,15 @@ struct get_second : public std::unary_function<MyMap::value_type, int>
     }
 };
 
-enum elementType {
-  vertex = 0,
-  edge = 1,
-  face = 2,
-  region = 3
-};
 
 void setMeshSize(pGModel model, pACase &meshCase, MeshAttributes &MeshAtt) {
     // Set mesh size on vertices, edges, surfaces and regions
     const char *element_name[4] = { "vertex", "edge", "face", "region" };
+    const ElementType element_type[4] = { ElementType::vertex, ElementType::edge, ElementType::face, ElementType::region };
 
-    for (int elType = vertex; elType != region+1; elType++ )
+    for (int element_type_id = 0; element_type_id < 4; element_type_id ++)
     {
-        std::list <std::pair <std::list<int>, double>> lpair_lId_MSize;
-        switch(elType) {
-        case vertex:
-            lpair_lId_MSize = MeshAtt.lpair_lVertexId_MSize;
-            break;
-        case edge:
-            lpair_lId_MSize = MeshAtt.lpair_lEdgeId_MSize;
-            break;
-        case face:
-            lpair_lId_MSize = MeshAtt.lpair_lFaceId_MSize;
-            break;
-        case region:
-            lpair_lId_MSize = MeshAtt.lpair_lRegionId_MSize;
-            break;
-        }
+        std::list <std::pair <std::list<int>, double>> lpair_lId_MSize = MeshAtt.getMSizeList(element_type[element_type_id]);
 
         for (auto itr = lpair_lId_MSize.begin(); itr != lpair_lId_MSize.end(); itr++)
         {
@@ -392,12 +373,12 @@ void setMeshSize(pGModel model, pACase &meshCase, MeshAttributes &MeshAtt) {
            std::list<int> tl = (*itr).first;
            for (auto it=tl.begin(); it != tl.end(); it++)
            {
-               pGEntity face = GM_entityByTag(model, elType, *it);
+               pGEntity face = GM_entityByTag(model, element_type_id, *it);
                if (face == NULL) {
-                logError() << element_name[elType] << "id:" << *it << "not found in model.";
+                logError() << element_name[element_type_id] << "id:" << *it << "not found in model.";
                } else {
                  MS_setMeshSize(meshCase, face, 1, MSize, NULL);
-                 logInfo(PMU_rank()) << element_name[elType] << "id:"<<*it <<", MSize =" << MSize;
+                 logInfo(PMU_rank()) << element_name[element_type_id] << "id:"<<*it <<", MSize =" << MSize;
                }
            }
         }

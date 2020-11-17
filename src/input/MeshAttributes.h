@@ -16,6 +16,13 @@ struct Cube {
   double CubeMSize=0,CubeCenter[3],CubeWidth[3],CubeHeight[3],CubeDepth[3];
 };
 
+enum class ElementType {
+  vertex = 0,
+  edge = 1,
+  face = 2,
+  region = 3
+};
+
 
 using namespace tinyxml2;
 class MeshAttributes {
@@ -32,6 +39,7 @@ class MeshAttributes {
     SmoothingType volumeSmoothingType = SmoothingType::Gradient;
     int VolumeMesherOptimization=1;
     double globalMSize=0., faultMSize=0., gradation=0., vol_AspectRatio=0., area_AspectRatio=0.;
+    const std::list<std::pair<std::list<int>, double>>& getMSizeList(ElementType type);
 
     std::list <std::pair <std::list<int>, double>> lpair_lVertexId_MSize;
     std::list <std::pair <std::list<int>, double>> lpair_lEdgeId_MSize;
@@ -43,7 +51,7 @@ class MeshAttributes {
     std::list<int> lFaceIdUseDiscreteMesh;
     int UseDiscreteMesh_noModification;
     double MeshSizePropagationScalingFactor,MeshSizePropagationDistance=0.0;
-    MeshAttributes() {};
+    MeshAttributes();
     MeshAttributes(const char*);
     void init(const char*);
 
