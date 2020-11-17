@@ -32,6 +32,6 @@ install:
  - cd ../../PUMGen
 
 script:
-  -python3 submodules/run-clang-format/run-clang-format.py src
+  -python3 submodules/run-clang-format/run-clang-format.py -r --exclude src/third_party src 
  - mkdir build && cd build
  - CC=mpicc CXX=mpiCC cmake .. -DCMAKE_PREFIX_PATH=../pumi && make -j2 
