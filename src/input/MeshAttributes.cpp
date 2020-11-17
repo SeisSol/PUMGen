@@ -149,6 +149,9 @@ const std::list<std::pair<std::list<int>, double>>& MeshAttributes::getMSizeList
     case ElementType::region:
       return lpair_lRegionId_MSize;
       break;
+    default:
+      __builtin_unreachable();
+      break;
   }
 }
 
