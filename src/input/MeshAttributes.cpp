@@ -1,5 +1,10 @@
 #include "MeshAttributes.h"
 
+
+MeshAttributes::MeshAttributes():
+  lpair_lVertexId_MSize(), lpair_lEdgeId_MSize(), lpair_lFaceId_MSize(), lpair_lRegionId_MSize() {
+}
+
 MeshAttributes::MeshAttributes(const char* xmlFilename) {
     init(xmlFilename);
 }
@@ -10,6 +15,8 @@ void MeshAttributes::init(const char* xmlFilename) {
     set_SurfaceMeshingAttributes();
     set_VolumeMeshingAttributes();
     set_UseDiscreteMesh();
+    set_vertexMSize();
+    set_edgeMSize();
     set_surfaceMSize();
     set_MeshSizePropagation();
     set_regionMSize();
@@ -23,16 +30,16 @@ void MeshAttributes::readXmlFile(const char* xmlFilename) {
 }
 
 void MeshAttributes::set_MeshRefinementZoneCube() {
-    std::string xyz = "xyz";
     for (auto child = doc.FirstChildElement("MeshRefinementZoneCube"); child; child = child->NextSiblingElement("MeshRefinementZoneCube"))
        {
        Cube mycube;
        mycube.CubeMSize =  std::atof(child->Attribute("value"));
-       for (std::string::size_type i = 0; i < xyz.size(); i++) {
-           update_attribute_from_xml(*child, "Center", &xyz[i], mycube.CubeCenter[i]);
-           update_attribute_from_xml(*child, "Width", &xyz[i], mycube.CubeWidth[i]);
-           update_attribute_from_xml(*child, "Height", &xyz[i], mycube.CubeHeight[i]);
-           update_attribute_from_xml(*child, "Depth", &xyz[i], mycube.CubeDepth[i]);
+       for (char i = 0; i < 3; i++) {
+           char xyz[] = {static_cast<char>('x' + i), '\0'};
+           update_attribute_from_xml(*child, "Center", xyz, mycube.CubeCenter[i]);
+           update_attribute_from_xml(*child, "Width", xyz, mycube.CubeWidth[i]);
+           update_attribute_from_xml(*child, "Height", xyz, mycube.CubeHeight[i]);
+           update_attribute_from_xml(*child, "Depth", xyz, mycube.CubeDepth[i]);
        }
        lCube.push_back(mycube);
     }
@@ -81,12 +88,24 @@ void MeshAttributes::set_UseDiscreteMesh() {
     }
 }
 
+void MeshAttributes::set_vertexMSize() {
+    for (auto child = doc.FirstChildElement("vertexMSize"); child; child = child->NextSiblingElement("vertexMSize"))
+    {
+       lpair_lVertexId_MSize.push_back(std::make_pair(fill_list_using_parsed_string(child-> GetText()), std::atof(child->Attribute("value"))));
+    }
+}
+
+void MeshAttributes::set_edgeMSize() {
+    for (auto child = doc.FirstChildElement("edgeMSize"); child; child = child->NextSiblingElement("edgeMSize"))
+    {
+       lpair_lEdgeId_MSize.push_back(std::make_pair(fill_list_using_parsed_string(child-> GetText()), std::atof(child->Attribute("value"))));
+    }
+}
 
 void MeshAttributes::set_surfaceMSize() {
     for (auto child = doc.FirstChildElement("surfaceMSize"); child; child = child->NextSiblingElement("surfaceMSize"))
     {
-       lsurfaceMSize.push_back( std::atof(child->Attribute("value")));
-       llsurfaceMSizeFaceId.push_back(fill_list_using_parsed_string(child-> GetText()));
+       lpair_lFaceId_MSize.push_back(std::make_pair(fill_list_using_parsed_string(child-> GetText()), std::atof(child->Attribute("value"))));
     }
 }
 
@@ -103,8 +122,7 @@ void MeshAttributes::set_MeshSizePropagation() {
 void MeshAttributes::set_regionMSize() {
     for (auto child = doc.FirstChildElement("regionMSize"); child; child = child->NextSiblingElement("regionMSize"))
     {
-       lregionMSize.push_back( std::atof(child->Attribute("value")));
-       llregionMSizeRegionId.push_back(fill_list_using_parsed_string(child-> GetText()));
+       lpair_lRegionId_MSize.push_back(std::make_pair(fill_list_using_parsed_string(child-> GetText()), std::atof(child->Attribute("value"))));
     }
 }
 
@@ -117,6 +135,25 @@ void MeshAttributes::set_global_mesh_attributes() {
 
 }
 
+const std::list<std::pair<std::list<int>, double>>& MeshAttributes::getMSizeList(ElementType type) {
+  switch(type) {
+    case ElementType::vertex:
+      return lpair_lVertexId_MSize;
+      break;
+    case ElementType::edge:
+      return lpair_lEdgeId_MSize;
+      break;
+    case ElementType::face:
+      return lpair_lFaceId_MSize;
+      break;
+    case ElementType::region:
+      return lpair_lRegionId_MSize;
+      break;
+    default:
+      __builtin_unreachable();
+      break;
+  }
+}
 
 void MeshAttributes::update_attribute_from_xml(XMLNode& element, const char* sElementName, const char* sAttributeName, double& MeshAttributesMember) {
     if (auto child = element.FirstChildElement(sElementName)) {

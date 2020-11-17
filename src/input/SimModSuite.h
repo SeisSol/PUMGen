@@ -357,6 +357,32 @@ struct get_second : public std::unary_function<MyMap::value_type, int>
     }
 };
 
+
+void setMeshSize(pGModel model, pACase &meshCase, MeshAttributes &MeshAtt) {
+    // Set mesh size on vertices, edges, surfaces and regions
+    const char *element_name[4] = { "vertex", "edge", "face", "region" };
+    const ElementType element_type[4] = { ElementType::vertex, ElementType::edge, ElementType::face, ElementType::region };
+
+    for (int element_type_id = 0; element_type_id < 4; element_type_id ++)
+    {
+        std::list <std::pair <std::list<int>, double>> lpair_lId_MSize = MeshAtt.getMSizeList(element_type[element_type_id]);
+        for (const auto& pair_lId_MSize : lpair_lId_MSize) {
+           double MSize = pair_lId_MSize.second;
+           std::list<int> lElements = pair_lId_MSize.first;
+           for (const auto& element_id : lElements) {
+               pGEntity entity = GM_entityByTag(model, element_type_id, element_id);
+               if (entity == NULL) {
+                   logError() << element_name[element_type_id] << "id:" << element_id << "not found in model.";
+               } else {
+                   MS_setMeshSize(meshCase, entity, 1, MSize, NULL);
+                   logInfo(PMU_rank()) << element_name[element_type_id] << "id:"<<element_id <<", MSize =" << MSize;
+               }
+           }
+        }
+    }
+}
+
+
 void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, MeshAttributes &MeshAtt, AnalysisAttributes &AnalysisAtt) {
 
     logInfo(PMU_rank()) << "Setting cases";
@@ -432,48 +458,10 @@ void setCases(pGModel model, pACase &meshCase, pACase &analysisCase, MeshAttribu
        // ( <meshing case>, <entity>, <1=absolute, 2=relative>, <size>, <size expression> )
        MS_setMeshSize(meshCase, modelDomain, 1, MeshAtt.globalMSize, NULL);
     }
-    
-    // Set mesh size on surfaces
-    std::list< std::list<int>>::iterator itr;
-    std::list<double>::iterator itMeshSize;
-    itMeshSize = MeshAtt.lsurfaceMSize.begin();
-    for (itr=MeshAtt.llsurfaceMSizeFaceId.begin(); itr != MeshAtt.llsurfaceMSizeFaceId.end(); itr++)
-    {
-       double surfaceMSize = *itMeshSize;
-       std::list<int>tl=*itr;
-       std::list<int>::iterator it;
-       for (it=tl.begin(); it != tl.end(); it++)
-       {
-           pGEntity face = GM_entityByTag(model, 2, *it);
-           if (face == NULL) {
-            logError() << "faceid:"<<*it <<"not found in model.";
-           } else {
-             MS_setMeshSize(meshCase, face, 1, surfaceMSize, NULL);
-             logInfo(PMU_rank()) << "faceid:"<<*it <<", surfaceMSize =" << surfaceMSize;
-           }
-       }
-       itMeshSize++;
-    }
 
-    // Set mesh size on region
-    itMeshSize = MeshAtt.lregionMSize.begin();
-    for (itr=MeshAtt.llregionMSizeRegionId.begin(); itr != MeshAtt.llregionMSizeRegionId.end(); itr++)
-    {
-       double regionMSize = *itMeshSize;
-       std::list<int>tl=*itr;
-       std::list<int>::iterator it;
-       for (it=tl.begin(); it != tl.end(); it++)
-       {
-           pGRegion region = (pGRegion) GM_entityByTag(model, 3, *it);
-           if (region == NULL) {
-             logError() << "regionid:"<<*it <<"not found in model.";
-           } else {
-             MS_setMeshSize(meshCase, region, 1, regionMSize, NULL);
-             logInfo(PMU_rank()) << "regionid:"<<*it <<", regionMSize =" << regionMSize;
-           }
-       }
-       itMeshSize++;
-    }
+    // Set mesh size on vertices, edges, surfaces and regions
+    setMeshSize(model, meshCase, MeshAtt);
+
     if (MeshAtt.gradation>0) {
        // Set gradation relative
        logInfo(PMU_rank()) << "Gradation rate =" << MeshAtt.gradation;

@@ -4,6 +4,8 @@
 <boundaryCondition tag="7">7</boundaryCondition>
 <boundaryCondition tag="8">8,9</boundaryCondition>
 <globalMSize value="100e3"/>
+<vertexMSize value="1000">1,2</vertexMSize>
+<edgeMSize value="500">4,8</edgeMSize>
 <surfaceMSize value="20e3">1,2</surfaceMSize>
 <surfaceMSize value="10e3">3,4</surfaceMSize>
 <regionMSize value="15e3">1</regionMSize>
