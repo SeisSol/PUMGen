@@ -16,7 +16,7 @@ before_install:
  - sudo apt-get update -qq
 
 install:
- - sudo apt-get install -qq g++-5 openmpi-bin openmpi-common libopenmpi-dev hdf5-tools libhdf5-openmpi-100 libhdf5-openmpi-dev libnetcdf-dev
+ - sudo apt-get install -qq g++-5 openmpi-bin openmpi-common libopenmpi-dev hdf5-tools libhdf5-openmpi-100 libhdf5-openmpi-dev libnetcdf-dev clang-format-10   
  - cd ..
 # Download simmetrix libraries 
 # check license
@@ -32,6 +32,6 @@ install:
  - cd ../../PUMGen
 
 script:
- - python3 submodules/run-clang-format/run-clang-format.py -r --exclude src/third_party src 
+ - ./submodules/run-clang-format/run-clang-format.py --clang-format-executable clang-format-10 --exclude src/third_party -r src
  - mkdir build && cd build
  - CC=mpicc CXX=mpiCC cmake .. -DCMAKE_PREFIX_PATH=../pumi && make -j2 
