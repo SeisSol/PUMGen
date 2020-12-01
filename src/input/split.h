@@ -5,14 +5,11 @@
 #include <cstring>
 #include <string>
 
-#include <list>
-#include <iostream>
 #include <fstream>
+#include <iostream>
+#include <list>
 #include <vector>
 
-
-std::vector<std::string> &split(std::vector<std::string> &elems, const std::string &s, char delim);
-
-
+std::vector<std::string>& split(std::vector<std::string>& elems, const std::string& s, char delim);
 
 #endif

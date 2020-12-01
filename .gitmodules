@@ -7,3 +7,6 @@
 [submodule "submodules/tinyxml2"]
 	path = submodules/tinyxml2
 	url = ../../leethomason/tinyxml2.git
+[submodule "submodules/run-clang-format"]
+	path = submodules/run-clang-format
+	url = ../../Sarcasm/run-clang-format.git

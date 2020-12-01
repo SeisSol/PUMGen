@@ -1,0 +1,13 @@
+jobs:
+  - job:
+    displayName: pumgen-clang-format
+    pool:
+      vmImage: 'ubuntu-18.04'
+    steps:
+      - bash: |
+          set -euo pipefail
+          export IFS=$'\n\t'
+          sudo apt-get update
+          sudo apt-get install -qq python3 clang-format-10
+          git submodule update --init
+          ./submodules/run-clang-format/run-clang-format.py --clang-format-executable clang-format-10 --exclude src/third_party -r src
