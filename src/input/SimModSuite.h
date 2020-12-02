@@ -290,23 +290,24 @@ class SimModSuite : public MeshInput {
                               void* ignore) {
     if (PMU_rank() != 0)
       return;
-    if (endVal!=0) {
-        switch(currentVal) {
-            case -2:
-                // task is started, do nothing
-                logInfo(PMU_rank())<<"Progress:"<<what<<", 0"<<"/"<<endVal;
-                break;
-            case -1:
-                // end of the task
-                logInfo(PMU_rank())<<"Progress:"<<what<<", done";
-                break;
-            default:
-                logInfo(PMU_rank())<<"Progress:"<<what<<","<<currentVal<<"/"<<endVal;
-                break;
-        }
+    if (endVal != 0) {
+      switch (currentVal) {
+      case -2:
+        // task is started, do nothing
+        logInfo(PMU_rank()) << "Progress:" << what << ", 0"
+                            << "/" << endVal;
+        break;
+      case -1:
+        // end of the task
+        logInfo(PMU_rank()) << "Progress:" << what << ", done";
+        break;
+      default:
+        logInfo(PMU_rank()) << "Progress:" << what << "," << currentVal << "/" << endVal;
+        break;
+      }
     } else {
-        if (currentVal == -2)
-            logInfo(PMU_rank())<<"Progress:"<<what;
+      if (currentVal == -2)
+        logInfo(PMU_rank()) << "Progress:" << what;
     }
     logDebug() << what << level << startVal << endVal << currentVal;
   }
