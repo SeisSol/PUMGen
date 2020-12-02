@@ -133,7 +133,6 @@ class SimModSuite : public MeshInput {
       SurfaceMesher_setFaceRotationLimit(surfaceMesher, MeshAtt.surfaceFaceRotationLimit);
       SurfaceMesher_setSnapForDiscrete(surfaceMesher, MeshAtt.surfaceSnap);
     }
-    progressBar.setTotal(26);
     SurfaceMesher_execute(surfaceMesher, prog);
     SurfaceMesher_delete(surfaceMesher);
 
@@ -147,7 +146,6 @@ class SimModSuite : public MeshInput {
       VolumeMesher_setOptimization(volumeMesher, MeshAtt.VolumeMesherOptimization);
     }
     VolumeMesher_setEnforceSize(volumeMesher, enforceSize);
-    progressBar.setTotal(6);
     VolumeMesher_execute(volumeMesher, prog);
     VolumeMesher_delete(volumeMesher);
 
@@ -606,8 +604,6 @@ class SimModSuite : public MeshInput {
                         << ",inf):" << bin_global;
   }
 
-  private:
-  static utils::Progress progressBar;
 };
 
 #endif // SIM_MOD_SUITE_H

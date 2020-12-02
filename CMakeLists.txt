@@ -68,11 +68,9 @@ target_link_libraries(pumgen PUBLIC tinyxml2)
 if (SIMMETRIX)
     find_package(Simmetrix REQUIRED)
     target_sources(pumgen PUBLIC 
-      ${CMAKE_CURRENT_SOURCE_DIR}/src/input/SimModSuite.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/src/input/AnalysisAttributes.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/src/input/MeshAttributes.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/src/input/ParallelVertexFilter.cpp
-      ${CMAKE_CURRENT_SOURCE_DIR}/src/input/SimModSuite.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/src/input/split.cpp
     )
     target_compile_definitions(pumgen PUBLIC USE_SIMMOD)
