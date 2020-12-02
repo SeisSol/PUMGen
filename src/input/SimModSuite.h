@@ -292,22 +292,24 @@ class SimModSuite : public MeshInput {
                               void* ignore) {
     if (PMU_rank() != 0)
       return;
-
-    switch (level) {
-    case 0:
-      if (currentVal == -2)
-        progressBar.update(0);
-      else
-        progressBar.clear();
-      break;
-    case 1:
-      if (currentVal == 0)
-        progressBar.update();
-      else
-        progressBar.increment();
-      break;
+    if (endVal!=0) {
+        switch(currentVal) {
+            case -2:
+                // task is started, do nothing
+                logInfo(PMU_rank())<<"Progress:"<<what<<", 0"<<"/"<<endVal;
+                break;
+            case -1:
+                // end of the task
+                logInfo(PMU_rank())<<"Progress:"<<what<<", done";
+                break;
+            default:
+                logInfo(PMU_rank())<<"Progress:"<<what<<","<<currentVal<<"/"<<endVal;
+                break;
+        }
+    } else {
+        if (currentVal == -2)
+            logInfo(PMU_rank())<<"Progress:"<<what;
     }
-
     logDebug() << what << level << startVal << endVal << currentVal;
   }
 
