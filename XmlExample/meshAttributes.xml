@@ -17,8 +17,8 @@
 <VolumeMeshing  SmoothingLevel="2" SmoothingType="Laplacian" SetOptimisation="1"></VolumeMeshing>
 <MeshRefinementZoneCube value="1000">
 <Center x="0" y="0" z="-10e3"/>
-<Width x="20e3" y="0" z="0"/>
-<Height x="20e3" y="0" z="10e3"/>
-<Depth x="0e3" y="2e3" z="0"/>
+<HalfWidth x="20e3" y="0" z="0"/>
+<HalfHeight x="20e3" y="0" z="10e3"/>
+<HalfDepth x="0e3" y="2e3" z="0"/>
 </MeshRefinementZoneCube>
 <UseDiscreteMesh noModification="1">1</UseDiscreteMesh>

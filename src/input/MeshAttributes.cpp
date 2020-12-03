@@ -34,9 +34,9 @@ void MeshAttributes::set_MeshRefinementZoneCube() {
     for (char i = 0; i < 3; i++) {
       char xyz[] = {static_cast<char>('x' + i), '\0'};
       update_attribute_from_xml(*child, "Center", xyz, mycube.CubeCenter[i]);
-      update_attribute_from_xml(*child, "Width", xyz, mycube.CubeWidth[i]);
-      update_attribute_from_xml(*child, "Height", xyz, mycube.CubeHeight[i]);
-      update_attribute_from_xml(*child, "Depth", xyz, mycube.CubeDepth[i]);
+      update_attribute_from_xml(*child, "HalfWidth", xyz, mycube.CubeWidth[i]);
+      update_attribute_from_xml(*child, "HalfHeight", xyz, mycube.CubeHeight[i]);
+      update_attribute_from_xml(*child, "HalfDepth", xyz, mycube.CubeDepth[i]);
     }
     lCube.push_back(mycube);
   }

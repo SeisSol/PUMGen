@@ -133,7 +133,6 @@ class SimModSuite : public MeshInput {
       SurfaceMesher_setFaceRotationLimit(surfaceMesher, MeshAtt.surfaceFaceRotationLimit);
       SurfaceMesher_setSnapForDiscrete(surfaceMesher, MeshAtt.surfaceSnap);
     }
-    progressBar.setTotal(26);
     SurfaceMesher_execute(surfaceMesher, prog);
     SurfaceMesher_delete(surfaceMesher);
 
@@ -147,7 +146,6 @@ class SimModSuite : public MeshInput {
       VolumeMesher_setOptimization(volumeMesher, MeshAtt.VolumeMesherOptimization);
     }
     VolumeMesher_setEnforceSize(volumeMesher, enforceSize);
-    progressBar.setTotal(6);
     VolumeMesher_execute(volumeMesher, prog);
     VolumeMesher_delete(volumeMesher);
 
@@ -292,22 +290,25 @@ class SimModSuite : public MeshInput {
                               void* ignore) {
     if (PMU_rank() != 0)
       return;
-
-    switch (level) {
-    case 0:
+    if (endVal != 0) {
+      switch (currentVal) {
+      case -2:
+        // task is started, do nothing
+        logInfo(PMU_rank()) << "Progress:" << what << ", 0"
+                            << "/" << endVal;
+        break;
+      case -1:
+        // end of the task
+        logInfo(PMU_rank()) << "Progress:" << what << ", done";
+        break;
+      default:
+        logInfo(PMU_rank()) << "Progress:" << what << "," << currentVal << "/" << endVal;
+        break;
+      }
+    } else {
       if (currentVal == -2)
-        progressBar.update(0);
-      else
-        progressBar.clear();
-      break;
-    case 1:
-      if (currentVal == 0)
-        progressBar.update();
-      else
-        progressBar.increment();
-      break;
+        logInfo(PMU_rank()) << "Progress:" << what;
     }
-
     logDebug() << what << level << startVal << endVal << currentVal;
   }
 
@@ -603,9 +604,6 @@ class SimModSuite : public MeshInput {
     logInfo(PMU_rank()) << std::fixed << std::setprecision(2) << "[" << AR[num_bins - 1]
                         << ",inf):" << bin_global;
   }
-
-  private:
-  static utils::Progress progressBar;
 };
 
 #endif // SIM_MOD_SUITE_H
