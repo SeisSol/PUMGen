@@ -604,7 +604,6 @@ class SimModSuite : public MeshInput {
     logInfo(PMU_rank()) << std::fixed << std::setprecision(2) << "[" << AR[num_bins - 1]
                         << ",inf):" << bin_global;
   }
-
 };
 
 #endif // SIM_MOD_SUITE_H
