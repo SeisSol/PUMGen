@@ -551,10 +551,42 @@ class SimModSuite : public MeshInput {
 
     // check for model errors
     pPList modelErrors = PList_new();
-    if (!GM_isValid(m_model, 0, modelErrors))
-      // TODO print more detail about errors
+    if (!GM_isValid(m_model, 1, modelErrors)) {
+      void* iter = 0L;
+      while (pSimError err = static_cast<pSimError>(PList_next(modelErrors, &iter))) {
+        logInfo(PMU_rank()) << "  Error code: " << SimError_code(err) << std::endl;
+        logInfo(PMU_rank()) << "  Error string: " << SimError_toString(err) << std::endl;
+      }
       logError() << "Input model is not valid";
+    }
     PList_delete(modelErrors);
+
+    // check for self-intersecting CAD mesh
+    pProgress prog = Progress_new();
+    Progress_setCallback(prog, progressHandler);
+    pMesh mesh = DM_getMesh(static_cast<pDiscreteModel>(m_model));
+    pPList entities = PList_new();
+    if (MS_checkMeshIntersections(mesh, entities, prog) > 0) {
+
+      const char* element_name[4] = {"vertex", "edge", "face", "region"};
+
+      for (int i = 0; i < PList_size(entities); i += 2) {
+        pEntity firstEnt = (pEntity)PList_item(entities, i);
+        pEntity secondEnt = (pEntity)PList_item(entities, i + 1);
+        logInfo(PMU_rank()) << "Self-intersection between" << element_name[EN_whatInType(firstEnt)]
+                            << GEN_tag(EN_whatIn(firstEnt)) << "and"
+                            << element_name[EN_whatInType(secondEnt)]
+                            << GEN_tag(EN_whatIn(secondEnt));
+        double centroid[3], centroid2[3];
+        EN_centroid(firstEnt, &centroid[0]);
+        EN_centroid(secondEnt, &centroid2[0]);
+        logInfo(PMU_rank()) << "centroids" << centroid[0] << centroid[1] << centroid[2] << "and "
+                            << centroid2[0] << centroid2[1] << centroid2[2] << std::flush;
+      }
+      logError() << PList_size(entities) / 2 << "Self-intersection(s) detected in CAD mesh";
+    }
+    PList_delete(entities);
+    Progress_delete(prog);
   }
 
   private:
