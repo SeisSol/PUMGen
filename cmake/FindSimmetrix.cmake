@@ -23,7 +23,7 @@ find_library(SIM_MODEL_LIB SimModel ${SIM_LIB_HINT})
 find_library(SIM_PARASOLID_LIB NAMES SimParasolid310 SimParasolid320 PATHS ${SIM_LIB_HINT})
 find_library(SIM_PARTITIONED_MESH_LIB SimPartitionedMesh ${SIM_LIB_HINT})
 find_library(SIM_PARTITIONED_MESH_MPI_LIB SimPartitionedMesh-mpi ${SIM_LIB_HINT})
-find_library(SIM_PARTITINED_WRAPPER_LIB SimPartitionWrapper-mpich3 ${SIM_LIB_HINT})
+find_library(SIM_PARTITINED_WRAPPER_LIB SimPartitionWrapper-${SIM_MPI} ${SIM_LIB_HINT})
 find_library(SIM_PS_KRNL_LIB pskernel ${SIM_LIB_HINT}/psKrnl)
   
 get_filename_component(SIM_PS_KRNL_LIB_DIR ${SIM_PS_KRNL_LIB} DIRECTORY)
