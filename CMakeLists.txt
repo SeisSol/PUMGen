@@ -4,6 +4,7 @@ project(pumgen LANGUAGES C CXX)
 
 option(SIMMETRIX "Use simmetrix libraries" OFF)
 set(SIMMETRIX_ROOT "" CACHE STRING "Root directory of simmetrix dev files")
+set(SIM_MPI "mpich3" CACHE STRING "MPI version used by simmetrix")
 option(NETCDF "Use netcdf" OFF)
 set(LOG_LEVEL "info" CACHE STRING "Log level for the code")
 set_property(CACHE LOG_LEVEL PROPERTY STRINGS "debug" "info" "warning" "error")
@@ -48,7 +49,6 @@ find_package(HDF5 REQUIRED COMPONENTS C HL)
 target_include_directories(pumgen PUBLIC ${HDF5_INCLUDE_DIRS})
 target_link_libraries(pumgen PUBLIC ${HDF5_C_HL_LIBRARIES} ${HDF5_C_LIBRARIES})
 target_compile_definitions(pumgen PUBLIC USE_HDF)
-
 
 find_package(OpenMP REQUIRED)
 target_link_libraries(pumgen PUBLIC OpenMP::OpenMP_CXX)
