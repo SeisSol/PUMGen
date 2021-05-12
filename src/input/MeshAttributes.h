@@ -41,6 +41,8 @@ class MeshAttributes {
   std::list<Cube> lCube;
   std::list<int> lFaceIdMeshSizePropagation;
   std::list<int> lFaceIdUseDiscreteMesh;
+  std::list<int> lFaceIdNoMesh;
+  std::list<int> lRegionIdNoMesh;
   int UseDiscreteMesh_noModification;
   double MeshSizePropagationScalingFactor, MeshSizePropagationDistance = 0.0;
   MeshAttributes();
@@ -54,6 +56,7 @@ class MeshAttributes {
   void set_SurfaceMeshingAttributes();
   void set_VolumeMeshingAttributes();
   void set_UseDiscreteMesh();
+  void set_NoMesh();
   void set_vertexMSize();
   void set_edgeMSize();
   void set_surfaceMSize();

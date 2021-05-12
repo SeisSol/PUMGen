@@ -527,6 +527,31 @@ class SimModSuite : public MeshInput {
         }
       }
     }
+    if (MeshAtt.lFaceIdNoMesh.size() > 0) {
+      for (std::list<int>::iterator it = MeshAtt.lFaceIdNoMesh.begin(); it != MeshAtt.lFaceIdNoMesh.end();
+           it++) {
+        pGEntity face = GM_entityByTag(model, 2, *it);
+        if (face == NULL) {
+          logError() << "No Mesh; faceid:" << *it << "not found in model.";
+        } else {
+          logInfo(PMU_rank()) << "No Mesh; faceid:" << *it;
+          MS_setNoMesh(meshCase, face, 1);
+        }
+      }
+    }
+    if (MeshAtt.lRegionIdNoMesh.size() > 0) {
+      for (std::list<int>::iterator it = MeshAtt.lRegionIdNoMesh.begin(); it != MeshAtt.lRegionIdNoMesh.end();
+           it++) {
+        pGEntity region = GM_entityByTag(model, 3, *it);
+        if (region == NULL) {
+          logError() << "No Mesh; regionid:" << *it << "not found in model.";
+        } else {
+          logInfo(PMU_rank()) << "No Mesh; regionid:" << *it;
+          MS_setNoMesh(meshCase, region, 1);
+        }
+      }
+    }
+
   }
 
   private:

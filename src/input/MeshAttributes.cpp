@@ -12,6 +12,7 @@ void MeshAttributes::init(const char* xmlFilename) {
   set_SurfaceMeshingAttributes();
   set_VolumeMeshingAttributes();
   set_UseDiscreteMesh();
+  set_NoMesh();
   set_vertexMSize();
   set_edgeMSize();
   set_surfaceMSize();
@@ -84,6 +85,15 @@ void MeshAttributes::set_UseDiscreteMesh() {
                             UseDiscreteMesh_noModification);
   if (auto child = doc.FirstChildElement("UseDiscreteMesh")) {
     lFaceIdUseDiscreteMesh = fill_list_using_parsed_string(child->GetText());
+  }
+}
+
+void MeshAttributes::set_NoMesh() {
+  if (auto child = doc.FirstChildElement("surfaceNoMesh")) {
+    lFaceIdNoMesh = fill_list_using_parsed_string(child->GetText());
+  }
+  if (auto child = doc.FirstChildElement("regionNoMesh")) {
+    lRegionIdNoMesh = fill_list_using_parsed_string(child->GetText());
   }
 }
 
