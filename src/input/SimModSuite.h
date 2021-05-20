@@ -472,34 +472,27 @@ class SimModSuite : public MeshInput {
                                ElementType_Triangle, MeshAtt.area_AspectRatio);
 #endif
     }
-    if (MeshAtt.lCube.size() > 0) {
-      std::list<Cube>::iterator it;
-      Cube mycube;
-      for (it = MeshAtt.lCube.begin(); it != MeshAtt.lCube.end(); it++) {
-        mycube = *it;
-        logInfo(PMU_rank()) << "Cube mesh refinement: " << mycube.CubeMSize;
-        logInfo(PMU_rank()) << "Center" << mycube.CubeCenter[0] << " " << mycube.CubeCenter[1]
-                            << " " << mycube.CubeCenter[2];
-        logInfo(PMU_rank()) << "Width" << mycube.CubeWidth[0] << " " << mycube.CubeWidth[1] << " "
-                            << mycube.CubeWidth[2];
-        logInfo(PMU_rank()) << "Height" << mycube.CubeHeight[0] << " " << mycube.CubeHeight[1]
-                            << " " << mycube.CubeHeight[2];
-        logInfo(PMU_rank()) << "Depth" << mycube.CubeDepth[0] << " " << mycube.CubeDepth[1] << " "
-                            << mycube.CubeDepth[2];
-        MS_addCubeRefinement(meshCase, mycube.CubeMSize, &mycube.CubeCenter[0],
-                             &mycube.CubeWidth[0], &mycube.CubeHeight[0], &mycube.CubeDepth[0]);
-      }
+    for (auto& mycube : MeshAtt.lCube) {
+      logInfo(PMU_rank()) << "Cube mesh refinement: " << mycube.CubeMSize;
+      logInfo(PMU_rank()) << "Center" << mycube.CubeCenter[0] << " " << mycube.CubeCenter[1] << " "
+                          << mycube.CubeCenter[2];
+      logInfo(PMU_rank()) << "Width" << mycube.CubeWidth[0] << " " << mycube.CubeWidth[1] << " "
+                          << mycube.CubeWidth[2];
+      logInfo(PMU_rank()) << "Height" << mycube.CubeHeight[0] << " " << mycube.CubeHeight[1] << " "
+                          << mycube.CubeHeight[2];
+      logInfo(PMU_rank()) << "Depth" << mycube.CubeDepth[0] << " " << mycube.CubeDepth[1] << " "
+                          << mycube.CubeDepth[2];
+      MS_addCubeRefinement(meshCase, mycube.CubeMSize, &mycube.CubeCenter[0], &mycube.CubeWidth[0],
+                           &mycube.CubeHeight[0], &mycube.CubeDepth[0]);
     }
 
     if (MeshAtt.MeshSizePropagationDistance > 0.0) {
-      std::list<int>::iterator it;
-      for (it = MeshAtt.lFaceIdMeshSizePropagation.begin();
-           it != MeshAtt.lFaceIdMeshSizePropagation.end(); it++) {
-        pGEntity face = GM_entityByTag(model, 2, *it);
+      for (auto& iElem : MeshAtt.lFaceIdMeshSizePropagation) {
+        pGEntity face = GM_entityByTag(model, 2, iElem);
         if (face == NULL) {
-          logError() << "MeshSizeProp faceid:" << *it << "not found in model.";
+          logError() << "MeshSizeProp faceid:" << iElem << "not found in model.";
         } else {
-          logInfo(PMU_rank()) << "MeshSizeProp faceid:" << *it
+          logInfo(PMU_rank()) << "MeshSizeProp faceid:" << iElem
                               << ", distance =" << MeshAtt.MeshSizePropagationDistance
                               << ", scaling factor =" << MeshAtt.MeshSizePropagationScalingFactor;
 #ifdef BEFORE_SIM_15
@@ -512,46 +505,35 @@ class SimModSuite : public MeshInput {
         }
       }
     }
-    if (MeshAtt.lFaceIdUseDiscreteMesh.size() > 0) {
-      std::list<int>::iterator it;
-      for (it = MeshAtt.lFaceIdUseDiscreteMesh.begin(); it != MeshAtt.lFaceIdUseDiscreteMesh.end();
-           it++) {
-        pGEntity face = GM_entityByTag(model, 2, *it);
-        if (face == NULL) {
-          logError() << "UseDiscreteMesh; faceid:" << *it << "not found in model.";
-        } else {
-          logInfo(PMU_rank()) << "UseDiscreteMesh; faceid, noModification:" << *it,
-              MeshAtt.UseDiscreteMesh_noModification;
-          MS_useDiscreteGeometryMesh(meshCase, face, MeshAtt.UseDiscreteMesh_noModification);
-          // MS_limitSurfaceMeshModification(meshCase,face,UseDiscreteMesh_noModification);
-        }
+    for (auto& iElem : MeshAtt.lFaceIdUseDiscreteMesh) {
+      pGEntity face = GM_entityByTag(model, 2, iElem);
+      if (face == NULL) {
+        logError() << "UseDiscreteMesh; faceid:" << iElem << "not found in model.";
+      } else {
+        logInfo(PMU_rank()) << "UseDiscreteMesh; faceid, noModification:" << iElem,
+            MeshAtt.UseDiscreteMesh_noModification;
+        MS_useDiscreteGeometryMesh(meshCase, face, MeshAtt.UseDiscreteMesh_noModification);
+        // MS_limitSurfaceMeshModification(meshCase,face,UseDiscreteMesh_noModification);
       }
     }
-    if (MeshAtt.lFaceIdNoMesh.size() > 0) {
-      for (std::list<int>::iterator it = MeshAtt.lFaceIdNoMesh.begin(); it != MeshAtt.lFaceIdNoMesh.end();
-           it++) {
-        pGEntity face = GM_entityByTag(model, 2, *it);
-        if (face == NULL) {
-          logError() << "No Mesh; faceid:" << *it << "not found in model.";
-        } else {
-          logInfo(PMU_rank()) << "No Mesh; faceid:" << *it;
-          MS_setNoMesh(meshCase, face, 1);
-        }
+    for (auto& iElem : MeshAtt.lFaceIdNoMesh) {
+      pGEntity face = GM_entityByTag(model, 2, iElem);
+      if (face == NULL) {
+        logError() << "No Mesh; faceid:" << iElem << "not found in model.";
+      } else {
+        logInfo(PMU_rank()) << "No Mesh; faceid:" << iElem;
+        MS_setNoMesh(meshCase, face, 1);
       }
     }
-    if (MeshAtt.lRegionIdNoMesh.size() > 0) {
-      for (std::list<int>::iterator it = MeshAtt.lRegionIdNoMesh.begin(); it != MeshAtt.lRegionIdNoMesh.end();
-           it++) {
-        pGEntity region = GM_entityByTag(model, 3, *it);
-        if (region == NULL) {
-          logError() << "No Mesh; regionid:" << *it << "not found in model.";
-        } else {
-          logInfo(PMU_rank()) << "No Mesh; regionid:" << *it;
-          MS_setNoMesh(meshCase, region, 1);
-        }
+    for (auto& iElem : MeshAtt.lRegionIdNoMesh) {
+      pGEntity region = GM_entityByTag(model, 3, iElem);
+      if (region == NULL) {
+        logError() << "No Mesh; regionid:" << iElem << "not found in model.";
+      } else {
+        logInfo(PMU_rank()) << "No Mesh; regionid:" << iElem;
+        MS_setNoMesh(meshCase, region, 1);
       }
     }
-
   }
 
   private:
