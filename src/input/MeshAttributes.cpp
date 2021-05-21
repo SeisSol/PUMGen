@@ -12,6 +12,7 @@ void MeshAttributes::init(const char* xmlFilename) {
   set_SurfaceMeshingAttributes();
   set_VolumeMeshingAttributes();
   set_UseDiscreteMesh();
+  set_NoMesh();
   set_vertexMSize();
   set_edgeMSize();
   set_surfaceMSize();
@@ -84,6 +85,15 @@ void MeshAttributes::set_UseDiscreteMesh() {
                             UseDiscreteMesh_noModification);
   if (auto child = doc.FirstChildElement("UseDiscreteMesh")) {
     lFaceIdUseDiscreteMesh = fill_list_using_parsed_string(child->GetText());
+  }
+}
+
+void MeshAttributes::set_NoMesh() {
+  if (auto child = doc.FirstChildElement("surfaceNoMesh")) {
+    lFaceIdNoMesh = fill_list_using_parsed_string(child->GetText());
+  }
+  if (auto child = doc.FirstChildElement("regionNoMesh")) {
+    lRegionIdNoMesh = fill_list_using_parsed_string(child->GetText());
   }
 }
 
@@ -160,7 +170,7 @@ void MeshAttributes::update_attribute_from_xml(XMLNode& element, const char* sEl
                                                double& MeshAttributesMember) {
   if (auto child = element.FirstChildElement(sElementName)) {
     const char* attr = child->Attribute(sAttributeName);
-    if (attr != NULL) {
+    if (attr != nullptr) {
       MeshAttributesMember = std::atof(attr);
     } else {
       logError() << "XML Tag " << sElementName << " has no attribute " << sAttributeName;
@@ -173,7 +183,7 @@ void MeshAttributes::update_attribute_from_xml(XMLNode& element, const char* sEl
                                                int& MeshAttributesMember) {
   if (auto child = element.FirstChildElement(sElementName)) {
     const char* attr = child->Attribute(sAttributeName);
-    if (attr != NULL) {
+    if (attr != nullptr) {
       MeshAttributesMember = std::atoi(attr);
     } else {
       logError() << "XML Tag " << sElementName << " has no attribute " << sAttributeName;

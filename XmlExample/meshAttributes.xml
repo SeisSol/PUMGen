@@ -22,3 +22,5 @@
 <HalfDepth x="0e3" y="2e3" z="0"/>
 </MeshRefinementZoneCube>
 <UseDiscreteMesh noModification="1">1</UseDiscreteMesh>
+<surfaceNoMesh>1,2</surfaceNoMesh>
+<regionNoMesh>1,4</regionNoMesh>

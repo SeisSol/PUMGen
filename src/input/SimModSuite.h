@@ -108,7 +108,7 @@ class SimModSuite : public MeshInput {
     pACase meshCase, analysisCase;
     MeshAttributes MeshAtt;
 
-    if (xmlFile != NULL) {
+    if (xmlFile != nullptr) {
 
       // Read mesh Attributes from xml file
       int numFaces = GM_numFaces(m_model);
@@ -127,7 +127,7 @@ class SimModSuite : public MeshInput {
     // create the mesh
     logInfo(PMU_rank()) << "Starting the surface mesher";
     pSurfaceMesher surfaceMesher = SurfaceMesher_new(meshCase, m_simMesh);
-    if (xmlFile != NULL) {
+    if (xmlFile != nullptr) {
       SurfaceMesher_setSmoothing(surfaceMesher, MeshAtt.surfaceSmoothingLevel);
       SurfaceMesher_setSmoothType(surfaceMesher, static_cast<int>(MeshAtt.surfaceSmoothingType));
       SurfaceMesher_setFaceRotationLimit(surfaceMesher, MeshAtt.surfaceFaceRotationLimit);
@@ -140,7 +140,7 @@ class SimModSuite : public MeshInput {
 
     logInfo(PMU_rank()) << "Starting the volume mesher";
     pVolumeMesher volumeMesher = VolumeMesher_new(meshCase, m_simMesh);
-    if (xmlFile != NULL) {
+    if (xmlFile != nullptr) {
       VolumeMesher_setSmoothing(volumeMesher, MeshAtt.volumeSmoothingLevel);
       VolumeMesher_setSmoothType(volumeMesher, static_cast<int>(MeshAtt.volumeSmoothingType));
       VolumeMesher_setOptimization(volumeMesher, MeshAtt.VolumeMesherOptimization);
@@ -322,7 +322,7 @@ class SimModSuite : public MeshInput {
     meshCase = MS_newMeshCase(m_model);
 
     pACase meshCaseFile = extractCase(attMngr, meshCaseName);
-    AttCase_associate(meshCaseFile, NULL);
+    AttCase_associate(meshCaseFile, nullptr);
     MS_processSimModelerMeshingAtts(meshCaseFile, meshCase, &meshingOptions);
     AttCase_setModel(meshCase, m_model);
 
@@ -356,11 +356,11 @@ class SimModSuite : public MeshInput {
         std::list<int> lElements = pair_lId_MSize.first;
         for (const auto& element_id : lElements) {
           pGEntity entity = GM_entityByTag(model, element_type_id, element_id);
-          if (entity == NULL) {
+          if (entity == nullptr) {
             logError() << element_name[element_type_id] << "id:" << element_id
                        << "not found in model.";
           } else {
-            MS_setMeshSize(meshCase, entity, 1, MSize, NULL);
+            MS_setMeshSize(meshCase, entity, 1, MSize, nullptr);
             logInfo(PMU_rank()) << element_name[element_type_id] << "id:" << element_id
                                 << ", MSize =" << MSize;
           }
@@ -418,7 +418,7 @@ class SimModSuite : public MeshInput {
     for (auto const& fb : AnalysisAtt.faceBound) {
       // Get the face
       pGEntity face = GM_entityByTag(model, 2, fb.faceID + 1);
-      if (face == NULL) {
+      if (face == nullptr) {
         logError() << "faceid:" << fb.faceID + 1 << "not found in model.";
       } else {
         // Add the face to the model association. Note that we passed
@@ -444,7 +444,7 @@ class SimModSuite : public MeshInput {
       logInfo(PMU_rank()) << "globalMSize =" << MeshAtt.globalMSize;
       // ( <meshing case>, <entity>, <1=absolute, 2=relative>, <size>, <size
       // expression> )
-      MS_setMeshSize(meshCase, modelDomain, 1, MeshAtt.globalMSize, NULL);
+      MS_setMeshSize(meshCase, modelDomain, 1, MeshAtt.globalMSize, nullptr);
     }
 
     // Set mesh size on vertices, edges, surfaces and regions
@@ -472,34 +472,27 @@ class SimModSuite : public MeshInput {
                                ElementType_Triangle, MeshAtt.area_AspectRatio);
 #endif
     }
-    if (MeshAtt.lCube.size() > 0) {
-      std::list<Cube>::iterator it;
-      Cube mycube;
-      for (it = MeshAtt.lCube.begin(); it != MeshAtt.lCube.end(); it++) {
-        mycube = *it;
-        logInfo(PMU_rank()) << "Cube mesh refinement: " << mycube.CubeMSize;
-        logInfo(PMU_rank()) << "Center" << mycube.CubeCenter[0] << " " << mycube.CubeCenter[1]
-                            << " " << mycube.CubeCenter[2];
-        logInfo(PMU_rank()) << "Width" << mycube.CubeWidth[0] << " " << mycube.CubeWidth[1] << " "
-                            << mycube.CubeWidth[2];
-        logInfo(PMU_rank()) << "Height" << mycube.CubeHeight[0] << " " << mycube.CubeHeight[1]
-                            << " " << mycube.CubeHeight[2];
-        logInfo(PMU_rank()) << "Depth" << mycube.CubeDepth[0] << " " << mycube.CubeDepth[1] << " "
-                            << mycube.CubeDepth[2];
-        MS_addCubeRefinement(meshCase, mycube.CubeMSize, &mycube.CubeCenter[0],
-                             &mycube.CubeWidth[0], &mycube.CubeHeight[0], &mycube.CubeDepth[0]);
-      }
+    for (auto& mycube : MeshAtt.lCube) {
+      logInfo(PMU_rank()) << "Cube mesh refinement: " << mycube.CubeMSize;
+      logInfo(PMU_rank()) << "Center" << mycube.CubeCenter[0] << " " << mycube.CubeCenter[1] << " "
+                          << mycube.CubeCenter[2];
+      logInfo(PMU_rank()) << "Width" << mycube.CubeWidth[0] << " " << mycube.CubeWidth[1] << " "
+                          << mycube.CubeWidth[2];
+      logInfo(PMU_rank()) << "Height" << mycube.CubeHeight[0] << " " << mycube.CubeHeight[1] << " "
+                          << mycube.CubeHeight[2];
+      logInfo(PMU_rank()) << "Depth" << mycube.CubeDepth[0] << " " << mycube.CubeDepth[1] << " "
+                          << mycube.CubeDepth[2];
+      MS_addCubeRefinement(meshCase, mycube.CubeMSize, &mycube.CubeCenter[0], &mycube.CubeWidth[0],
+                           &mycube.CubeHeight[0], &mycube.CubeDepth[0]);
     }
 
     if (MeshAtt.MeshSizePropagationDistance > 0.0) {
-      std::list<int>::iterator it;
-      for (it = MeshAtt.lFaceIdMeshSizePropagation.begin();
-           it != MeshAtt.lFaceIdMeshSizePropagation.end(); it++) {
-        pGEntity face = GM_entityByTag(model, 2, *it);
-        if (face == NULL) {
-          logError() << "MeshSizeProp faceid:" << *it << "not found in model.";
+      for (auto& iElem : MeshAtt.lFaceIdMeshSizePropagation) {
+        pGEntity face = GM_entityByTag(model, 2, iElem);
+        if (face == nullptr) {
+          logError() << "MeshSizeProp faceid:" << iElem << "not found in model.";
         } else {
-          logInfo(PMU_rank()) << "MeshSizeProp faceid:" << *it
+          logInfo(PMU_rank()) << "MeshSizeProp faceid:" << iElem
                               << ", distance =" << MeshAtt.MeshSizePropagationDistance
                               << ", scaling factor =" << MeshAtt.MeshSizePropagationScalingFactor;
 #ifdef BEFORE_SIM_15
@@ -512,19 +505,33 @@ class SimModSuite : public MeshInput {
         }
       }
     }
-    if (MeshAtt.lFaceIdUseDiscreteMesh.size() > 0) {
-      std::list<int>::iterator it;
-      for (it = MeshAtt.lFaceIdUseDiscreteMesh.begin(); it != MeshAtt.lFaceIdUseDiscreteMesh.end();
-           it++) {
-        pGEntity face = GM_entityByTag(model, 2, *it);
-        if (face == NULL) {
-          logError() << "UseDiscreteMesh; faceid:" << *it << "not found in model.";
-        } else {
-          logInfo(PMU_rank()) << "UseDiscreteMesh; faceid, noModification:" << *it,
-              MeshAtt.UseDiscreteMesh_noModification;
-          MS_useDiscreteGeometryMesh(meshCase, face, MeshAtt.UseDiscreteMesh_noModification);
-          // MS_limitSurfaceMeshModification(meshCase,face,UseDiscreteMesh_noModification);
-        }
+    for (auto& iElem : MeshAtt.lFaceIdUseDiscreteMesh) {
+      pGEntity face = GM_entityByTag(model, 2, iElem);
+      if (face == nullptr) {
+        logError() << "UseDiscreteMesh; faceid:" << iElem << "not found in model.";
+      } else {
+        logInfo(PMU_rank()) << "UseDiscreteMesh; faceid, noModification:" << iElem,
+            MeshAtt.UseDiscreteMesh_noModification;
+        MS_useDiscreteGeometryMesh(meshCase, face, MeshAtt.UseDiscreteMesh_noModification);
+        // MS_limitSurfaceMeshModification(meshCase,face,UseDiscreteMesh_noModification);
+      }
+    }
+    for (auto& iElem : MeshAtt.lFaceIdNoMesh) {
+      pGEntity face = GM_entityByTag(model, 2, iElem);
+      if (face == nullptr) {
+        logError() << "No Mesh; faceid:" << iElem << "not found in model.";
+      } else {
+        logInfo(PMU_rank()) << "No Mesh; faceid:" << iElem;
+        MS_setNoMesh(meshCase, face, 1);
+      }
+    }
+    for (auto& iElem : MeshAtt.lRegionIdNoMesh) {
+      pGEntity region = GM_entityByTag(model, 3, iElem);
+      if (region == nullptr) {
+        logError() << "No Mesh; regionid:" << iElem << "not found in model.";
+      } else {
+        logInfo(PMU_rank()) << "No Mesh; regionid:" << iElem;
+        MS_setNoMesh(meshCase, region, 1);
       }
     }
   }
