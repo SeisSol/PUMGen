@@ -6,6 +6,7 @@ option(SIMMETRIX "Use simmetrix libraries" OFF)
 set(SIMMETRIX_ROOT "" CACHE STRING "Root directory of simmetrix dev files")
 set(SIM_MPI "mpich3" CACHE STRING "MPI version used by simmetrix")
 option(NETCDF "Use netcdf" OFF)
+option(PARASOLID "enable support for parasolid files" OFF)
 set(LOG_LEVEL "info" CACHE STRING "Log level for the code")
 set_property(CACHE LOG_LEVEL PROPERTY STRINGS "debug" "info" "warning" "error")
 
@@ -35,6 +36,10 @@ target_include_directories(pumgen PUBLIC src
   "${CMAKE_CURRENT_SOURCE_DIR}/src"
   "${CMAKE_CURRENT_SOURCE_DIR}/submodules/"
 )
+
+if (PARASOLID)
+  target_compile_definitions(pumgen PUBLIC PARASOLID)
+endif()
 
 if (NETCDF)
   find_package(NetCDF REQUIRED)
