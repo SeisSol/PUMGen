@@ -68,7 +68,9 @@ int main(int argc, char* argv[]) {
   args.addOption("vtk", 0, "Dump mesh to VTK files", utils::Args::Required, false);
   args.addOption("license", 'l', "License file (only used by SimModSuite)", utils::Args::Required,
                  false);
+#ifdef PARASOLID
   args.addOption("cad", 'c', "CAD file (only used by SimModSuite)", utils::Args::Required, false);
+#endif
   args.addOption("mesh", 0, "Mesh attributes name (only used by SimModSuite, default: \"mesh\")",
                  utils::Args::Required, false);
   args.addOption("analysis", 0,
