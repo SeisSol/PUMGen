@@ -33,7 +33,9 @@
 #include <SimMeshingErrorCodes.h>
 #include <SimModel.h>
 #include <SimModelerUtil.h>
+#ifdef PARASOLID
 #include <SimParasolidKrnl.h>
+#endif
 #include <SimPartitionedMesh.h>
 
 #include "utils/logger.h"
@@ -88,7 +90,9 @@ class SimModSuite : public MeshInput {
     Sim_readLicenseFile(licenseFile);
     MS_init();
     SimDiscrete_start(0);
+#ifdef PARASOLID
     SimParasolid_start(1);
+#endif
     Sim_setMessageHandler(messageHandler);
 
     // Load CAD
@@ -223,7 +227,9 @@ class SimModSuite : public MeshInput {
     // GM_release(m_model);
 
     // Finalize SimModSuite
+#ifdef PARASOLID
     SimParasolid_stop(1);
+#endif
     SimDiscrete_stop(0);
     MS_exit();
     Sim_unregisterAllKeys();
@@ -547,9 +553,10 @@ class SimModSuite : public MeshInput {
       utils::StringUtils::replaceLast(sCadFile, ".smd", "_nat.x_t");
     }
     pNativeModel nativeModel = 0L;
+#ifdef PARASOLID
     if (utils::Path(sCadFile).exists())
       nativeModel = ParasolidNM_createFromFile(sCadFile.c_str(), 0);
-
+#endif
     m_model = GM_load(modFile, nativeModel, 0L);
     nativeModel = GM_nativeModel(m_model);
 
