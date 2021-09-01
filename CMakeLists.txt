@@ -25,8 +25,7 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 set(CMAKE_CXX_FLAGS_RELEASE "-O2")
 
-
-add_executable(pumgen 
+add_executable(pumgen
   ${CMAKE_CURRENT_SOURCE_DIR}/src/pumgen.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/meshreader/FidapReader.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/meshreader/GambitReader.cpp
