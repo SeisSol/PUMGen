@@ -74,6 +74,7 @@ if (SIMMETRIX)
     find_package(Simmetrix REQUIRED)
     target_sources(pumgen PUBLIC 
       ${CMAKE_CURRENT_SOURCE_DIR}/src/input/AnalysisAttributes.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/input/EasiMeshSize.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/src/input/MeshAttributes.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/src/input/ParallelVertexFilter.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/src/input/split.cpp
