@@ -45,6 +45,7 @@
 #include "MeshInput.h"
 
 #include "AnalysisAttributes.h"
+#include "EasiMeshSize.h"
 #include "MeshAttributes.h"
 
 #include <SimDisplay.h>
@@ -455,6 +456,25 @@ class SimModSuite : public MeshInput {
 
     // Set mesh size on vertices, edges, surfaces and regions
     setMeshSize(model, meshCase, MeshAtt);
+
+    // TODO(Lukas) Make configurable
+    if (true) {
+      auto easiMeshSize = EasiMeshSize("todo.yaml");
+      auto easiMeshSizeFunc = [](pSizeAttData sadata, void *userdata){
+        auto* easiMeshSize = static_cast<EasiMeshSize*>(userdata);
+        std::array<double, 3> pt{};
+        int haspt = SizeAttData_point(sadata, pt.data());
+        if (!haspt) {
+          logError() << "!haspt";
+        }
+        return easiMeshSize->getMeshSize(pt);
+        };
+      // set the user-defined function for anisotropic size
+      MS_setSizeAttFunc(meshCase, "setCustomMeshSize", easiMeshSizeFunc, &easiMeshSize);
+      // Relative anisotropic size is set for the entire model through the
+      // function anisoSize
+      MS_setMeshSize(meshCase, GM_domain(model), MS_userDefinedType | 2, 0, "setCustomMeshSize");
+    }
 
     if (MeshAtt.gradation > 0) {
       // Set gradation relative
