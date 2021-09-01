@@ -22,8 +22,7 @@ if(NOT CMAKE_BUILD_TYPE)
   message(STATUS "Set build type to Release as none was supplied.")
 endif()
 
-
-add_executable(pumgen 
+add_executable(pumgen
   ${CMAKE_CURRENT_SOURCE_DIR}/src/pumgen.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/meshreader/FidapReader.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/meshreader/GambitReader.cpp
