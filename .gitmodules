@@ -10,3 +10,6 @@
 [submodule "submodules/run-clang-format"]
 	path = submodules/run-clang-format
 	url = ../../Sarcasm/run-clang-format.git
+[submodule "submodules/easi"]
+	path = submodules/easi
+	url = ../../SeisSol/easi.git
