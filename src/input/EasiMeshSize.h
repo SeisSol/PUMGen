@@ -24,23 +24,14 @@ private:
   easi::YAMLParser* parser;
   easi::Component* model; // Unique ptr to model leads to segfault
   pGModel simModel;
+  std::unordered_map<pGRegion, int> groupMap;
 
-  int findGroup(std::array<double, 3> point) {
-    GRIter regionIt = GM_regionIter(simModel);
-    while (pGRegion region = GRIter_next(regionIt)) {
-      // Note: Does not work on discrete regions!
-      if (GR_containsPoint(region, point.data()) > 0) {
-        return GEN_tag(region);
-      }
-
-      return -1;
-    }
-  }
+  int findGroup(std::array<double, 3> point);
 
   public:
   EasiMeshSize();;
   EasiMeshSize(std::string easiFileName, double targetedFrequency, double elementsPerWaveLength,
-               pGModel simModel);
+               pGModel simModel, std::unordered_map<pGRegion, int> groupMap);
 
   double getMeshSize(std::array<double, 3> point);
 

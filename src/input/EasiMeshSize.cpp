@@ -8,15 +8,30 @@ EasiMeshSize::EasiMeshSize() : parser(nullptr), model(nullptr) {
 }
 
 EasiMeshSize::EasiMeshSize(std::string easiFileName, double targetedFrequency,
-                           double elementsPerWaveLength, pGModel simModel)
+                           double elementsPerWaveLength, pGModel simModel,
+                           std::unordered_map<pGRegion, int> groupMap)
     :
     easiFileName(easiFileName), targetedFrequency(targetedFrequency),
     elementsPerWaveLength(elementsPerWaveLength),
     simModel(simModel),
-    parser(new easi::YAMLParser(3)) {
+    parser(new easi::YAMLParser(3)),
+    groupMap(groupMap) {
   std::cout << "EasiMeshSize(easiFileName) called" << std::endl;
   model = parser->parse(easiFileName);
 }
+
+int EasiMeshSize::findGroup(std::array<double, 3> point) {
+  GRIter regionIt = GM_regionIter(simModel);
+  while (pGRegion region = GRIter_next(regionIt)) {
+    // Note: Does not work on discrete regions!
+    if (GR_containsPoint(region, point.data()) > 0) {
+      assert(groupMap.count(region) > 0);
+      return groupMap[region];
+    }
+  }
+  return -1;
+}
+
 double EasiMeshSize::getMeshSize(std::array<double, 3> point) {
   if (!model) {
     logError() << "Model was not parsed correctly";
@@ -50,3 +65,4 @@ EasiMeshSize::~EasiMeshSize() {
   //delete parser;
   //delete model;
 }
+

@@ -109,6 +109,13 @@ class SimModSuite : public MeshInput {
       logError() << "unsupported model file";
     }
 
+    // Create group lookup table
+    std::unordered_map<pGRegion, int> groupMap;
+    GRIter regionIt = GM_regionIter(m_model);
+    while (pGRegion region = GRIter_next(regionIt)) {
+      groupMap[region] = static_cast<int>(groupMap.size() + 1);
+    }
+
     // Extract cases
     logInfo(PMU_rank()) << "Extracting cases";
     pACase meshCase, analysisCase;
@@ -120,7 +127,7 @@ class SimModSuite : public MeshInput {
       int numFaces = GM_numFaces(m_model);
       MeshAtt.init(xmlFile);
       AnalysisAttributes AnalysisAtt(xmlFile, numFaces);
-      setCases(m_model, meshCase, analysisCase, MeshAtt, AnalysisAtt);
+      setCases(m_model, meshCase, analysisCase, MeshAtt, AnalysisAtt, groupMap);
     } else {
       extractCases(m_model, meshCase, meshCaseName, analysisCase, analysisCaseName);
     }
@@ -192,13 +199,6 @@ class SimModSuite : public MeshInput {
     }
     m_mesh->end(it);
 
-    // Create group lookup table
-    std::unordered_map<pGRegion, int> groupTable;
-    GRIter regionIt = GM_regionIter(m_model);
-    while (pGRegion region = GRIter_next(regionIt)) {
-      int id = groupTable.size() + 1;
-      groupTable[region] = id;
-    }
 
     // Set groups
     apf::MeshTag* groupTag = m_mesh->createIntTag("group", 1);
@@ -207,8 +207,8 @@ class SimModSuite : public MeshInput {
       apf::ModelEntity* modelRegion = m_mesh->toModel(element);
 
       pGRegion simRegion = reinterpret_cast<pGRegion>(modelRegion);
-      std::unordered_map<pGRegion, int>::const_iterator i = groupTable.find(simRegion);
-      if (i == groupTable.end())
+      std::unordered_map<pGRegion, int>::const_iterator i = groupMap.find(simRegion);
+      if (i == groupMap.end())
         logError() << "Mesh element with unknown region found.";
 
       m_mesh->setIntTag(element, groupTag, &i->second);
@@ -378,7 +378,8 @@ class SimModSuite : public MeshInput {
   }
 
   void setCases(pGModel model, pACase& meshCase, pACase& analysisCase, MeshAttributes& MeshAtt,
-                AnalysisAttributes& AnalysisAtt) {
+                AnalysisAttributes& AnalysisAtt,
+                std::unordered_map<pGRegion, int> groupMap) {
 
     logInfo(PMU_rank()) << "Setting cases";
     // ------------------------------ Set boundary conditions
@@ -460,10 +461,9 @@ class SimModSuite : public MeshInput {
 
     if (MeshAtt.useVelocityAwareMeshing) {
       logInfo() << "Enabling velocity aware meshing";
-      easiMeshSize = EasiMeshSize(MeshAtt.easiFileName,
-                                  MeshAtt.targetedFrequency,
-                                  MeshAtt.elementsPerWaveLength,
-                                  model);
+      easiMeshSize =
+          EasiMeshSize(MeshAtt.easiFileName, MeshAtt.targetedFrequency,
+                       MeshAtt.elementsPerWaveLength, model, groupMap);
       auto easiMeshSizeFunc = [](pSizeAttData sadata, void *userdata){
         auto* easiMeshSize = static_cast<EasiMeshSize*>(userdata);
         std::array<double, 3> pt{};
