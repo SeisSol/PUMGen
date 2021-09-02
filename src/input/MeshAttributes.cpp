@@ -19,6 +19,7 @@ void MeshAttributes::init(const char* xmlFilename) {
   set_MeshSizePropagation();
   set_regionMSize();
   set_global_mesh_attributes();
+  set_velocity_aware_meshing();
 }
 
 void MeshAttributes::readXmlFile(const char* xmlFilename) {
@@ -135,6 +136,24 @@ void MeshAttributes::set_regionMSize() {
        child = child->NextSiblingElement("regionMSize")) {
     lpair_lRegionId_MSize.push_back(std::make_pair(fill_list_using_parsed_string(child->GetText()),
                                                    std::atof(child->Attribute("value"))));
+  }
+}
+
+void MeshAttributes::set_velocity_aware_meshing() {
+  int numChilds = 0;
+  const auto name = "velocityAwareMeshing";
+  for (auto child = doc.FirstChildElement(name);
+       child;
+       child = child->NextSiblingElement("velocityAwareMeshing")) {
+    useVelocityAwareMeshing = true;
+    easiFileName = child->GetText();
+    targetedFrequency = std::stof(child->Attribute("frequency"));
+    elementsPerWaveLength = std::stof(child->Attribute("elementsPerWaveLength"));
+    ++numChilds;
+  }
+  if (numChilds > 1) {
+    logError() << "Multiple definitions of velocityAwareMeshing";
+
   }
 }
 

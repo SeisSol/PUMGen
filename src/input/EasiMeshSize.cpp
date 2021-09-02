@@ -7,8 +7,13 @@ EasiMeshSize::EasiMeshSize() : parser(nullptr), model(nullptr) {
   std::cout << "EasiMeshSize() called" << std::endl;
 }
 
-EasiMeshSize::EasiMeshSize(std::string easiFileName) :
-    parser(new easi::YAMLParser(3)), easiFileName(easiFileName){
+EasiMeshSize::EasiMeshSize(std::string easiFileName, double targetedFrequency,
+                           double elementsPerWaveLength, pGModel simModel)
+    :
+    easiFileName(easiFileName), targetedFrequency(targetedFrequency),
+    elementsPerWaveLength(elementsPerWaveLength),
+    simModel(simModel),
+    parser(new easi::YAMLParser(3)) {
   std::cout << "EasiMeshSize(easiFileName) called" << std::endl;
   model = parser->parse(easiFileName);
 }
@@ -20,7 +25,8 @@ double EasiMeshSize::getMeshSize(std::array<double, 3> point) {
   query.x(0,0) = point[0];
   query.x(0,1) = point[1];
   query.x(0,2) = point[2];
-  query.group(0) = 0;
+  query.group(0) = findGroup(point);
+  assert(query.group(0) > 0);
 
   // Need array for easi interface
   auto materials = std::array<ElasticMaterial,1>();
@@ -36,16 +42,11 @@ double EasiMeshSize::getMeshSize(std::array<double, 3> point) {
       (material.lambda + 2 * material.mu ) / material.rho
       );
 
-  std::cout << pWaveSpeed << std::endl;
-  // TODO: What to do about groups?
-  if(point[2] > 0 ) {
-    return 1.0;
-  } else {
-    return 0.1;
-  }
+  const auto waveLength = pWaveSpeed / targetedFrequency;
+  return waveLength / elementsPerWaveLength;
 }
 EasiMeshSize::~EasiMeshSize() {
   std::cout << "Destructor of EasiMeshSize called" << std::endl;
-  delete parser;
-  delete model;
+  //delete parser;
+  //delete model;
 }

@@ -31,6 +31,9 @@ class MeshAttributes {
   int VolumeMesherOptimization = 1;
   double globalMSize = 0., faultMSize = 0., gradation = 0., vol_AspectRatio = 0.,
          area_AspectRatio = 0.;
+  bool useVelocityAwareMeshing = false;
+  double targetedFrequency = 0., elementsPerWaveLength = 0;
+  std::string easiFileName;
   const std::list<std::pair<std::list<int>, double>>& getMSizeList(ElementType type);
 
   std::list<std::pair<std::list<int>, double>> lpair_lVertexId_MSize;
@@ -63,6 +66,7 @@ class MeshAttributes {
   void set_MeshSizePropagation();
   void set_regionMSize();
   void set_global_mesh_attributes();
+  void set_velocity_aware_meshing();
   void update_attribute_from_xml(XMLNode& element, const char* sElementName,
                                  const char* sAttributeName, int& MeshAttributesMember);
   void update_attribute_from_xml(XMLNode& element, const char* sElementName,

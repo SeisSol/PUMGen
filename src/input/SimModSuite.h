@@ -458,11 +458,12 @@ class SimModSuite : public MeshInput {
     // Set mesh size on vertices, edges, surfaces and regions
     setMeshSize(model, meshCase, MeshAtt);
 
-    // TODO(Lukas) Make configurable
-    if (true) {
-      const auto easiFile =
-          "/home/lukas/src/SeisSol-Examples/convergence_acoustic_elastic/convergence_snell/material.yaml";
-      easiMeshSize = EasiMeshSize(easiFile);
+    if (MeshAtt.useVelocityAwareMeshing) {
+      logInfo() << "Enabling velocity aware meshing";
+      easiMeshSize = EasiMeshSize(MeshAtt.easiFileName,
+                                  MeshAtt.targetedFrequency,
+                                  MeshAtt.elementsPerWaveLength,
+                                  model);
       auto easiMeshSizeFunc = [](pSizeAttData sadata, void *userdata){
         auto* easiMeshSize = static_cast<EasiMeshSize*>(userdata);
         std::array<double, 3> pt{};
