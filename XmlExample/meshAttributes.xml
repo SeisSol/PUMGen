@@ -24,3 +24,4 @@
 <UseDiscreteMesh noModification="1">1</UseDiscreteMesh>
 <surfaceNoMesh>1,2</surfaceNoMesh>
 <regionNoMesh>1,4</regionNoMesh>
+<velocityAwareMeshing frequency="10" elementsPerWaveLength="2">easiFile.yaml</velocityAwareMeshing>
