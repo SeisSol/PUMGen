@@ -68,6 +68,7 @@ pAManager SModel_attManager(pModel model);
  */
 class SimModSuite : public MeshInput {
   private:
+  EasiMeshSize easiMeshSize;
   pGModel m_model;
 
   pParMesh m_simMesh;
@@ -459,7 +460,9 @@ class SimModSuite : public MeshInput {
 
     // TODO(Lukas) Make configurable
     if (true) {
-      auto easiMeshSize = EasiMeshSize("todo.yaml");
+      const auto easiFile =
+          "/home/lukas/src/SeisSol-Examples/convergence_acoustic_elastic/convergence_snell/material.yaml";
+      easiMeshSize = EasiMeshSize(easiFile);
       auto easiMeshSizeFunc = [](pSizeAttData sadata, void *userdata){
         auto* easiMeshSize = static_cast<EasiMeshSize*>(userdata);
         std::array<double, 3> pt{};
