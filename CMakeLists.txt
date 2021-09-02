@@ -2,6 +2,10 @@ cmake_minimum_required(VERSION 3.9)
 
 project(pumgen LANGUAGES C CXX)
 
+set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
+set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
+
 option(SIMMETRIX "Use simmetrix libraries" OFF)
 set(SIMMETRIX_ROOT "" CACHE STRING "Root directory of simmetrix dev files")
 set(SIM_MPI "mpich3" CACHE STRING "MPI version used by simmetrix")
@@ -70,7 +74,49 @@ add_library(tinyxml2 submodules/tinyxml2/tinyxml2.cpp)
 target_link_libraries(pumgen PUBLIC tinyxml2)
 
 if (SIMMETRIX)
-    find_package(Simmetrix REQUIRED)
+    # Libs
+    include(ExternalProject)
+
+    find_package(YAML-CPP 0.6.3 QUIET)
+    if (YAML-CPP_FOUND)
+        target_link_libraries(SeisSol-lib PUBLIC ${YAML_CPP_LIBRARIES})
+        target_include_directories(SeisSol-lib PUBLIC ${YAML_CPP_INCLUDE_DIR})
+    else()
+        ExternalProject_Add(yaml-cpp-build
+                SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}/submodules/yaml-cpp/
+                INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/yaml-cpp-install
+                PREFIX ${CMAKE_CURRENT_BINARY_DIR}/yaml-cpp
+                CMAKE_ARGS -DCMAKE_BUILD_TYPE=Release
+                -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+                -DYAML_CPP_BUILD_TOOLS=OFF
+                -DYAML_CPP_BUILD_TESTS=OFF
+                -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+                -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+                -DCMAKE_CXX_FLAGS=${EXTRA_CXX_FLAGS}
+                )
+        add_dependencies(pumgen yaml-cpp-build)
+        target_link_libraries(pumgen PUBLIC "${CMAKE_CURRENT_BINARY_DIR}/yaml-cpp-install/lib/libyaml-cpp.a")
+        target_include_directories(pumgen PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/yaml-cpp-install/include/)
+    endif()
+
+    ExternalProject_Add(ImpalaJIT-build
+            SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}/submodules/ImpalaJIT/
+            INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/ImpalaJIT-install
+            PREFIX ${CMAKE_CURRENT_BINARY_DIR}/ImpalaJIT
+            CMAKE_ARGS -DCMAKE_BUILD_TYPE=Release
+            -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
+            -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+            -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
+            -DCMAKE_CXX_FLAGS=${EXTRA_CXX_FLAGS}
+            )
+    add_dependencies(pumgen ImpalaJIT-build)
+    target_link_libraries(pumgen PUBLIC "${CMAKE_CURRENT_BINARY_DIR}/ImpalaJIT-install/lib/libimpalajit.a")
+    target_include_directories(pumgen PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/ImpalaJIT-install/include/)
+
+    # easi
+    target_include_directories(pumgen PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/submodules/easi/include/)
+
+find_package(Simmetrix REQUIRED)
     target_sources(pumgen PUBLIC 
       ${CMAKE_CURRENT_SOURCE_DIR}/src/input/AnalysisAttributes.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/src/input/EasiMeshSize.cpp
@@ -86,6 +132,8 @@ if (SIMMETRIX)
     endif()
     target_include_directories(pumgen PUBLIC ${SIMMETRIX_INCLUDE_DIR})
     target_link_libraries(pumgen PUBLIC ${SIMMETRIX_LIBRARIES})
+
+    target_link_libraries(pumgen PUBLIC tirpc) # Only for Fedora
 endif()
 
 function(cast_log_level_to_int log_level_str log_level_int)
