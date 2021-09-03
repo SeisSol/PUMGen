@@ -118,6 +118,14 @@ if (SIMMETRIX)
     target_link_libraries(pumgen PUBLIC "${CMAKE_CURRENT_BINARY_DIR}/ImpalaJIT-install/lib/libimpalajit.a")
     target_include_directories(pumgen PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/ImpalaJIT-install/include/)
 
+    # asagi
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(ASAGI REQUIRED asagi)
+    target_compile_definitions(pumgen PUBLIC USE_ASAGI)
+    target_link_libraries(pumgen PUBLIC ${ASAGI_STATIC_LDFLAGS})
+    target_include_directories(pumgen PUBLIC ${ASAGI_INCLUDE_DIRS})
+    target_compile_options(pumgen PUBLIC ${ASAGI_CFLAGS} ${ASAGI_CFLAGS_OTHER})
+
     # easi
     target_include_directories(pumgen PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/submodules/easi/include/)
 
