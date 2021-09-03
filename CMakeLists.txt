@@ -144,8 +144,6 @@ if (SIMMETRIX)
     endif()
     target_include_directories(pumgen PUBLIC ${SIMMETRIX_INCLUDE_DIR})
     target_link_libraries(pumgen PUBLIC ${SIMMETRIX_LIBRARIES})
-
-    target_link_libraries(pumgen PUBLIC tirpc) # Only for Fedora
 endif()
 
 function(cast_log_level_to_int log_level_str log_level_int)
