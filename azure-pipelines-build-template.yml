@@ -13,7 +13,9 @@ jobs:
           # build pumi
           git clone https://github.com/SCOREC/core.git
           mkdir core/build
-          cd core/build
+          cd core
+          git submodule update --init
+          cd build
           cmake .. -DCMAKE_C_COMPILER="`which mpicc`" -DCMAKE_CXX_COMPILER="`which mpiCC`" -DCMAKE_C_FLAGS="-O2 -g -Wall" -DCMAKE_CXX_FLAGS="-O2 -g -Wall" -DCMAKE_INSTALL_PREFIX=../../pumi
           make -j $(nproc) && make install
           #Go back to PUMGen and build it
