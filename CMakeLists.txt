@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.9)
 
+cmake_policy(SET CMP0074 NEW)
+
 project(pumgen LANGUAGES C CXX)
 
 option(SIMMETRIX "Use simmetrix libraries" OFF)
@@ -64,7 +66,7 @@ target_link_libraries(pumgen PUBLIC MPI::MPI_CXX)
 
 target_compile_definitions(pumgen PUBLIC PARALLEL)
 
-find_package(Apf REQUIRED)
+find_package(APF REQUIRED)
 target_include_directories(pumgen PUBLIC ${APF_INCLUDE_DIR})
 target_link_libraries(pumgen PUBLIC ${APF_LIBRARIES})
 
@@ -72,7 +74,7 @@ add_library(tinyxml2 submodules/tinyxml2/tinyxml2.cpp)
 target_link_libraries(pumgen PUBLIC tinyxml2)
 
 if (SIMMETRIX)
-    find_package(Simmetrix REQUIRED)
+    find_package(SIMMETRIX REQUIRED)
     target_sources(pumgen PUBLIC 
       ${CMAKE_CURRENT_SOURCE_DIR}/src/input/AnalysisAttributes.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/src/input/MeshAttributes.cpp
