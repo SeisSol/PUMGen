@@ -2,7 +2,7 @@ include(FindPackageHandleStandardArgs)
 
 find_path(GMI_SIM_INCLUDE_DIR gmi_sim.h)
 find_path(APF_SIM_INCLUDE_DIR apfSIM.h)
-find_path(MESH_SIM_INCLUDE_DIR MeshSim.h ${SIMMETRIX_ROOT}/include)
+find_path(MESH_SIM_INCLUDE_DIR MeshSim.h)
 
 list(APPEND SIMMETRIX_INCLUDE_DIR
   ${GMI_SIM_INCLUDE_DIR}
@@ -20,7 +20,7 @@ find_library(SIM_MESHING_LIB SimMeshing ${SIM_LIB_HINT})
 find_library(SIM_MESH_TOOLS_LIB SimMeshTools ${SIM_LIB_HINT})
 find_library(SIM_MODEL_LIB SimModel ${SIM_LIB_HINT})
 if (PARASOLID)
-find_library(SIM_PARASOLID_LIB NAMES SimParasolid310 SimParasolid320 PATHS ${SIM_LIB_HINT})
+find_library(SIM_PARASOLID_LIB NAMES SimParasolid310 SimParasolid320 SimParasolid330 PATHS ${SIM_LIB_HINT})
 endif()
 find_library(SIM_PARTITIONED_MESH_LIB SimPartitionedMesh ${SIM_LIB_HINT})
 find_library(SIM_PARTITIONED_MESH_MPI_LIB SimPartitionedMesh-mpi ${SIM_LIB_HINT})
