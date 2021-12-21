@@ -21,6 +21,7 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
   message(STATUS "Set build type to Release as none was supplied.")
 endif()
+set(CMAKE_CXX_FLAGS_RELEASE "-O2")
 
 
 add_executable(pumgen 
