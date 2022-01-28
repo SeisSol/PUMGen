@@ -1,8 +1,8 @@
 <freeSurface>1</freeSurface>
 <dynamicRupture>2</dynamicRupture>
 <absorbing>3,4</absorbing>
-<boundaryCondition tag="7">7</boundaryCondition>
-<boundaryCondition tag="8">8,9</boundaryCondition>
+<boundaryCondition tag="65">7</boundaryCondition>
+<boundaryCondition tag="66">8,9</boundaryCondition>
 <globalMSize value="100e3"/>
 <vertexMSize value="1000">1,2</vertexMSize>
 <edgeMSize value="500">4,8</edgeMSize>
