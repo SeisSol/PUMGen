@@ -32,6 +32,7 @@
 #include <SimErrorCodes.h>
 #include <SimMeshingErrorCodes.h>
 #include <SimModel.h>
+#include <SimLicense.h>
 #include <SimModelerUtil.h>
 #ifdef PARASOLID
 #include <SimParasolidKrnl.h>
