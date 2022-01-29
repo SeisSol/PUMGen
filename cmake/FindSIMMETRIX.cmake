@@ -50,7 +50,7 @@ endif()
 
 message(SIM_MODEL_LIB : ${SIM_MODEL_LIB})
 
-string(REGEX REPLACE ".*/([0-9]+).[0-9]-.*" "\\1" SIM_MAJOR_VER ${SIM_MODEL_LIB})
+string(REGEX REPLACE ".*/.*([0-9]+).[0-9]-.*" "\\1" SIM_MAJOR_VER ${SIM_MODEL_LIB})
 
 message(SIM_MAJOR_VER : ${SIM_MAJOR_VER})
 
