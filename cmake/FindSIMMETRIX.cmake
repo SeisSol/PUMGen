@@ -13,7 +13,7 @@ list(APPEND SIMMETRIX_INCLUDE_DIR
 find_library(GMI_SIM_LIB gmi_sim)
 find_library(APF_SIM_LIB apf_sim)
 
-set(SIM_LIB_HINT ${SIMMETRIX_ROOT}/lib/x64_rhel7_gcc48)
+set(SIM_LIB_HINT ${SIMMETRIX_ROOT}/lib/x64_rhel8_gcc83)
 
 find_library(SIM_DISCRETE_LIB SimDiscrete ${SIM_LIB_HINT})
 find_library(SIM_MESHING_LIB SimMeshing ${SIM_LIB_HINT})
