@@ -13,6 +13,7 @@ list(APPEND SIMMETRIX_INCLUDE_DIR
 find_library(GMI_SIM_LIB gmi_sim)
 find_library(APF_SIM_LIB apf_sim)
 
+message(SIMMETRIX_ROOT : ${SIMMETRIX_ROOT})
 set(SIM_LIB_HINT ${SIMMETRIX_ROOT}/lib/x64_rhel8_gcc83)
 
 find_library(SIM_DISCRETE_LIB SimDiscrete ${SIM_LIB_HINT})
@@ -53,6 +54,7 @@ message(SIM_MODEL_LIB : ${SIM_MODEL_LIB})
 string(REGEX REPLACE ".*/([0-9]+).[0-9]-.*" "\\1" SIM_MAJOR_VER ${SIM_MODEL_LIB})
 
 message(SIM_MAJOR_VER : ${SIM_MAJOR_VER})
+message(SIMMETRIX : ${SIMMETRIX})
 message(SIMMETRIX_INCLUDE_DIR : ${SIMMETRIX_INCLUDE_DIR})
 message(SIMMETRIX_LIBRARIES : ${SIMMETRIX_LIBRARIES})
 
