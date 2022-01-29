@@ -68,6 +68,8 @@ int main(int argc, char* argv[]) {
   args.addOption("vtk", 0, "Dump mesh to VTK files", utils::Args::Required, false);
   args.addOption("license", 'l', "License file (only used by SimModSuite)", utils::Args::Required,
                  false);
+  args.addOption("features", 'f', "SimModSuite features (available in License file,only used by SimModSuite)", utils::Args::Required,
+                 false);
 #ifdef PARASOLID
   args.addOption("cad", 'c', "CAD file (only used by SimModSuite)", utils::Args::Required, false);
 #endif
@@ -148,7 +150,8 @@ int main(int argc, char* argv[]) {
 
     meshInput = new SimModSuite(
         inputFile, args.getArgument<const char*>("cad", 0L),
-        args.getArgument<const char*>("license", 0L), args.getArgument<const char*>("mesh", "mesh"),
+        args.getArgument<const char*>("license", 0L), args.getArgument<const char*>("features", 0L), 
+        args.getArgument<const char*>("mesh", "mesh"),
         args.getArgument<const char*>("analysis", "analysis"),
         args.getArgument<int>("enforce-size", 0), args.getArgument<const char*>("xml", 0L),
         args.isSet("analyseAR"), args.getArgument<const char*>("sim_log", 0L));
