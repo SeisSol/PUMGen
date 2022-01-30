@@ -236,6 +236,7 @@ class SimModSuite : public MeshInput {
     Sim_unregisterAllKeys();
     if (m_log)
       Sim_logOff();
+    SimLicense_stop();
     SimPartitionedMesh_stop();
     SimModel_stop();
   }
