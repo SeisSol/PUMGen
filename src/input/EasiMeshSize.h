@@ -1,17 +1,14 @@
 #ifndef PUMGEN_EASIMESHSIZE_H
 #define PUMGEN_EASIMESHSIZE_H
 
-#include "easi/Component.h"
+#include <easi/YAMLParser.h>
+#include <easi/Component.h>
 #include <MeshTypes.h>
 #include <SimModel.h>
 #include <array>
 #include <memory>
 #include <string>
 
-// Workaround for easi linking bug
-namespace easi {
-class YAMLParser;
-}
 struct ElasticMaterial {
   double lambda, mu, rho;
 };
