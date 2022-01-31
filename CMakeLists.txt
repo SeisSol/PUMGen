@@ -79,55 +79,9 @@ target_link_libraries(pumgen PUBLIC tinyxml2)
 if (SIMMETRIX)
     find_package(SIMMETRIX REQUIRED)
 
-    # Libs
-    include(ExternalProject)
-
-    find_package(YAML-CPP 0.6.3 QUIET)
-    if (YAML-CPP_FOUND)
-        target_link_libraries(SeisSol-lib PUBLIC ${YAML_CPP_LIBRARIES})
-        target_include_directories(SeisSol-lib PUBLIC ${YAML_CPP_INCLUDE_DIR})
-    else()
-        ExternalProject_Add(yaml-cpp-build
-                SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}/submodules/yaml-cpp/
-                INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/yaml-cpp-install
-                PREFIX ${CMAKE_CURRENT_BINARY_DIR}/yaml-cpp
-                CMAKE_ARGS -DCMAKE_BUILD_TYPE=Release
-                -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
-                -DYAML_CPP_BUILD_TOOLS=OFF
-                -DYAML_CPP_BUILD_TESTS=OFF
-                -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
-                -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
-                -DCMAKE_CXX_FLAGS=${EXTRA_CXX_FLAGS}
-                )
-        add_dependencies(pumgen yaml-cpp-build)
-        target_link_libraries(pumgen PUBLIC "${CMAKE_CURRENT_BINARY_DIR}/yaml-cpp-install/lib/libyaml-cpp.a")
-        target_include_directories(pumgen PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/yaml-cpp-install/include/)
-    endif()
-
-    ExternalProject_Add(ImpalaJIT-build
-            SOURCE_DIR ${CMAKE_CURRENT_LIST_DIR}/submodules/ImpalaJIT/
-            INSTALL_DIR ${CMAKE_CURRENT_BINARY_DIR}/ImpalaJIT-install
-            PREFIX ${CMAKE_CURRENT_BINARY_DIR}/ImpalaJIT
-            CMAKE_ARGS -DCMAKE_BUILD_TYPE=Release
-            -DCMAKE_INSTALL_PREFIX=<INSTALL_DIR>
-            -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
-            -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
-            -DCMAKE_CXX_FLAGS=${EXTRA_CXX_FLAGS}
-            )
-    add_dependencies(pumgen ImpalaJIT-build)
-    target_link_libraries(pumgen PUBLIC "${CMAKE_CURRENT_BINARY_DIR}/ImpalaJIT-install/lib/libimpalajit.a")
-    target_include_directories(pumgen PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/ImpalaJIT-install/include/)
-
-    # asagi
-    find_package(PkgConfig REQUIRED)
-    pkg_check_modules(ASAGI REQUIRED asagi)
-    target_compile_definitions(pumgen PUBLIC USE_ASAGI)
-    target_link_libraries(pumgen PUBLIC ${ASAGI_STATIC_LDFLAGS})
-    target_include_directories(pumgen PUBLIC ${ASAGI_INCLUDE_DIRS})
-    target_compile_options(pumgen PUBLIC ${ASAGI_CFLAGS} ${ASAGI_CFLAGS_OTHER})
-
     # easi
-    target_include_directories(pumgen PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/submodules/easi/include/)
+    find_package(easi 1.0.0 REQUIRED)
+    target_link_libraries(pumgen PUBLIC easi::easi)
 
     target_sources(pumgen PUBLIC 
       ${CMAKE_CURRENT_SOURCE_DIR}/src/input/AnalysisAttributes.cpp
