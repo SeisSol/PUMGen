@@ -1,20 +1,15 @@
 #include "EasiMeshSize.h"
 #include <utils/logger.h>
 
+#include <utility>
 
-EasiMeshSize::EasiMeshSize() : parser(nullptr), model(nullptr) {
-}
+EasiMeshSize::EasiMeshSize() : parser(nullptr), model(nullptr) {}
 
-EasiMeshSize::EasiMeshSize(std::string easiFileName, double targetedFrequency,
-                           double elementsPerWaveLength, pGModel simModel,
+EasiMeshSize::EasiMeshSize(VelocityAwareRefinementSettings refinementSettings, pGModel simModel,
                            std::unordered_map<pGRegion, int> groupMap)
-    :
-    easiFileName(easiFileName), targetedFrequency(targetedFrequency),
-    elementsPerWaveLength(elementsPerWaveLength),
-    simModel(simModel),
-    parser(new easi::YAMLParser(3)),
-    groupMap(groupMap) {
-  model = parser->parse(easiFileName);
+    : refinementSettings(refinementSettings), simModel(simModel), parser(new easi::YAMLParser(3)),
+      groupMap(std::move(groupMap)) {
+  model = parser->parse(refinementSettings.getEasiFileName());
 }
 
 int EasiMeshSize::findGroup(std::array<double, 3> point) {
@@ -29,19 +24,44 @@ int EasiMeshSize::findGroup(std::array<double, 3> point) {
   return -1;
 }
 
+double EasiMeshSize::getTargetedFrequency(std::array<double, 3> point) const {
+  const auto& refinementRegions = refinementSettings.getRefinementRegions();
+  double targetedFrequency = 0.0;
+  for (const auto& refinementCube : refinementRegions) {
+    auto& cuboid = refinementCube.cuboid;
+    bool isInCuboid = true;
+    for (int i = 0; i < 3; ++i) {
+      const auto minCoord = cuboid.center[0] - cuboid.extent[0];
+      const auto maxCoord = cuboid.center[0] + cuboid.extent[0];
+      isInCuboid &= minCoord < point[i] && point[i] < maxCoord;
+    }
+    if (isInCuboid) {
+      targetedFrequency = std::max(targetedFrequency, refinementCube.targetedFrequency);
+    }
+  }
+  return targetedFrequency;
+}
+
 double EasiMeshSize::getMeshSize(std::array<double, 3> point) {
   if (!model) {
     logError() << "Model was not parsed correctly";
   }
-  auto query = easi::Query(1,3);
-  query.x(0,0) = point[0];
-  query.x(0,1) = point[1];
-  query.x(0,2) = point[2];
+
+  constexpr double defaultMeshSize = std::numeric_limits<double>::max();
+  const double targetedFrequency = getTargetedFrequency(point);
+  if (targetedFrequency == 0.0) {
+    return defaultMeshSize;
+  }
+
+  auto query = easi::Query(1, 3);
+  query.x(0, 0) = point[0];
+  query.x(0, 1) = point[1];
+  query.x(0, 2) = point[2];
   query.group(0) = findGroup(point);
   assert(query.group(0) > 0);
 
   // Need array for easi interface
-  auto materials = std::array<ElasticMaterial,1>();
+  auto materials = std::array<ElasticMaterial, 1>();
   auto& material = materials[0];
   auto adapter = easi::ArrayOfStructsAdapter<ElasticMaterial>(materials.data());
   adapter.addBindingPoint("lambda", &ElasticMaterial::lambda);
@@ -50,13 +70,16 @@ double EasiMeshSize::getMeshSize(std::array<double, 3> point) {
 
   model->evaluate(query, adapter);
 
-  const auto pWaveSpeed = std::sqrt(
-      (material.lambda + 2 * material.mu ) / material.rho
-      );
+  double waveSpeed = 0.0;
+  if (material.mu < 10e-14) {
+    // acoustic
+    waveSpeed = std::sqrt((material.lambda + 2 * material.mu) / material.rho);
+  } else {
+    // elastic
+    waveSpeed = std::sqrt(material.mu / material.rho);
+  }
 
-  const auto waveLength = pWaveSpeed / targetedFrequency;
-  return waveLength / elementsPerWaveLength;
+  const auto waveLength = waveSpeed / targetedFrequency;
+  return waveLength / refinementSettings.getElementsPerWaveLength();
 }
-EasiMeshSize::~EasiMeshSize() {
-}
-
+EasiMeshSize::~EasiMeshSize() = default;

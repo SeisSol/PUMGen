@@ -11,9 +11,44 @@
 
 // for PMU_rank()
 #include <SimPartitionedMesh.h>
+#include <optional>
 
 struct Cube {
   double CubeMSize = 0, CubeCenter[3], CubeWidth[3], CubeHeight[3], CubeDepth[3];
+};
+
+struct SimpleCuboid {
+  std::array<double, 3> center;
+  std::array<double, 3> extent;
+};
+
+struct VelocityRefinementCube {
+  VelocityRefinementCube(SimpleCuboid cuboid, double targetedFrequency)
+      : cuboid(cuboid), targetedFrequency(targetedFrequency){};
+
+  SimpleCuboid cuboid;
+  double targetedFrequency;
+};
+
+class VelocityAwareRefinementSettings {
+  public:
+  VelocityAwareRefinementSettings() = default;
+  VelocityAwareRefinementSettings(double elementsPerWaveLength, std::string easiFileName);
+
+  void addRefinementRegion(SimpleCuboid cuboid, double targetedFrequency);
+
+  [[nodiscard]] bool isVelocityAwareRefinementOn() const;
+
+  [[nodiscard]] const std::string& getEasiFileName() const;
+
+  [[nodiscard]] double getElementsPerWaveLength() const;
+
+  [[nodiscard]] const std::vector<VelocityRefinementCube>& getRefinementRegions() const;
+
+  private:
+  double elementsPerWaveLength{};
+  std::string easiFileName;
+  std::vector<VelocityRefinementCube> refinementRegions{};
 };
 
 enum class ElementType { vertex = 0, edge = 1, face = 2, region = 3 };
@@ -31,9 +66,7 @@ class MeshAttributes {
   int VolumeMesherOptimization = 1;
   double globalMSize = 0., faultMSize = 0., gradation = 0., vol_AspectRatio = 0.,
          area_AspectRatio = 0.;
-  bool useVelocityAwareMeshing = false;
-  double targetedFrequency = 0., elementsPerWaveLength = 0;
-  std::string easiFileName;
+  VelocityAwareRefinementSettings velocityAwareRefinementSettings;
   const std::list<std::pair<std::list<int>, double>>& getMSizeList(ElementType type);
 
   std::list<std::pair<std::list<int>, double>> lpair_lVertexId_MSize;

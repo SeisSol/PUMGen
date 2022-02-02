@@ -199,7 +199,6 @@ class SimModSuite : public MeshInput {
     }
     m_mesh->end(it);
 
-
     // Set groups
     apf::MeshTag* groupTag = m_mesh->createIntTag("group", 1);
     it = m_mesh->begin(3);
@@ -378,8 +377,7 @@ class SimModSuite : public MeshInput {
   }
 
   void setCases(pGModel model, pACase& meshCase, pACase& analysisCase, MeshAttributes& MeshAtt,
-                AnalysisAttributes& AnalysisAtt,
-                std::unordered_map<pGRegion, int> groupMap) {
+                AnalysisAttributes& AnalysisAtt, std::unordered_map<pGRegion, int> groupMap) {
 
     logInfo(PMU_rank()) << "Setting cases";
     // ------------------------------ Set boundary conditions
@@ -459,12 +457,10 @@ class SimModSuite : public MeshInput {
     // Set mesh size on vertices, edges, surfaces and regions
     setMeshSize(model, meshCase, MeshAtt);
 
-    if (MeshAtt.useVelocityAwareMeshing) {
+    if (MeshAtt.velocityAwareRefinementSettings.isVelocityAwareRefinementOn()) {
       logInfo() << "Enabling velocity aware meshing";
-      easiMeshSize =
-          EasiMeshSize(MeshAtt.easiFileName, MeshAtt.targetedFrequency,
-                       MeshAtt.elementsPerWaveLength, model, groupMap);
-      auto easiMeshSizeFunc = [](pSizeAttData sadata, void *userdata){
+      easiMeshSize = EasiMeshSize(MeshAtt.velocityAwareRefinementSettings, model, groupMap);
+      auto easiMeshSizeFunc = [](pSizeAttData sadata, void* userdata) {
         auto* easiMeshSize = static_cast<EasiMeshSize*>(userdata);
         std::array<double, 3> pt{};
         int haspt = SizeAttData_point(sadata, pt.data());
@@ -472,7 +468,7 @@ class SimModSuite : public MeshInput {
           logError() << "!haspt";
         }
         return easiMeshSize->getMeshSize(pt);
-        };
+      };
       // set the user-defined function for isotropic size
       MS_setSizeAttFunc(meshCase, "setCustomMeshSize", easiMeshSizeFunc, &easiMeshSize);
       // Relative anisotropic size is set for the entire model through the

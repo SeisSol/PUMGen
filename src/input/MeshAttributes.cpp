@@ -1,5 +1,29 @@
 #include "MeshAttributes.h"
 
+VelocityAwareRefinementSettings::VelocityAwareRefinementSettings(double elementsPerWaveLength,
+                                                                 std::string easiFileName)
+    : elementsPerWaveLength(elementsPerWaveLength), easiFileName(std::move(easiFileName)) {}
+
+void VelocityAwareRefinementSettings::addRefinementRegion(SimpleCuboid cuboid,
+                                                          double targetedFrequency) {
+  refinementRegions.emplace_back(cuboid, targetedFrequency);
+}
+
+bool VelocityAwareRefinementSettings::isVelocityAwareRefinementOn() const {
+  return !refinementRegions.empty();
+}
+
+const std::string& VelocityAwareRefinementSettings::getEasiFileName() const { return easiFileName; }
+
+double VelocityAwareRefinementSettings::getElementsPerWaveLength() const {
+  return elementsPerWaveLength;
+}
+
+const std::vector<VelocityRefinementCube>&
+VelocityAwareRefinementSettings::getRefinementRegions() const {
+  return refinementRegions;
+}
+
 MeshAttributes::MeshAttributes()
     : lpair_lVertexId_MSize(), lpair_lEdgeId_MSize(), lpair_lFaceId_MSize(),
       lpair_lRegionId_MSize() {}
@@ -141,19 +165,44 @@ void MeshAttributes::set_regionMSize() {
 
 void MeshAttributes::set_velocity_aware_meshing() {
   int numChilds = 0;
-  const auto name = "velocityAwareMeshing";
-  for (auto child = doc.FirstChildElement(name);
-       child;
-       child = child->NextSiblingElement(name)) {
-    useVelocityAwareMeshing = true;
-    easiFileName = child->GetText();
-    targetedFrequency = std::stof(child->Attribute("frequency"));
-    elementsPerWaveLength = std::stof(child->Attribute("elementsPerWaveLength"));
+  const auto name = "VelocityAwareMeshing";
+  for (auto velocityAwareMeshingElement = doc.FirstChildElement(name); velocityAwareMeshingElement;
+       velocityAwareMeshingElement = velocityAwareMeshingElement->NextSiblingElement(name)) {
+    const auto easiFileName = velocityAwareMeshingElement->Attribute("easiFile");
+    const auto elementsPerWaveLength =
+        std::stof(velocityAwareMeshingElement->Attribute("elementsPerWaveLength"));
+    velocityAwareRefinementSettings =
+        VelocityAwareRefinementSettings(elementsPerWaveLength, easiFileName);
+    constexpr auto cuboidName = "VelocityRefinementCuboid";
+    logInfo() << "Activating velocity aware meshing, using" << elementsPerWaveLength
+              << "elements per wavelength and easi file" << easiFileName;
+    for (auto child = velocityAwareMeshingElement->FirstChildElement(cuboidName); child;
+         child = child->NextSiblingElement(name)) {
+      auto cuboid = SimpleCuboid{{
+                                     std::stof(child->Attribute("centerX")),
+                                     std::stof(child->Attribute("centerY")),
+                                     std::stof(child->Attribute("centerZ")),
+                                 },
+                                 {
+                                     std::stof(child->Attribute("extentX")),
+                                     std::stof(child->Attribute("extentY")),
+                                     std::stof(child->Attribute("extentZ")),
+                                 }};
+      const auto targetedFrequency = std::stof(child->Attribute("frequency"));
+      velocityAwareRefinementSettings.addRefinementRegion(cuboid, targetedFrequency);
+      logInfo() << "Adding velocity aware refinement region targeting" << targetedFrequency
+                << "Hz, centered at x =" << cuboid.center[0] << "y=" << cuboid.center[1]
+                << "z=" << cuboid.center[2] << "with extents"
+                << "x =" << cuboid.extent[0] << "y =" << cuboid.extent[1]
+                << "z =" << cuboid.extent[2];
+    }
+    if (!velocityAwareRefinementSettings.isVelocityAwareRefinementOn()) {
+      logWarning() << "Activated velocity aware meshing but did not specify any refinement region!";
+    }
     ++numChilds;
   }
   if (numChilds > 1) {
     logError() << "Multiple definitions of velocityAwareMeshing";
-
   }
 }
 
