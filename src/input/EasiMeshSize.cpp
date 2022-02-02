@@ -3,7 +3,6 @@
 
 
 EasiMeshSize::EasiMeshSize() : parser(nullptr), model(nullptr) {
-  std::cout << "EasiMeshSize() called" << std::endl;
 }
 
 EasiMeshSize::EasiMeshSize(std::string easiFileName, double targetedFrequency,
@@ -15,7 +14,6 @@ EasiMeshSize::EasiMeshSize(std::string easiFileName, double targetedFrequency,
     simModel(simModel),
     parser(new easi::YAMLParser(3)),
     groupMap(groupMap) {
-  std::cout << "EasiMeshSize(easiFileName) called" << std::endl;
   model = parser->parse(easiFileName);
 }
 
@@ -60,8 +58,5 @@ double EasiMeshSize::getMeshSize(std::array<double, 3> point) {
   return waveLength / elementsPerWaveLength;
 }
 EasiMeshSize::~EasiMeshSize() {
-  std::cout << "Destructor of EasiMeshSize called" << std::endl;
-  //delete parser;
-  //delete model;
 }
 

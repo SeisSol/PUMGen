@@ -144,7 +144,7 @@ void MeshAttributes::set_velocity_aware_meshing() {
   const auto name = "velocityAwareMeshing";
   for (auto child = doc.FirstChildElement(name);
        child;
-       child = child->NextSiblingElement("velocityAwareMeshing")) {
+       child = child->NextSiblingElement(name)) {
     useVelocityAwareMeshing = true;
     easiFileName = child->GetText();
     targetedFrequency = std::stof(child->Attribute("frequency"));

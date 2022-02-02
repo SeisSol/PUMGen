@@ -473,11 +473,11 @@ class SimModSuite : public MeshInput {
         }
         return easiMeshSize->getMeshSize(pt);
         };
-      // set the user-defined function for anisotropic size
+      // set the user-defined function for isotropic size
       MS_setSizeAttFunc(meshCase, "setCustomMeshSize", easiMeshSizeFunc, &easiMeshSize);
       // Relative anisotropic size is set for the entire model through the
       // function anisoSize
-      MS_setMeshSize(meshCase, GM_domain(model), MS_userDefinedType | 2, 0, "setCustomMeshSize");
+      MS_setMeshSize(meshCase, GM_domain(model), MS_userDefinedType | 1, 0, "setCustomMeshSize");
     }
 
     if (MeshAtt.gradation > 0) {
