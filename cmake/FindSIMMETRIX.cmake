@@ -48,6 +48,14 @@ list(APPEND SIMMETRIX_LIBRARIES
 )
 endif()
 
+# Workaround for Fedora:
+# Needs to manually link with TIRPC
+# Optional on most other distributions!
+find_library(TIRPC tirpc)
+if (TIRPC)
+    list(APPEND SIMMETRIX_LIBRARIES ${TIRPC})
+endif()
+
 string(REGEX REPLACE ".*/([0-9]+).[0-9]-.*" "\\1" SIM_MAJOR_VER ${SIM_MODEL_LIB})
 find_package_handle_standard_args(SIMMETRIX DEFAULT_MSG
   SIMMETRIX_INCLUDE_DIR SIMMETRIX_LIBRARIES SIM_MAJOR_VER)

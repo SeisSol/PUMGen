@@ -34,6 +34,7 @@ add_executable(pumgen
   ${CMAKE_CURRENT_SOURCE_DIR}/src/meshreader/FidapReader.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/meshreader/GambitReader.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/meshreader/ParallelGMSHReader.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/input/ParallelVertexFilter.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/third_party/GMSHLexer.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/third_party/GMSHParser.cpp
   )
@@ -87,7 +88,6 @@ if (SIMMETRIX)
       ${CMAKE_CURRENT_SOURCE_DIR}/src/input/AnalysisAttributes.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/src/input/EasiMeshSize.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/src/input/MeshAttributes.cpp
-      ${CMAKE_CURRENT_SOURCE_DIR}/src/input/ParallelVertexFilter.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/src/input/split.cpp
     )
     target_compile_definitions(pumgen PUBLIC USE_SIMMOD)
