@@ -31,9 +31,9 @@ double EasiMeshSize::getTargetedFrequency(std::array<double, 3> point) const {
     auto& cuboid = refinementCube.cuboid;
     bool isInCuboid = true;
     for (int i = 0; i < 3; ++i) {
-      const auto minCoord = cuboid.center[0] - cuboid.extent[0];
-      const auto maxCoord = cuboid.center[0] + cuboid.extent[0];
-      isInCuboid &= minCoord < point[i] && point[i] < maxCoord;
+      const auto minCoord = cuboid.center[i] - cuboid.extent[i];
+      const auto maxCoord = cuboid.center[i] + cuboid.extent[i];
+      isInCuboid &= minCoord <= point[i] && point[i] <= maxCoord;
     }
     if (isInCuboid) {
       targetedFrequency = std::max(targetedFrequency, refinementCube.targetedFrequency);
