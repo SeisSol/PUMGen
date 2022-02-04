@@ -174,8 +174,8 @@ void MeshAttributes::set_velocity_aware_meshing() {
     velocityAwareRefinementSettings =
         VelocityAwareRefinementSettings(elementsPerWaveLength, easiFileName);
     constexpr auto cuboidName = "VelocityRefinementCuboid";
-    logInfo() << "Activating velocity aware meshing, using" << elementsPerWaveLength
-              << "elements per wavelength and easi file" << easiFileName;
+    logInfo(PMU_rank()) << "Activating velocity aware meshing, using" << elementsPerWaveLength
+                        << "elements per wavelength and easi file" << easiFileName;
     for (auto child = velocityAwareMeshingElement->FirstChildElement(cuboidName); child;
          child = child->NextSiblingElement(cuboidName)) {
       auto cuboid = SimpleCuboid{{
@@ -190,14 +190,16 @@ void MeshAttributes::set_velocity_aware_meshing() {
                                  }};
       const auto targetedFrequency = std::stof(child->Attribute("frequency"));
       velocityAwareRefinementSettings.addRefinementRegion(cuboid, targetedFrequency);
-      logInfo() << "Adding velocity aware refinement region targeting" << targetedFrequency
-                << "Hz, centered at x =" << cuboid.center[0] << "y=" << cuboid.center[1]
-                << "z=" << cuboid.center[2] << "with half sizes"
-                << "x =" << cuboid.halfSize[0] << "y =" << cuboid.halfSize[1]
-                << "z =" << cuboid.halfSize[2];
+      logInfo(PMU_rank()) << "Adding velocity aware refinement region targeting"
+                          << targetedFrequency << "Hz, centered at x =" << cuboid.center[0]
+                          << "y=" << cuboid.center[1] << "z=" << cuboid.center[2]
+                          << "with half sizes"
+                          << "x =" << cuboid.halfSize[0] << "y =" << cuboid.halfSize[1]
+                          << "z =" << cuboid.halfSize[2];
     }
     if (!velocityAwareRefinementSettings.isVelocityAwareRefinementOn()) {
-      logWarning() << "Activated velocity aware meshing but did not specify any refinement region!";
+      logWarning(PMU_rank())
+          << "Activated velocity aware meshing but did not specify any refinement region!";
     }
     ++numChilds;
   }

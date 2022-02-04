@@ -458,7 +458,7 @@ class SimModSuite : public MeshInput {
     setMeshSize(model, meshCase, MeshAtt);
 
     if (MeshAtt.velocityAwareRefinementSettings.isVelocityAwareRefinementOn()) {
-      logInfo() << "Enabling velocity aware meshing";
+      logInfo(PMU_rank()) << "Enabling velocity aware meshing";
       easiMeshSize = EasiMeshSize(MeshAtt.velocityAwareRefinementSettings, model, groupMap);
       auto easiMeshSizeFunc = [](pSizeAttData sadata, void* userdata) {
         auto* easiMeshSize = static_cast<EasiMeshSize*>(userdata);
