@@ -34,8 +34,6 @@ class EasiMeshSize {
                std::unordered_map<pGRegion, int> groupMap);
 
   double getMeshSize(std::array<double, 3> point);
-
-  ~EasiMeshSize();
 };
 
 #endif // PUMGEN_EASIMESHSIZE_H

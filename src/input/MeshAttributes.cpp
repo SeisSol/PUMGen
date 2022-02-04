@@ -177,24 +177,24 @@ void MeshAttributes::set_velocity_aware_meshing() {
     logInfo() << "Activating velocity aware meshing, using" << elementsPerWaveLength
               << "elements per wavelength and easi file" << easiFileName;
     for (auto child = velocityAwareMeshingElement->FirstChildElement(cuboidName); child;
-         child = child->NextSiblingElement(name)) {
+         child = child->NextSiblingElement(cuboidName)) {
       auto cuboid = SimpleCuboid{{
                                      std::stof(child->Attribute("centerX")),
                                      std::stof(child->Attribute("centerY")),
                                      std::stof(child->Attribute("centerZ")),
                                  },
                                  {
-                                     std::stof(child->Attribute("extentX")),
-                                     std::stof(child->Attribute("extentY")),
-                                     std::stof(child->Attribute("extentZ")),
+                                     std::stof(child->Attribute("halfSizeX")),
+                                     std::stof(child->Attribute("halfSizeY")),
+                                     std::stof(child->Attribute("halfSizeZ")),
                                  }};
       const auto targetedFrequency = std::stof(child->Attribute("frequency"));
       velocityAwareRefinementSettings.addRefinementRegion(cuboid, targetedFrequency);
       logInfo() << "Adding velocity aware refinement region targeting" << targetedFrequency
                 << "Hz, centered at x =" << cuboid.center[0] << "y=" << cuboid.center[1]
-                << "z=" << cuboid.center[2] << "with extents"
-                << "x =" << cuboid.extent[0] << "y =" << cuboid.extent[1]
-                << "z =" << cuboid.extent[2];
+                << "z=" << cuboid.center[2] << "with half sizes"
+                << "x =" << cuboid.halfSize[0] << "y =" << cuboid.halfSize[1]
+                << "z =" << cuboid.halfSize[2];
     }
     if (!velocityAwareRefinementSettings.isVelocityAwareRefinementOn()) {
       logWarning() << "Activated velocity aware meshing but did not specify any refinement region!";

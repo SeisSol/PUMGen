@@ -19,7 +19,7 @@ struct Cube {
 
 struct SimpleCuboid {
   std::array<double, 3> center;
-  std::array<double, 3> extent;
+  std::array<double, 3> halfSize;
 };
 
 struct VelocityRefinementCube {

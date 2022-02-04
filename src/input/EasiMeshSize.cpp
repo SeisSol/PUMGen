@@ -31,8 +31,8 @@ double EasiMeshSize::getTargetedFrequency(std::array<double, 3> point) const {
     auto& cuboid = refinementCube.cuboid;
     bool isInCuboid = true;
     for (int i = 0; i < 3; ++i) {
-      const auto minCoord = cuboid.center[i] - cuboid.extent[i];
-      const auto maxCoord = cuboid.center[i] + cuboid.extent[i];
+      const auto minCoord = cuboid.center[i] - cuboid.halfSize[i];
+      const auto maxCoord = cuboid.center[i] + cuboid.halfSize[i];
       isInCuboid &= minCoord <= point[i] && point[i] <= maxCoord;
     }
     if (isInCuboid) {
@@ -82,4 +82,3 @@ double EasiMeshSize::getMeshSize(std::array<double, 3> point) {
   const auto waveLength = waveSpeed / targetedFrequency;
   return waveLength / refinementSettings.getElementsPerWaveLength();
 }
-EasiMeshSize::~EasiMeshSize() = default;

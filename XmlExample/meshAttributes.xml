@@ -26,5 +26,5 @@
 <regionNoMesh>1,4</regionNoMesh>
 <VelocityAwareMeshing easiFile="easiFile.yaml" elementsPerWaveLength="2">
     <VelocityRefinementCuboid frequency="10" centerX="0" centerY="0" centerZ="0"
-                              extentX="100" extentY="100" extentZ="100" />
+                              halfSizeX="100" halfSizeY="100" halfSizeZ="100" />
 </VelocityAwareMeshing>
