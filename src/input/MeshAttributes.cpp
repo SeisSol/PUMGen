@@ -1,5 +1,29 @@
 #include "MeshAttributes.h"
 
+VelocityAwareRefinementSettings::VelocityAwareRefinementSettings(double elementsPerWaveLength,
+                                                                 std::string easiFileName)
+    : elementsPerWaveLength(elementsPerWaveLength), easiFileName(std::move(easiFileName)) {}
+
+void VelocityAwareRefinementSettings::addRefinementRegion(SimpleCuboid cuboid,
+                                                          double targetedFrequency) {
+  refinementRegions.emplace_back(cuboid, targetedFrequency);
+}
+
+bool VelocityAwareRefinementSettings::isVelocityAwareRefinementOn() const {
+  return !refinementRegions.empty();
+}
+
+const std::string& VelocityAwareRefinementSettings::getEasiFileName() const { return easiFileName; }
+
+double VelocityAwareRefinementSettings::getElementsPerWaveLength() const {
+  return elementsPerWaveLength;
+}
+
+const std::vector<VelocityRefinementCube>&
+VelocityAwareRefinementSettings::getRefinementRegions() const {
+  return refinementRegions;
+}
+
 MeshAttributes::MeshAttributes()
     : lpair_lVertexId_MSize(), lpair_lEdgeId_MSize(), lpair_lFaceId_MSize(),
       lpair_lRegionId_MSize() {}
@@ -19,6 +43,7 @@ void MeshAttributes::init(const char* xmlFilename) {
   set_MeshSizePropagation();
   set_regionMSize();
   set_global_mesh_attributes();
+  set_velocity_aware_meshing();
 }
 
 void MeshAttributes::readXmlFile(const char* xmlFilename) {
@@ -135,6 +160,51 @@ void MeshAttributes::set_regionMSize() {
        child = child->NextSiblingElement("regionMSize")) {
     lpair_lRegionId_MSize.push_back(std::make_pair(fill_list_using_parsed_string(child->GetText()),
                                                    std::atof(child->Attribute("value"))));
+  }
+}
+
+void MeshAttributes::set_velocity_aware_meshing() {
+  int numChilds = 0;
+  const auto name = "VelocityAwareMeshing";
+  for (auto velocityAwareMeshingElement = doc.FirstChildElement(name); velocityAwareMeshingElement;
+       velocityAwareMeshingElement = velocityAwareMeshingElement->NextSiblingElement(name)) {
+    const auto easiFileName = velocityAwareMeshingElement->Attribute("easiFile");
+    const auto elementsPerWaveLength =
+        std::stof(velocityAwareMeshingElement->Attribute("elementsPerWaveLength"));
+    velocityAwareRefinementSettings =
+        VelocityAwareRefinementSettings(elementsPerWaveLength, easiFileName);
+    constexpr auto cuboidName = "VelocityRefinementCuboid";
+    logInfo(PMU_rank()) << "Activating velocity aware meshing, using" << elementsPerWaveLength
+                        << "elements per wavelength and easi file" << easiFileName;
+    for (auto child = velocityAwareMeshingElement->FirstChildElement(cuboidName); child;
+         child = child->NextSiblingElement(cuboidName)) {
+      auto cuboid = SimpleCuboid{{
+                                     std::stof(child->Attribute("centerX")),
+                                     std::stof(child->Attribute("centerY")),
+                                     std::stof(child->Attribute("centerZ")),
+                                 },
+                                 {
+                                     std::stof(child->Attribute("halfSizeX")),
+                                     std::stof(child->Attribute("halfSizeY")),
+                                     std::stof(child->Attribute("halfSizeZ")),
+                                 }};
+      const auto targetedFrequency = std::stof(child->Attribute("frequency"));
+      velocityAwareRefinementSettings.addRefinementRegion(cuboid, targetedFrequency);
+      logInfo(PMU_rank()) << "Adding velocity aware refinement region targeting"
+                          << targetedFrequency << "Hz, centered at x =" << cuboid.center[0]
+                          << "y=" << cuboid.center[1] << "z=" << cuboid.center[2]
+                          << "with half sizes"
+                          << "x =" << cuboid.halfSize[0] << "y =" << cuboid.halfSize[1]
+                          << "z =" << cuboid.halfSize[2];
+    }
+    if (!velocityAwareRefinementSettings.isVelocityAwareRefinementOn()) {
+      logWarning(PMU_rank())
+          << "Activated velocity aware meshing but did not specify any refinement region!";
+    }
+    ++numChilds;
+  }
+  if (numChilds > 1) {
+    logError() << "Multiple definitions of velocityAwareMeshing";
   }
 }
 

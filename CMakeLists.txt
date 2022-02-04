@@ -4,6 +4,10 @@ cmake_policy(SET CMP0074 NEW)
 
 project(pumgen LANGUAGES C CXX)
 
+set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
+set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
+
 option(SIMMETRIX "Use simmetrix libraries" OFF)
 set(SIMMETRIX_ROOT "" CACHE STRING "Root directory of simmetrix dev files")
 set(SIM_MPI "mpich3" CACHE STRING "MPI version used by simmetrix")
@@ -25,12 +29,12 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 set(CMAKE_CXX_FLAGS_RELEASE "-O2")
 
-
-add_executable(pumgen 
+add_executable(pumgen
   ${CMAKE_CURRENT_SOURCE_DIR}/src/pumgen.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/meshreader/FidapReader.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/meshreader/GambitReader.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/meshreader/ParallelGMSHReader.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/input/ParallelVertexFilter.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/third_party/GMSHLexer.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/third_party/GMSHParser.cpp
   )
@@ -75,10 +79,15 @@ target_link_libraries(pumgen PUBLIC tinyxml2)
 
 if (SIMMETRIX)
     find_package(SIMMETRIX REQUIRED)
+
+    # easi
+    find_package(easi 1.0.0 REQUIRED)
+    target_link_libraries(pumgen PUBLIC easi::easi)
+
     target_sources(pumgen PUBLIC 
       ${CMAKE_CURRENT_SOURCE_DIR}/src/input/AnalysisAttributes.cpp
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/input/EasiMeshSize.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/src/input/MeshAttributes.cpp
-      ${CMAKE_CURRENT_SOURCE_DIR}/src/input/ParallelVertexFilter.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/src/input/split.cpp
     )
     target_compile_definitions(pumgen PUBLIC USE_SIMMOD)
