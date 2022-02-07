@@ -59,9 +59,9 @@ double EasiMeshSize::getMeshSize(std::array<double, 3> point) {
   }
 
   constexpr double defaultMeshSize = std::numeric_limits<double>::max();
-  auto freqRegion = getTargetedFrequencyAndRegion(point);
-  const double targetedFrequency = std::get<0>(freqRegion);
-  const int bypassFindRegionAndUseGroup = std::get<1>(freqRegion);
+  const auto [targetedFrequency, bypassFindRegionAndUseGroup] =
+      getTargetedFrequencyAndRegion(point);
+
   if (targetedFrequency == 0.0) {
     return defaultMeshSize;
   }
