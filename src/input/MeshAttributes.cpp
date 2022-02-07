@@ -5,8 +5,9 @@ VelocityAwareRefinementSettings::VelocityAwareRefinementSettings(double elements
     : elementsPerWaveLength(elementsPerWaveLength), easiFileName(std::move(easiFileName)) {}
 
 void VelocityAwareRefinementSettings::addRefinementRegion(SimpleCuboid cuboid,
-                                                          double targetedFrequency) {
-  refinementRegions.emplace_back(cuboid, targetedFrequency);
+                                                          double targetedFrequency,
+                                                          int bypassFindRegionAndUseGroup) {
+  refinementRegions.emplace_back(cuboid, targetedFrequency, bypassFindRegionAndUseGroup);
 }
 
 bool VelocityAwareRefinementSettings::isVelocityAwareRefinementOn() const {
@@ -189,13 +190,25 @@ void MeshAttributes::set_velocity_aware_meshing() {
                                      std::stof(child->Attribute("halfSizeZ")),
                                  }};
       const auto targetedFrequency = std::stof(child->Attribute("frequency"));
-      velocityAwareRefinementSettings.addRefinementRegion(cuboid, targetedFrequency);
+      const char* attr = child->Attribute("bypassFindRegionAndUseGroup");
+      int bypassFindRegionAndUseGroup;
+      if (attr != nullptr) {
+        bypassFindRegionAndUseGroup = std::atoi(attr);
+      } else {
+        bypassFindRegionAndUseGroup = 0;
+      }
+
+      velocityAwareRefinementSettings.addRefinementRegion(cuboid, targetedFrequency,
+                                                          bypassFindRegionAndUseGroup);
       logInfo(PMU_rank()) << "Adding velocity aware refinement region targeting"
                           << targetedFrequency << "Hz, centered at x =" << cuboid.center[0]
                           << "y=" << cuboid.center[1] << "z=" << cuboid.center[2]
                           << "with half sizes"
                           << "x =" << cuboid.halfSize[0] << "y =" << cuboid.halfSize[1]
                           << "z =" << cuboid.halfSize[2];
+      if (bypassFindRegionAndUseGroup) {
+        logInfo(PMU_rank()) << "bypass findRegion and use group =" << bypassFindRegionAndUseGroup;
+      }
     }
     if (!velocityAwareRefinementSettings.isVelocityAwareRefinementOn()) {
       logWarning(PMU_rank())
