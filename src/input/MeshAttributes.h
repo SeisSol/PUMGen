@@ -23,11 +23,14 @@ struct SimpleCuboid {
 };
 
 struct VelocityRefinementCube {
-  VelocityRefinementCube(SimpleCuboid cuboid, double targetedFrequency)
-      : cuboid(cuboid), targetedFrequency(targetedFrequency){};
+  VelocityRefinementCube(SimpleCuboid cuboid, double targetedFrequency,
+                         int bypassFindRegionAndUseGroup)
+      : cuboid(cuboid), targetedFrequency(targetedFrequency),
+        bypassFindRegionAndUseGroup(bypassFindRegionAndUseGroup){};
 
   SimpleCuboid cuboid;
   double targetedFrequency;
+  int bypassFindRegionAndUseGroup;
 };
 
 class VelocityAwareRefinementSettings {
@@ -35,7 +38,8 @@ class VelocityAwareRefinementSettings {
   VelocityAwareRefinementSettings() = default;
   VelocityAwareRefinementSettings(double elementsPerWaveLength, std::string easiFileName);
 
-  void addRefinementRegion(SimpleCuboid cuboid, double targetedFrequency);
+  void addRefinementRegion(SimpleCuboid cuboid, double targetedFrequency,
+                           int bypassFindRegionAndUseGroup);
 
   [[nodiscard]] bool isVelocityAwareRefinementOn() const;
 

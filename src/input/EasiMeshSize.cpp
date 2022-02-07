@@ -1,9 +1,10 @@
 #include "EasiMeshSize.h"
 #include <utils/logger.h>
 
+#include <tuple>
 #include <utility>
 
-EasiMeshSize::EasiMeshSize() : parser(nullptr), model(nullptr), query(easi::Query(1, 3)){}
+EasiMeshSize::EasiMeshSize() : parser(nullptr), model(nullptr), query(easi::Query(1, 3)) {}
 
 EasiMeshSize::EasiMeshSize(VelocityAwareRefinementSettings refinementSettings, pGModel simModel,
                            std::unordered_map<pGRegion, int> groupMap)
@@ -13,8 +14,8 @@ EasiMeshSize::EasiMeshSize(VelocityAwareRefinementSettings refinementSettings, p
 }
 
 int EasiMeshSize::findGroup(std::array<double, 3> point) {
-  // GR_containsPoint can be expensive for large geometry, 
-  // therefore we bypass it in simple case
+  // GR_containsPoint can be expensive for large geometry,
+  // therefore we bypass it the simple case of one region
   if (groupMap.size() == 1) {
     return 1;
   }
@@ -29,9 +30,11 @@ int EasiMeshSize::findGroup(std::array<double, 3> point) {
   return -1;
 }
 
-double EasiMeshSize::getTargetedFrequency(std::array<double, 3> point) const {
+std::tuple<const double, const int>
+EasiMeshSize::getTargetedFrequencyAndRegion(std::array<double, 3> point) {
   const auto& refinementRegions = refinementSettings.getRefinementRegions();
   double targetedFrequency = 0.0;
+  int bypassFindRegionAndUseGroup = 0;
   for (const auto& refinementCube : refinementRegions) {
     auto& cuboid = refinementCube.cuboid;
     bool isInCuboid = true;
@@ -41,10 +44,13 @@ double EasiMeshSize::getTargetedFrequency(std::array<double, 3> point) const {
       isInCuboid &= minCoord <= point[i] && point[i] <= maxCoord;
     }
     if (isInCuboid) {
+      if (refinementCube.targetedFrequency >= targetedFrequency) {
+        bypassFindRegionAndUseGroup = refinementCube.bypassFindRegionAndUseGroup;
+      }
       targetedFrequency = std::max(targetedFrequency, refinementCube.targetedFrequency);
     }
   }
-  return targetedFrequency;
+  return std::make_tuple(targetedFrequency, bypassFindRegionAndUseGroup);
 }
 
 double EasiMeshSize::getMeshSize(std::array<double, 3> point) {
@@ -53,7 +59,9 @@ double EasiMeshSize::getMeshSize(std::array<double, 3> point) {
   }
 
   constexpr double defaultMeshSize = std::numeric_limits<double>::max();
-  const double targetedFrequency = getTargetedFrequency(point);
+  auto freqRegion = getTargetedFrequencyAndRegion(point);
+  const double targetedFrequency = std::get<0>(freqRegion);
+  const int bypassFindRegionAndUseGroup = std::get<1>(freqRegion);
   if (targetedFrequency == 0.0) {
     return defaultMeshSize;
   }
@@ -61,11 +69,11 @@ double EasiMeshSize::getMeshSize(std::array<double, 3> point) {
   query.x(0, 0) = point[0];
   query.x(0, 1) = point[1];
   query.x(0, 2) = point[2];
-  query.group(0) = findGroup(point);
+  query.group(0) = bypassFindRegionAndUseGroup ? bypassFindRegionAndUseGroup : findGroup(point);
 
   // This means the point is slightly outside the geometry
   if (query.group(0) <= 0) {
-     return std::numeric_limits<double>::max();
+    return defaultMeshSize;
   }
 
   // Need array for easi interface

@@ -26,7 +26,7 @@ class EasiMeshSize {
 
   int findGroup(std::array<double, 3> point);
 
-  double getTargetedFrequency(std::array<double, 3> point) const;
+  std::tuple<const double, const int> getTargetedFrequencyAndRegion(std::array<double, 3> point);
 
   public:
   EasiMeshSize();
