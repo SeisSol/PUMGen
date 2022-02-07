@@ -20,6 +20,7 @@ class EasiMeshSize {
 
   easi::YAMLParser* parser;
   easi::Component* model; // Unique ptr to model leads to segfault
+  easi::Query query;
   pGModel simModel;
   std::unordered_map<pGRegion, int> groupMap;
 
