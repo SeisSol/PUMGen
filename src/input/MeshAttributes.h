@@ -1,6 +1,7 @@
 #ifndef MESHATTRIBUTES_H
 #define MESHATTRIBUTES_H
 
+#include <array>
 #include <cassert>
 #include <list>
 #include <string>
