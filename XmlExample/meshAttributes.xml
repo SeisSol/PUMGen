@@ -34,7 +34,7 @@ in the easi query using the (optional) argument bypassFindRegionAndUseGroup -->
 
 <VelocityAwareMeshing easiFile="easiFile.yaml" elementsPerWaveLength="2">
     <VelocityRefinementCuboid frequency="2" centerX="200" centerY="200" centerZ="-100"
-                              halfSizeX="100" halfSizeY="100" halfSizeZ="100" />
+                              halfSizeX="100" halfSizeY="100" halfSizeZ="100" rotationZAnticlockwiseFromX="30."/>
     <VelocityRefinementCuboid frequency="10" centerX="0" centerY="0" centerZ="0"
                               halfSizeX="100" halfSizeY="100" halfSizeZ="100" 
                               bypassFindRegionAndUseGroup="1"/>

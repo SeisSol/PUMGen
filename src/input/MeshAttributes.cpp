@@ -179,6 +179,17 @@ void MeshAttributes::set_velocity_aware_meshing() {
                         << "elements per wavelength and easi file" << easiFileName;
     for (auto child = velocityAwareMeshingElement->FirstChildElement(cuboidName); child;
          child = child->NextSiblingElement(cuboidName)) {
+
+      const char* attr = child->Attribute("rotationZAnticlockwiseFromX");
+      double rotationZAnticlockwiseFromX = 0.0;
+      if (attr != nullptr) {
+        rotationZAnticlockwiseFromX = std::stof(attr);
+      }
+      attr = child->Attribute("bypassFindRegionAndUseGroup");
+      int bypassFindRegionAndUseGroup = 0;
+      if (attr != nullptr) {
+        bypassFindRegionAndUseGroup = std::stoi(attr);
+      }
       auto cuboid = SimpleCuboid{{
                                      std::stof(child->Attribute("centerX")),
                                      std::stof(child->Attribute("centerY")),
@@ -188,15 +199,11 @@ void MeshAttributes::set_velocity_aware_meshing() {
                                      std::stof(child->Attribute("halfSizeX")),
                                      std::stof(child->Attribute("halfSizeY")),
                                      std::stof(child->Attribute("halfSizeZ")),
-                                 }};
+                                 },
+                                 {cos(rotationZAnticlockwiseFromX * toRadians),
+                                  sin(rotationZAnticlockwiseFromX * toRadians)},
+                                 rotationZAnticlockwiseFromX};
       const auto targetedFrequency = std::stof(child->Attribute("frequency"));
-      const char* attr = child->Attribute("bypassFindRegionAndUseGroup");
-      int bypassFindRegionAndUseGroup;
-      if (attr != nullptr) {
-        bypassFindRegionAndUseGroup = std::atoi(attr);
-      } else {
-        bypassFindRegionAndUseGroup = 0;
-      }
 
       velocityAwareRefinementSettings.addRefinementRegion(cuboid, targetedFrequency,
                                                           bypassFindRegionAndUseGroup);
@@ -206,6 +213,10 @@ void MeshAttributes::set_velocity_aware_meshing() {
                           << "with half sizes"
                           << "x =" << cuboid.halfSize[0] << "y =" << cuboid.halfSize[1]
                           << "z =" << cuboid.halfSize[2];
+      if (abs(cuboid.rotationZ) > 0.0) {
+        logInfo(PMU_rank()) << "rotated around z axis by " << cuboid.rotationZ
+                            << "degree(s) counterclockwise from x axis.";
+      }
       if (bypassFindRegionAndUseGroup) {
         logInfo(PMU_rank()) << "bypass findRegion and use group =" << bypassFindRegionAndUseGroup;
       }

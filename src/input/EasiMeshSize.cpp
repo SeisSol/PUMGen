@@ -38,11 +38,16 @@ EasiMeshSize::getTargetedFrequencyAndRegion(std::array<double, 3> point) {
   for (const auto& refinementCube : refinementRegions) {
     auto& cuboid = refinementCube.cuboid;
     bool isInCuboid = true;
-    for (int i = 0; i < 3; ++i) {
-      const auto minCoord = cuboid.center[i] - cuboid.halfSize[i];
-      const auto maxCoord = cuboid.center[i] + cuboid.halfSize[i];
-      isInCuboid &= minCoord <= point[i] && point[i] <= maxCoord;
-    }
+
+    double u0 = (point[0] - cuboid.center[0]) * cuboid.cosSinRotationZ[0] +
+                (point[1] - cuboid.center[1]) * cuboid.cosSinRotationZ[1];
+    isInCuboid &= abs(u0) <= cuboid.halfSize[0];
+    double u1 = (point[0] - cuboid.center[0]) * -cuboid.cosSinRotationZ[1] +
+                (point[1] - cuboid.center[1]) * cuboid.cosSinRotationZ[0];
+    isInCuboid &= abs(u1) <= cuboid.halfSize[1];
+    double u2 = (point[2] - cuboid.center[2]);
+    isInCuboid &= abs(u2) <= cuboid.halfSize[2];
+
     if (isInCuboid) {
       if (refinementCube.targetedFrequency >= targetedFrequency) {
         bypassFindRegionAndUseGroup = refinementCube.bypassFindRegionAndUseGroup;
