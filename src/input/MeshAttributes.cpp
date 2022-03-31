@@ -200,8 +200,8 @@ void MeshAttributes::set_velocity_aware_meshing() {
                                      std::stof(child->Attribute("halfSizeY")),
                                      std::stof(child->Attribute("halfSizeZ")),
                                  },
-                                 {cos(rotationZAnticlockwiseFromX * toRadians),
-                                  sin(rotationZAnticlockwiseFromX * toRadians)},
+                                 {std::cos(rotationZAnticlockwiseFromX * toRadians),
+                                  std::sin(rotationZAnticlockwiseFromX * toRadians)},
                                  rotationZAnticlockwiseFromX};
       const auto targetedFrequency = std::stof(child->Attribute("frequency"));
 
@@ -213,7 +213,7 @@ void MeshAttributes::set_velocity_aware_meshing() {
                           << "with half sizes"
                           << "x =" << cuboid.halfSize[0] << "y =" << cuboid.halfSize[1]
                           << "z =" << cuboid.halfSize[2];
-      if (abs(cuboid.rotationZ) > 0.0) {
+      if (std::abs(cuboid.rotationZ) > 0.0) {
         logInfo(PMU_rank()) << "rotated around z axis by " << cuboid.rotationZ
                             << "degree(s) counterclockwise from x axis.";
       }
