@@ -3,6 +3,7 @@
 
 #include <array>
 #include <cassert>
+#include <cmath>
 #include <list>
 #include <string>
 
@@ -14,6 +15,9 @@
 #include <SimPartitionedMesh.h>
 #include <optional>
 
+const double Pi = std::acos(-1);
+const double toRadians = Pi / 180.0;
+
 struct Cube {
   double CubeMSize = 0, CubeCenter[3], CubeWidth[3], CubeHeight[3], CubeDepth[3];
 };
@@ -21,6 +25,8 @@ struct Cube {
 struct SimpleCuboid {
   std::array<double, 3> center;
   std::array<double, 3> halfSize;
+  std::array<double, 2> cosSinRotationZ;
+  double rotationZ;
 };
 
 struct VelocityRefinementCube {
