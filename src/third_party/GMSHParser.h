@@ -62,6 +62,7 @@ public:
         27, // P2 hexahedron
         18, // P2 prism
         14, // P2 pyramid
+        1,  // point
     };
 
     GMSHParser(GMSHMeshBuilder* builder) : builder(builder) {}
