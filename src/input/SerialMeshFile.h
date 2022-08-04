@@ -99,6 +99,7 @@ template <typename T> class SerialMeshFile : public MeshInput {
     m_meshReader.readVertices(vertices);
     logInfo(m_rank) << "Set coordinates in APF";
     apf::setCoords(m_mesh, vertices, nLocalVertices, vertMap);
+    delete[] vertices;
 
     // Set boundaries
     apf::MeshTag* boundaryTag = m_mesh->createIntTag("boundary condition", 1);

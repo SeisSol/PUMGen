@@ -71,12 +71,10 @@ bool GMSHParser::parse_() {
     while (curTok != GMSHToken::eof) {
         switch (curTok) {
         case GMSHToken::nodes:
-            parseNodes();
-            hasNodes = true;
+            hasNodes = parseNodes();
             break;
         case GMSHToken::elements:
-            parseElements();
-            hasElements = true;
+            hasElements = parseElements();
             break;
         default:
             getNextToken();
