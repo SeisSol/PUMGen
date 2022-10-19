@@ -28,9 +28,15 @@
 
 #include <MeshSim.h>
 #include <SimDiscrete.h>
+#ifdef BEFORE_SIM_18
 #include <SimError.h>
 #include <SimErrorCodes.h>
 #include <SimMeshingErrorCodes.h>
+#else
+#include <SimInfo.h>
+#include <SimInfoCodes.h>
+#include <SimMeshingInfoCodes.h>
+#endif
 #include <SimModel.h>
 #include <SimModelerUtil.h>
 #ifdef PARASOLID
@@ -583,6 +589,7 @@ class SimModSuite : public MeshInput {
     if (nativeModel)
       NM_release(nativeModel);
 
+#ifdef BEFORE_SIM_18
     // check for model errors
     pPList modelErrors = PList_new();
     if (!GM_isValid(m_model, 1, modelErrors)) {
@@ -594,6 +601,19 @@ class SimModSuite : public MeshInput {
       logError() << "Input model is not valid";
     }
     PList_delete(modelErrors);
+#else
+    // check for model infos
+    pPList modelInfos = PList_new();
+    if (!GM_isValid(m_model, 1, modelInfos)) {
+      void* iter = 0L;
+      while (pSimInfo info = static_cast<pSimInfo>(PList_next(modelInfos, &iter))) {
+        logInfo(PMU_rank()) << "  Info code: " << SimInfo_code(info) << std::endl;
+        logInfo(PMU_rank()) << "  Info string: " << SimInfo_toString(info) << std::endl;
+      }
+      logError() << "Input model is not valid";
+    }
+    PList_delete(modelInfos);
+#endif
 
     // check for self-intersecting CAD mesh
     pProgress prog = Progress_new();
