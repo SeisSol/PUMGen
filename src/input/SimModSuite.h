@@ -342,13 +342,6 @@ class SimModSuite : public MeshInput {
   }
 
   private:
-  // source:
-  // https://stackoverflow.com/questions/4195611/getting-a-list-of-values-from-a-map
-  typedef std::map<int, int> MyMap;
-  struct get_second : public std::unary_function<MyMap::value_type, int> {
-    int operator()(const MyMap::value_type& value) const { return value.second; }
-  };
-
   void setMeshSize(pGModel model, pACase& meshCase, MeshAttributes& MeshAtt) {
     // Set mesh size on vertices, edges, surfaces and regions
     const char* element_name[4] = {"vertex", "edge", "face", "region"};
