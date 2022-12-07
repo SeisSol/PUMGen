@@ -32,6 +32,23 @@ class GMSHParser {
       14, // P2 pyramid
       1,  // point
   };
+  static constexpr const char* ElementTypes[] = {
+      "line",
+      "triangle",
+      "quadrangle",
+      "tetrahedron",
+      "hexahedron",
+      "prisa",
+      "pyramid",
+      "P1 line",
+      "P1 triangle",
+      "P1 quadrangle",
+      "P1 tetrahedron",
+      "P2 hexahedron",
+      "P2 prisa",
+      "P2 pyramid",
+      "point",
+  };
 
   explicit GMSHParser(GMSHMeshBuilder* builder) : builder(builder){};
   ~GMSHParser() { delete lexer; };
@@ -83,6 +100,8 @@ class GMSHParser {
   }
 
   virtual bool parse_() = 0;
+
+  double parseMeshFormat();
 };
 } // namespace puml
 

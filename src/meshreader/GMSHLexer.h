@@ -11,6 +11,8 @@ enum class GMSHToken {
   string,
   mesh_format,
   end_mesh_format,
+  entities,
+  end_entities,
   nodes,
   end_nodes,
   elements,

@@ -20,7 +20,6 @@ class GMSH2Parser: public puml::GMSHParser {
     lexer = new GMSH2Lexer();
   }
 private:
-    double parseMeshFormat();
     bool parseNodes();
     bool parseElements();
     virtual bool parse_() override;

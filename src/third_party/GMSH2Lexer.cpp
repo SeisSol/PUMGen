@@ -36,6 +36,12 @@ puml::GMSHToken GMSH2Lexer::getToken() {
         case "EndMeshFormat"_fnv1a:
             token = puml::GMSHToken::end_mesh_format;
             break;
+        case "Entities"_fnv1a:
+          token = puml::GMSHToken::entities;
+          break;
+        case "EndEntities"_fnv1a:
+          token = puml::GMSHToken::end_entities;
+          break;
         case "Nodes"_fnv1a:
             token = puml::GMSHToken::nodes;
             break;

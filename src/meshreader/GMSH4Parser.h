@@ -3,8 +3,9 @@
 
 #include <string>
 #include <string_view>
+#include <map>
 
-#include "GMSH4Lexer.h"
+#include "third_party/GMSH2Lexer.h"
 #include "meshreader/GMSHBuilder.h"
 #include "meshreader/GMSHParser.h"
 
@@ -13,13 +14,28 @@ namespace puml {
 class GMSH4Parser : public GMSHParser {
   public:
   explicit GMSH4Parser(puml::GMSHMeshBuilder* builder) : GMSHParser(builder) {
-    lexer = new GMSH4Lexer();
+    lexer = new tndm::GMSH2Lexer();
   }
 
   private:
-  double parseMeshFormat() { return 1; };
-  bool parseNodes() { return 1; };
-  bool parseElements() { return 1; };
+  std::map<long, long> physicalSurfaceIds;
+  std::map<long, long> physicalVolumeIds;
+  long expectInt() {
+    if (curTok != puml::GMSHToken::integer || lexer->getInteger() < 0) {
+      return logErrorAnnotated<bool>("Expected non-zero integer");
+    }
+    return lexer->getInteger();
+  };
+  double expectNumber() {
+    auto num = getNumber();
+    if (!num) {
+      return logErrorAnnotated<bool>("Expected number");
+    }
+    return num.value();
+  };
+  bool parseEntities();
+  bool parseNodes();
+  bool parseElements();
   virtual bool parse_() override;
 };
 
