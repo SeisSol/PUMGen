@@ -35,7 +35,7 @@ class GMSHLexer {
     loc = {1, 1};
   };
 
-  virtual GMSHToken getToken() = 0;
+  virtual GMSHToken getToken();
   GMSHSourceLocation getSourceLoc() const { return loc; }
   uint64_t getIdentifier() const { return identifier; }
   long getInteger() const { return integer; }

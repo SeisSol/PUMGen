@@ -33,25 +33,12 @@ class GMSHParser {
       1,  // point
   };
   static constexpr const char* ElementTypes[] = {
-      "line",
-      "triangle",
-      "quadrangle",
-      "tetrahedron",
-      "hexahedron",
-      "prisa",
-      "pyramid",
-      "P1 line",
-      "P1 triangle",
-      "P1 quadrangle",
-      "P1 tetrahedron",
-      "P2 hexahedron",
-      "P2 prisa",
-      "P2 pyramid",
-      "point",
+      "line",           "triangle",      "quadrangle", "tetrahedron", "hexahedron",
+      "prisma",         "pyramid",       "P1 line",    "P1 triangle", "P1 quadrangle",
+      "P1 tetrahedron", "P2 hexahedron", "P2 prisma",  "P2 pyramid",  "point",
   };
 
   explicit GMSHParser(GMSHMeshBuilder* builder) : builder(builder){};
-  ~GMSHParser() { delete lexer; };
   [[nodiscard]] std::string_view getErrorMessage() const { return errorMsg; }
 
   bool parseFile(std::string const& fileName) {
@@ -59,7 +46,7 @@ class GMSHParser {
     if (!in.is_open()) {
       return logError<bool>("Unable to open MSH file");
     }
-    lexer->setIStream(&in);
+    lexer.setIStream(&in);
     return parse_();
   }
 
@@ -80,21 +67,21 @@ class GMSHParser {
   }
 
   GMSHMeshBuilder* builder;
-  GMSHLexer* lexer = nullptr;
+  GMSHLexer lexer;
   GMSHSourceLocation curLoc = {0, 0};
   GMSHToken curTok;
   std::string errorMsg;
 
   GMSHToken getNextToken() {
-    curLoc = lexer->getSourceLoc();
-    return curTok = lexer->getToken();
+    curLoc = lexer.getSourceLoc();
+    return curTok = lexer.getToken();
   }
 
   std::optional<double> getNumber() {
     if (curTok == GMSHToken::integer) {
-      return {lexer->getInteger()};
+      return {lexer.getInteger()};
     } else if (curTok == GMSHToken::real) {
-      return {lexer->getReal()};
+      return {lexer.getReal()};
     }
     return std::nullopt;
   }

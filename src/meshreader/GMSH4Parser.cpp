@@ -42,7 +42,7 @@ bool GMSH4Parser::parse_() {
 }
 
 bool GMSH4Parser::parseEntities() {
-  //logInfo() << "Read entities, currently at" << curLoc.line << "," << curLoc.col;
+  // logInfo() << "Read entities, currently at" << curLoc.line << "," << curLoc.col;
   getNextToken();
   std::size_t numPoints = expectInt();
   getNextToken();
@@ -51,7 +51,8 @@ bool GMSH4Parser::parseEntities() {
   std::size_t numSurfaces = expectInt();
   getNextToken();
   std::size_t numVolumes = expectInt();
-  //logInfo() << numPoints << "points," << numCurves << "curves," << numSurfaces << "surfaces," << numVolumes << "volumes.";
+  // logInfo() << numPoints << "points," << numCurves << "curves," << numSurfaces << "surfaces," <<
+  // numVolumes << "volumes.";
 
   // ignore points
   for (std::size_t i = 0; i < numPoints; ++i) {
@@ -69,10 +70,11 @@ bool GMSH4Parser::parseEntities() {
     for (std::size_t tagIdx = 0; tagIdx < numTags; tagIdx++) {
       getNextToken();
     }
-    //logInfo() << "Point" << id << ":" << x_1 << "," << y_1 << "," << z_1 << "with" << numTags << "tags.";
+    // logInfo() << "Point" << id << ":" << x_1 << "," << y_1 << "," << z_1 << "with" << numTags <<
+    // "tags.";
   }
-  //logInfo() << "Ignored all points, currently at" << curLoc.line << "," << curLoc.col;
-  // ignore curves
+  // logInfo() << "Ignored all points, currently at" << curLoc.line << "," << curLoc.col;
+  //  ignore curves
   for (std::size_t i = 0; i < numCurves; ++i) {
     getNextToken();
     long id = expectInt();
@@ -100,10 +102,12 @@ bool GMSH4Parser::parseEntities() {
     for (std::size_t tagIdx = 0; tagIdx < numBoundaryTags; tagIdx++) {
       getNextToken();
     }
-    //logInfo() << "Line" << id << ": from" << x_1 << "," << y_1 << "," << z_1 << "to" << x_2 << "," << y_2 << "," << z_2 << "with" << numPhysicalTags << "physical tags and" << numBoundaryTags <<"boundary tags.";
+    // logInfo() << "Line" << id << ": from" << x_1 << "," << y_1 << "," << z_1 << "to" << x_2 <<
+    // "," << y_2 << "," << z_2 << "with" << numPhysicalTags << "physical tags and" <<
+    // numBoundaryTags <<"boundary tags.";
   }
-  //logInfo() << "Ignored all curves, currently at" << curLoc.line << "," << curLoc.col;
-  // read surfaces
+  // logInfo() << "Ignored all curves, currently at" << curLoc.line << "," << curLoc.col;
+  //  read surfaces
   for (std::size_t i = 0; i < numSurfaces; ++i) {
     getNextToken();
     long id = expectInt();
@@ -126,7 +130,7 @@ bool GMSH4Parser::parseEntities() {
       getNextToken();
       tags.push_back(expectInt());
     }
-    if(!tags.empty()) {
+    if (!tags.empty()) {
       physicalSurfaceIds.insert_or_assign(id, tags.at(0));
     }
     getNextToken();
@@ -135,10 +139,12 @@ bool GMSH4Parser::parseEntities() {
     for (std::size_t curveIdx = 0; curveIdx < numBoundaryTags; ++curveIdx) {
       getNextToken();
     }
-    //logInfo() << "Surface" << id << ": from" << x_1 << "," << y_1 << "," << z_1 << "to" << x_2 << "," << y_2 << "," << z_2 << "with" << numPhysicalTags << "physical tags and" << numBoundaryTags <<"boundary tags.";
+    // logInfo() << "Surface" << id << ": from" << x_1 << "," << y_1 << "," << z_1 << "to" << x_2 <<
+    // "," << y_2 << "," << z_2 << "with" << numPhysicalTags << "physical tags and" <<
+    // numBoundaryTags <<"boundary tags.";
   }
-  //logInfo() << "Processed all surfaces, currently at" << curLoc.line << "," << curLoc.col;
-  // read volumes
+  // logInfo() << "Processed all surfaces, currently at" << curLoc.line << "," << curLoc.col;
+  //  read volumes
   for (std::size_t i = 0; i < numVolumes; ++i) {
     getNextToken();
     long id = expectInt();
@@ -168,9 +174,11 @@ bool GMSH4Parser::parseEntities() {
     for (std::size_t curveIdx = 0; curveIdx < numBoundaryTags; ++curveIdx) {
       getNextToken();
     }
-    //logInfo() << "Volume" << id << ": from" << x_1 << "," << y_1 << "," << z_1 << "to" << x_2 << "," << y_2 << "," << z_2 << "with" << numPhysicalTags << "physical tags and" << numBoundaryTags <<"boundary tags.";
+    // logInfo() << "Volume" << id << ": from" << x_1 << "," << y_1 << "," << z_1 << "to" << x_2 <<
+    // "," << y_2 << "," << z_2 << "with" << numPhysicalTags << "physical tags and" <<
+    // numBoundaryTags <<"boundary tags.";
   }
-  //logInfo() << "Processed all volumes, currently at" << curLoc.line << "," << curLoc.col;
+  // logInfo() << "Processed all volumes, currently at" << curLoc.line << "," << curLoc.col;
   getNextToken();
   if (curTok != puml::GMSHToken::end_entities) {
     return logErrorAnnotated<bool>("Expected $EndEntities");
@@ -180,7 +188,7 @@ bool GMSH4Parser::parseEntities() {
 }
 
 bool GMSH4Parser::parseNodes() {
-  //logInfo() << "Read nodes, currently at" << curLoc.line << "," << curLoc.col;
+  // logInfo() << "Read nodes, currently at" << curLoc.line << "," << curLoc.col;
   getNextToken();
   std::size_t numBlocks = expectInt();
   getNextToken();
@@ -190,7 +198,8 @@ bool GMSH4Parser::parseNodes() {
   getNextToken();
   std::size_t maxNodeTag = expectInt();
   builder->setNumVertices(numVertices);
-  //logInfo() << numVertices << "vertices in" << numBlocks << "blocks with ids" << minNodeTag << "to" << maxNodeTag;
+  // logInfo() << numVertices << "vertices in" << numBlocks << "blocks with ids" << minNodeTag <<
+  // "to" << maxNodeTag;
 
   for (std::size_t blockIdx = 0; blockIdx < numBlocks; blockIdx++) {
     getNextToken();
@@ -201,9 +210,9 @@ bool GMSH4Parser::parseNodes() {
     std::size_t parametric = expectInt();
     getNextToken();
     std::size_t numVerticesInBlock = expectInt();
-    //logInfo() << "Read block" << blockIdx << "with" << numVerticesInBlock
-    //          << "vertices: dim =" << dim << ", entityTag =" << entityTag
-    //          << "parametric =" << parametric;
+    // logInfo() << "Read block" << blockIdx << "with" << numVerticesInBlock
+    //           << "vertices: dim =" << dim << ", entityTag =" << entityTag
+    //           << "parametric =" << parametric;
     std::vector<long> vertexIds;
     vertexIds.reserve(numVerticesInBlock);
     // first read vertex ids
@@ -218,13 +227,13 @@ bool GMSH4Parser::parseNodes() {
         getNextToken();
         x[i] = expectNumber();
       }
-      //logInfo() << "Vertex" << vertexIds.at(vertexIdx) << "at" << x[0] << "," << x[1] << ","
-      //          << x[2];
+      // logInfo() << "Vertex" << vertexIds.at(vertexIdx) << "at" << x[0] << "," << x[1] << ","
+      //           << x[2];
       assert(vertexIds.at(vertexIdx) < numVertices);
       builder->setVertex(vertexIds.at(vertexIdx), x);
     }
   }
-  //logInfo() << "Processed all nodes, currently at" << curLoc.line << "," << curLoc.col;
+  // logInfo() << "Processed all nodes, currently at" << curLoc.line << "," << curLoc.col;
   getNextToken();
   if (curTok != puml::GMSHToken::end_nodes) {
     return logErrorAnnotated<bool>("Expected $EndNodes");
@@ -234,7 +243,7 @@ bool GMSH4Parser::parseNodes() {
 }
 
 bool GMSH4Parser::parseElements() {
-  //logInfo() << "Read elements, currently at" << curLoc.line << "," << curLoc.col;
+  // logInfo() << "Read elements, currently at" << curLoc.line << "," << curLoc.col;
   getNextToken();
   std::size_t numBlocks = expectInt();
   getNextToken();
@@ -244,7 +253,8 @@ bool GMSH4Parser::parseElements() {
   getNextToken();
   std::size_t maxElementTag = expectInt();
   builder->setNumElements(numElements);
-  //logInfo() << numElements << "elements in" << numBlocks << "blocks with ids" << minElementTag << "to" << maxElementTag;
+  // logInfo() << numElements << "elements in" << numBlocks << "blocks with ids" << minElementTag <<
+  // "to" << maxElementTag;
 
   constexpr std::size_t MaxNodes = sizeof(NumNodes) / sizeof(std::size_t);
   std::array<long, MaxNodes> nodes;
@@ -259,21 +269,22 @@ bool GMSH4Parser::parseElements() {
     std::size_t type = expectInt();
     getNextToken();
     std::size_t numElementsInBlock = expectInt();
-    //logInfo() << "Read block" << blockIdx << "with" << numElementsInBlock
-    //          << "vertices: dim =" << dim << ", entityTag =" << entityTag << "type =" << ElementTypes[type-1];
+    // logInfo() << "Read block" << blockIdx << "with" << numElementsInBlock
+    //           << "vertices: dim =" << dim << ", entityTag =" << entityTag << "type =" <<
+    //           ElementTypes[type-1];
     for (std::size_t elementIdx = 0; elementIdx < numElementsInBlock; ++elementIdx) {
       getNextToken();
       long id = expectInt();
-      for (std::size_t nodeIdx = 0; nodeIdx < NumNodes[type-1]; nodeIdx++) {
+      for (std::size_t nodeIdx = 0; nodeIdx < NumNodes[type - 1]; nodeIdx++) {
         getNextToken();
         nodes.at(nodeIdx) = expectInt() - 1;
       }
       long tag = (type == 2) ? physicalSurfaceIds[entityTag] : physicalVolumeIds[entityTag];
-      //logInfo() << "Found" << ElementTypes[type-1] << id << "with physical tag" << tag;
+      // logInfo() << "Found" << ElementTypes[type-1] << id << "with physical tag" << tag;
       builder->addElement(type, tag, nodes.data(), NumNodes[type - 1]);
     }
   }
-  //logInfo() << "Processed all elements, currently at" << curLoc.line << "," << curLoc.col;
+  // logInfo() << "Processed all elements, currently at" << curLoc.line << "," << curLoc.col;
   getNextToken();
   if (curTok != puml::GMSHToken::end_elements) {
     return logErrorAnnotated<bool>("Expected $EndElements");
@@ -282,6 +293,5 @@ bool GMSH4Parser::parseElements() {
 
   return true;
 }
-
 
 } // namespace puml

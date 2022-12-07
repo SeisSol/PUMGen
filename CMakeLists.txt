@@ -37,7 +37,6 @@ add_executable(pumgen
   ${CMAKE_CURRENT_SOURCE_DIR}/src/meshreader/GMSHParser.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/meshreader/GMSH4Parser.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/input/ParallelVertexFilter.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/third_party/GMSH2Lexer.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/third_party/GMSH2Parser.cpp
   )
 

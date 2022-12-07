@@ -11,7 +11,7 @@ double GMSHParser::parseMeshFormat() {
     return logErrorAnnotated<double>("Expected version number");
   }
   getNextToken();
-  if (curTok != puml::GMSHToken::integer || lexer->getInteger() != 0) {
+  if (curTok != puml::GMSHToken::integer || lexer.getInteger() != 0) {
     return logErrorAnnotated<double>("Expected 0");
   }
   getNextToken(); // skip data-size
@@ -22,4 +22,4 @@ double GMSHParser::parseMeshFormat() {
   getNextToken();
   return *version;
 }
-};
+}; // namespace puml

@@ -1,12 +1,9 @@
 #include "GMSH2Parser.h"
-#include "GMSH2Lexer.h"
+#include "meshreader/GMSHLexer.h"
 
 #include <cstdio>
-#include <fstream>
-#include <sstream>
 
 namespace tndm {
-
 
 bool GMSH2Parser::parse_() {
     errorMsg.clear();
@@ -41,21 +38,21 @@ bool GMSH2Parser::parse_() {
 
 bool GMSH2Parser::parseNodes() {
     getNextToken();
-    if (curTok != puml::GMSHToken::integer || lexer->getInteger() < 0) {
+    if (curTok != puml::GMSHToken::integer || lexer.getInteger() < 0) {
         return logErrorAnnotated<bool>("Expected non-zero integer");
     }
-    std::size_t numVertices = lexer->getInteger();
+    std::size_t numVertices = lexer.getInteger();
     builder->setNumVertices(numVertices);
 
     for (std::size_t i = 0; i < numVertices; ++i) {
         getNextToken();
-        if (curTok != puml::GMSHToken::integer || lexer->getInteger() < 1 ||
-            lexer->getInteger() > numVertices) {
+        if (curTok != puml::GMSHToken::integer || lexer.getInteger() < 1 ||
+            lexer.getInteger() > numVertices) {
             char buf[128];
             sprintf(buf, "Expected node-tag with 1 <= node-tag <= %zu", numVertices);
             return logErrorAnnotated<bool>(buf);
         }
-        std::size_t id = lexer->getInteger() - 1;
+        std::size_t id = lexer.getInteger() - 1;
 
         std::array<double, 3> x;
         for (std::size_t i = 0; i < 3; ++i) {
@@ -78,10 +75,10 @@ bool GMSH2Parser::parseNodes() {
 
 bool GMSH2Parser::parseElements() {
     getNextToken();
-    if (curTok != puml::GMSHToken::integer || lexer->getInteger() < 0) {
+    if (curTok != puml::GMSHToken::integer || lexer.getInteger() < 0) {
         return logErrorAnnotated<bool>("Expected positive integer");
     }
-    const auto numElements = lexer->getInteger();
+    const auto numElements = lexer.getInteger();
 
     constexpr std::size_t MaxNodes = sizeof(NumNodes) / sizeof(std::size_t);
     long tag;
@@ -96,38 +93,38 @@ bool GMSH2Parser::parseElements() {
         }
 
         getNextToken();
-        if (curTok != puml::GMSHToken::integer || lexer->getInteger() < 1 ||
-            lexer->getInteger() > MaxNodes) {
+        if (curTok != puml::GMSHToken::integer || lexer.getInteger() < 1 ||
+            lexer.getInteger() > MaxNodes) {
             char buf[128];
             sprintf(buf, "Expected element-type with 1 <= element-type <= %zu", MaxNodes);
             return logErrorAnnotated<bool>(buf);
         }
-        long type = lexer->getInteger();
+        long type = lexer.getInteger();
 
         getNextToken();
-        if (curTok != puml::GMSHToken::integer || lexer->getInteger() < 0) {
+        if (curTok != puml::GMSHToken::integer || lexer.getInteger() < 0) {
             return logErrorAnnotated<bool>("Expected number of tags");
         }
-        long numTags = lexer->getInteger();
+        long numTags = lexer.getInteger();
         for (long i = 0; i < numTags; ++i) {
             getNextToken();
             if (curTok != puml::GMSHToken::integer) {
                 return logErrorAnnotated<bool>("Expected tag (integer)");
             }
             if (i == 0) {
-                tag = lexer->getInteger();
+                tag = lexer.getInteger();
             }
         }
 
         for (std::size_t i = 0; i < NumNodes[type - 1]; ++i) {
             getNextToken();
-            if (curTok != puml::GMSHToken::integer || lexer->getInteger() < 1) {
+            if (curTok != puml::GMSHToken::integer || lexer.getInteger() < 1) {
                 char buf[128];
                 sprintf(buf, "Expected node number > 0 (%zu/%zu for type %li)", i + 1,
                         NumNodes[type - 1], type);
                 return logErrorAnnotated<bool>(buf);
             }
-            nodes[i] = lexer->getInteger() - 1;
+            nodes[i] = lexer.getInteger() - 1;
         }
 
         builder->addElement(type, tag, nodes.data(), NumNodes[type - 1]);
