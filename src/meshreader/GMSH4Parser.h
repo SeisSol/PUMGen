@@ -1,8 +1,11 @@
 #ifndef PUMGEN_GMSH4PARSER_H
 #define PUMGEN_GMSH4PARSER_H
 
-#include "third_party/GMSHBuilder.h"
 #include <string>
+#include <string_view>
+
+#include "GMSH4Lexer.h"
+#include "third_party/GMSHBuilder.h"
 
 namespace puml {
 
@@ -13,8 +16,13 @@ class GMSH4Parser {
   std::string_view getErrorMessage() const { return errorMsg; }
 
   private:
-  tndm::GMSHMeshBuilder* builder;
+  template <typename T> T logError(std::string_view msg);
+  template <typename T> T logErrorAnnotated(std::string_view msg);
+  bool parse_() { return true; };
+  GMSH4Lexer lexer;
+  GMSHSourceLocation curLoc;
   std::string errorMsg;
+  tndm::GMSHMeshBuilder* builder;
 };
 
 } // namespace puml
