@@ -7,28 +7,35 @@
 #include "utils/logger.h"
 
 namespace puml {
+bool GMSH4Parser::parse_() {
+  errorMsg.clear();
+  getNextToken();
 
-template <typename T> T GMSH4Parser::logErrorAnnotated(std::string_view msg) {
-  std::stringstream ss;
-  ss << "GMSH parser error in line " << curLoc.line << " in column " << curLoc.col << ":\n";
-  ss << '\t' << msg << '\n';
-  errorMsg += ss.str();
-  return {};
-}
-
-template <typename T> T GMSH4Parser::logError(std::string_view msg) {
-  errorMsg += "GMSH parser error:\n\t";
-  errorMsg += msg;
-  errorMsg += '\n';
-  return {};
-}
-
-bool GMSH4Parser::parseFile(std::string const& fileName) {
-  std::ifstream in(fileName);
-  if (!in.is_open()) {
-    return logError<bool>("Unable to open MSH file");
+  double version = parseMeshFormat();
+  if (version < 2.0 || version >= 3.0) {
+    char buf[128];
+    sprintf(buf, "Unsupported MSH version %.1lf", version);
+    return logError<bool>(buf);
   }
-  lexer.setIStream(&in);
-  return parse_();
+
+  bool hasNodes = false;
+  bool hasElements = false;
+
+  while (curTok != GMSHToken::eof) {
+    switch (curTok) {
+    case GMSHToken::nodes:
+      hasNodes = parseNodes();
+      break;
+    case GMSHToken::elements:
+      hasElements = parseElements();
+      break;
+    default:
+      getNextToken();
+      break;
+    }
+  }
+
+  return hasNodes && hasElements;
 }
+
 } // namespace puml

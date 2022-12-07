@@ -5,24 +5,22 @@
 #include <string_view>
 
 #include "GMSH4Lexer.h"
-#include "third_party/GMSHBuilder.h"
+#include "meshreader/GMSHBuilder.h"
+#include "meshreader/GMSHParser.h"
 
 namespace puml {
 
-class GMSH4Parser {
+class GMSH4Parser : public GMSHParser {
   public:
-  GMSH4Parser(tndm::GMSHMeshBuilder* builder) : builder(builder) {}
-  bool parseFile(std::string const& fileName);
-  std::string_view getErrorMessage() const { return errorMsg; }
+  explicit GMSH4Parser(puml::GMSHMeshBuilder* builder) : GMSHParser(builder) {
+    lexer = new GMSH4Lexer();
+  }
 
   private:
-  template <typename T> T logError(std::string_view msg);
-  template <typename T> T logErrorAnnotated(std::string_view msg);
-  bool parse_() { return true; };
-  GMSH4Lexer lexer;
-  GMSHSourceLocation curLoc;
-  std::string errorMsg;
-  tndm::GMSHMeshBuilder* builder;
+  double parseMeshFormat() { return 1; };
+  bool parseNodes() { return 1; };
+  bool parseElements() { return 1; };
+  virtual bool parse_() override;
 };
 
 } // namespace puml

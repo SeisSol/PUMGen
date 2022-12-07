@@ -8,24 +8,13 @@
 
 namespace tndm {
 
-void GMSH2Lexer::advance() {
-    in->get(lastChar);
-
-    if (lastChar == '\n' || lastChar == '\r') {
-        ++loc.line;
-        loc.col = 1;
-    } else {
-        ++loc.col;
-    }
-}
-
-GMSHToken GMSH2Lexer::getToken() {
+puml::GMSHToken GMSH2Lexer::getToken() {
     if (in == nullptr) {
-        return GMSHToken::eof;
+        return puml::GMSHToken::eof;
     }
     in->peek();
     if (!in->good()) {
-        return GMSHToken::eof;
+        return puml::GMSHToken::eof;
     }
 
     while (isspace(lastChar)) {
@@ -39,25 +28,25 @@ GMSHToken GMSH2Lexer::getToken() {
             hash = fnv1a_step(hash, lastChar);
             advance();
         }
-        GMSHToken token = GMSHToken::unknown_section;
+        puml::GMSHToken token = puml::GMSHToken::unknown_section;
         switch (hash) {
         case "MeshFormat"_fnv1a:
-            token = GMSHToken::mesh_format;
+            token = puml::GMSHToken::mesh_format;
             break;
         case "EndMeshFormat"_fnv1a:
-            token = GMSHToken::end_mesh_format;
+            token = puml::GMSHToken::end_mesh_format;
             break;
         case "Nodes"_fnv1a:
-            token = GMSHToken::nodes;
+            token = puml::GMSHToken::nodes;
             break;
         case "EndNodes"_fnv1a:
-            token = GMSHToken::end_nodes;
+            token = puml::GMSHToken::end_nodes;
             break;
         case "Elements"_fnv1a:
-            token = GMSHToken::elements;
+            token = puml::GMSHToken::elements;
             break;
         case "EndElements"_fnv1a:
-            token = GMSHToken::end_elements;
+            token = puml::GMSHToken::end_elements;
             break;
         default:
             break;
@@ -86,10 +75,10 @@ GMSHToken GMSH2Lexer::getToken() {
         }
         if (isreal) {
             real = std::strtod(buf, 0);
-            return GMSHToken::real;
+            return puml::GMSHToken::real;
         }
         integer = std::strtol(buf, 0, 10);
-        return GMSHToken::integer;
+        return puml::GMSHToken::integer;
     }
 
     if (lastChar == '"') {
@@ -97,9 +86,9 @@ GMSHToken GMSH2Lexer::getToken() {
             advance();
         } while (lastChar != '"');
         advance();
-        return GMSHToken::string;
+        return puml::GMSHToken::string;
     }
-    return GMSHToken::unknown_token;
+    return puml::GMSHToken::unknown_token;
 }
 
 } // namespace tndm
