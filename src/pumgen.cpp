@@ -37,9 +37,11 @@
 #ifdef USE_SIMMOD
 #include "input/SimModSuite.h"
 #endif // USE_SIMMOD
+#include "meshreader/GMSH4Parser.h"
 #include "meshreader/ParallelFidapReader.h"
 #include "meshreader/ParallelGMSHReader.h"
 #include "meshreader/ParallelGambitReader.h"
+#include "third_party/GMSH2Parser.h"
 
 template <typename TT> static void _checkH5Err(TT status, const char* file, int line) {
   if (status < 0)
@@ -128,11 +130,11 @@ int main(int argc, char* argv[]) {
     break;
   case 2:
     logInfo(rank) << "Using GMSH mesh format 2 (msh2) mesh";
-    meshInput = new SerialMeshFile<puml::ParallelGMSHReader<puml::gmsh_version::v2>>(inputFile);
+    meshInput = new SerialMeshFile<puml::ParallelGMSHReader<tndm::GMSH2Parser>>(inputFile);
     break;
   case 3:
     logInfo(rank) << "Using GMSH mesh format 4 (msh4) mesh";
-    meshInput = new SerialMeshFile<puml::ParallelGMSHReader<puml::gmsh_version::v4>>(inputFile);
+    meshInput = new SerialMeshFile<puml::ParallelGMSHReader<puml::GMSH4Parser>>(inputFile);
     break;
   case 4:
 #ifdef USE_NETCDF

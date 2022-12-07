@@ -1,5 +1,5 @@
-#ifndef GMSHLEXER_20200901_H
-#define GMSHLEXER_20200901_H
+#ifndef GMSH2LEXER_20200901_H
+#define GMSH2LEXER_20200901_H
 
 #include <cstdint>
 #include <istream>
@@ -26,7 +26,7 @@ struct GMSHSourceLocation {
     std::size_t col;
 };
 
-class GMSHLexer {
+class GMSH2Lexer {
 private:
     uint64_t identifier;
     long integer;
@@ -54,4 +54,4 @@ public:
 
 } // namespace tndm
 
-#endif // GMSHLEXER_20200901_H
+#endif // GMSH2LEXER_20200901_H

@@ -1,4 +1,4 @@
-#include "GMSHLexer.h"
+#include "GMSH2Lexer.h"
 #include "Hash.h"
 
 #include <cctype>
@@ -8,7 +8,7 @@
 
 namespace tndm {
 
-void GMSHLexer::advance() {
+void GMSH2Lexer::advance() {
     in->get(lastChar);
 
     if (lastChar == '\n' || lastChar == '\r') {
@@ -19,7 +19,7 @@ void GMSHLexer::advance() {
     }
 }
 
-GMSHToken GMSHLexer::getToken() {
+GMSHToken GMSH2Lexer::getToken() {
     if (in == nullptr) {
         return GMSHToken::eof;
     }
@@ -81,7 +81,7 @@ GMSHToken GMSHLexer::getToken() {
         } while (isnumber(lastChar) && pos < MaxNumberLength);
         buf[pos] = 0;
         if (pos == MaxNumberLength) {
-            throw std::runtime_error("Too large number encountered in GMSHLexer: " +
+            throw std::runtime_error("Too large number encountered in GMSH2Lexer: " +
                                      std::string(buf));
         }
         if (isreal) {

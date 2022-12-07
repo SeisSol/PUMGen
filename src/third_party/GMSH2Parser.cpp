@@ -1,5 +1,5 @@
-#include "GMSHParser.h"
-#include "GMSHLexer.h"
+#include "GMSH2Parser.h"
+#include "GMSH2Lexer.h"
 
 #include <cstdio>
 #include <fstream>
@@ -7,7 +7,7 @@
 
 namespace tndm {
 
-template <typename T> T GMSHParser::logErrorAnnotated(std::string_view msg) {
+template <typename T> T GMSH2Parser::logErrorAnnotated(std::string_view msg) {
     std::stringstream ss;
     ss << "GMSH parser error in line " << curLoc.line << " in column " << curLoc.col << ":\n";
     ss << '\t' << msg << '\n';
@@ -15,14 +15,14 @@ template <typename T> T GMSHParser::logErrorAnnotated(std::string_view msg) {
     return {};
 }
 
-template <typename T> T GMSHParser::logError(std::string_view msg) {
+template <typename T> T GMSH2Parser::logError(std::string_view msg) {
     errorMsg += "GMSH parser error:\n\t";
     errorMsg += msg;
     errorMsg += '\n';
     return {};
 }
 
-std::optional<double> GMSHParser::getNumber() {
+std::optional<double> GMSH2Parser::getNumber() {
     if (curTok == GMSHToken::integer) {
         return {lexer.getInteger()};
     } else if (curTok == GMSHToken::real) {
@@ -31,21 +31,21 @@ std::optional<double> GMSHParser::getNumber() {
     return std::nullopt;
 }
 
-bool GMSHParser::parse(char* msh, std::size_t len) {
+bool GMSH2Parser::parse(char* msh, std::size_t len) {
     membuf buf(msh, msh + len);
     std::istream in(&buf);
     lexer.setIStream(&in);
     return parse_();
 }
 
-bool GMSHParser::parse(std::string& msh) {
+bool GMSH2Parser::parse(std::string& msh) {
     membuf buf(msh.data(), msh.data() + msh.size());
     std::istream in(&buf);
     lexer.setIStream(&in);
     return parse_();
 }
 
-bool GMSHParser::parseFile(std::string const& fileName) {
+bool GMSH2Parser::parseFile(std::string const& fileName) {
     std::ifstream in(fileName);
     if (!in.is_open()) {
         return logError<bool>("Unable to open MSH file");
@@ -54,7 +54,7 @@ bool GMSHParser::parseFile(std::string const& fileName) {
     return parse_();
 }
 
-bool GMSHParser::parse_() {
+bool GMSH2Parser::parse_() {
     errorMsg.clear();
     getNextToken();
 
@@ -85,7 +85,7 @@ bool GMSHParser::parse_() {
     return hasNodes && hasElements;
 }
 
-double GMSHParser::parseMeshFormat() {
+double GMSH2Parser::parseMeshFormat() {
     if (curTok != GMSHToken::mesh_format) {
         return logErrorAnnotated<double>("Expected $MeshFormat");
     }
@@ -107,7 +107,7 @@ double GMSHParser::parseMeshFormat() {
     return *version;
 }
 
-bool GMSHParser::parseNodes() {
+bool GMSH2Parser::parseNodes() {
     getNextToken();
     if (curTok != GMSHToken::integer || lexer.getInteger() < 0) {
         return logErrorAnnotated<bool>("Expected non-zero integer");
@@ -144,7 +144,7 @@ bool GMSHParser::parseNodes() {
     return true;
 }
 
-bool GMSHParser::parseElements() {
+bool GMSH2Parser::parseElements() {
     getNextToken();
     if (curTok != GMSHToken::integer || lexer.getInteger() < 0) {
         return logErrorAnnotated<bool>("Expected positive integer");

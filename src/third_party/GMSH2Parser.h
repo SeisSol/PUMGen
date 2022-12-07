@@ -1,7 +1,8 @@
-#ifndef GMSHPARSER_20200901_H
-#define GMSHPARSER_20200901_H
+#ifndef GMSH2PARSER_20200901_H
+#define GMSH2PARSER_20200901_H
 
-#include "GMSHLexer.h"
+#include "GMSH2Lexer.h"
+#include "GMSHBuilder.h"
 
 #include <array>
 #include <optional>
@@ -15,21 +16,12 @@ struct membuf : std::streambuf {
     membuf(char* b, char* e) { this->setg(b, b, e); }
 };
 
-class GMSHMeshBuilder {
-public:
-    virtual ~GMSHMeshBuilder() {}
-    virtual void setNumVertices(std::size_t numVertices) = 0;
-    virtual void setVertex(long id, std::array<double, 3> const& x) = 0;
-    virtual void setNumElements(std::size_t numElements) = 0;
-    virtual void addElement(long type, long tag, long* node, std::size_t numNodes) = 0;
-};
-
-class GMSHParser {
+class GMSH2Parser {
 private:
     GMSHMeshBuilder* builder;
     GMSHToken curTok;
     GMSHSourceLocation curLoc;
-    GMSHLexer lexer;
+    GMSH2Lexer lexer;
     std::string errorMsg;
 
     GMSHToken getNextToken() {
@@ -65,7 +57,7 @@ public:
         1,  // point
     };
 
-    GMSHParser(GMSHMeshBuilder* builder) : builder(builder) {}
+    GMSH2Parser(GMSHMeshBuilder* builder) : builder(builder) {}
 
     bool parse(std::string& msh);
     bool parse(char* msh, std::size_t len);
@@ -76,4 +68,4 @@ public:
 
 }; // namespace tndm
 
-#endif // GMSHPARSER_20200901_H
+#endif // GMSH2PARSER_20200901_H

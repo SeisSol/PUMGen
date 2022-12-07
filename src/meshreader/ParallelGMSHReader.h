@@ -13,9 +13,7 @@
 
 namespace puml {
 
-enum class gmsh_version { v2, v4 };
-
-template <gmsh_version V> class ParallelGMSHReader {
+template <typename P> class ParallelGMSHReader {
   public:
   constexpr static std::size_t Dim = 3;
   using bc_t = std::array<int, Dim + 1u>;
@@ -25,7 +23,26 @@ template <gmsh_version V> class ParallelGMSHReader {
 
   explicit ParallelGMSHReader(MPI_Comm comm = MPI_COMM_WORLD) : comm_(comm) {}
 
-  void open(char const* meshFile);
+  void open(char const* meshFile) {
+    int rank;
+    MPI_Comm_rank(comm_, &rank);
+
+    if (rank == 0) {
+      P parser(&builder_);
+      bool ok = parser.parseFile(meshFile);
+      if (!ok) {
+        logError() << meshFile << std::endl << parser.getErrorMessage();
+      }
+      convertBoundaryConditions();
+
+      nVertices_ = builder_.vertices.size();
+      nElements_ = builder_.elements.size();
+    }
+
+    MPI_Bcast(&nVertices_, 1, tndm::mpi_type_t<decltype(nVertices_)>(), 0, comm_);
+    MPI_Bcast(&nElements_, 1, tndm::mpi_type_t<decltype(nVertices_)>(), 0, comm_);
+  }
+
   [[nodiscard]] unsigned int nVertices() const { return nVertices_; }
   [[nodiscard]] unsigned int nElements() const { return nElements_; }
   void readElements(int* elements) const {
