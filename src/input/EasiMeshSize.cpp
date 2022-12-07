@@ -41,12 +41,12 @@ EasiMeshSize::getTargetedFrequencyAndRegion(std::array<double, 3> point) {
 
     double u0 = (point[0] - cuboid.center[0]) * cuboid.cosSinRotationZ[0] +
                 (point[1] - cuboid.center[1]) * cuboid.cosSinRotationZ[1];
-    isInCuboid &= abs(u0) <= cuboid.halfSize[0];
+    isInCuboid &= std::abs(u0) <= cuboid.halfSize[0];
     double u1 = (point[0] - cuboid.center[0]) * -cuboid.cosSinRotationZ[1] +
                 (point[1] - cuboid.center[1]) * cuboid.cosSinRotationZ[0];
-    isInCuboid &= abs(u1) <= cuboid.halfSize[1];
+    isInCuboid &= std::abs(u1) <= cuboid.halfSize[1];
     double u2 = (point[2] - cuboid.center[2]);
-    isInCuboid &= abs(u2) <= cuboid.halfSize[2];
+    isInCuboid &= std::abs(u2) <= cuboid.halfSize[2];
 
     if (isInCuboid) {
       if (refinementCube.targetedFrequency >= targetedFrequency) {
