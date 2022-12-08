@@ -6,21 +6,21 @@
 #include <string_view>
 
 #include "meshreader/GMSHBuilder.h"
-#include "meshreader/GMSHLexer.h"
-#include "meshreader/GMSHParser.h"
+#include "third_party/GMSHLexer.h"
+#include "third_party/GMSHParser.h"
 
 namespace puml {
 
-class GMSH4Parser : public GMSHParser {
+class GMSH4Parser : public tndm::GMSHParser {
   public:
-  using GMSHParser::GMSHParser;
+  using tndm::GMSHParser::GMSHParser;
 
   private:
   std::map<long, long> physicalSurfaceIds;
   std::map<long, long> physicalVolumeIds;
 
   long expectInt() {
-    if (curTok != puml::GMSHToken::integer || lexer.getInteger() < 0) {
+    if (curTok != tndm::GMSHToken::integer || lexer.getInteger() < 0) {
       return logErrorAnnotated<bool>("Expected non-zero integer");
     }
     return lexer.getInteger();

@@ -5,16 +5,9 @@
 #include <cassert>
 #include <vector>
 
-namespace puml {
+#include "third_party/GMSHMeshBuilder.h"
 
-class GMSHMeshBuilder {
-  public:
-  virtual ~GMSHMeshBuilder() = default;
-  virtual void setNumVertices(std::size_t numVertices) = 0;
-  virtual void setVertex(long id, std::array<double, 3> const& x) = 0;
-  virtual void setNumElements(std::size_t numElements) = 0;
-  virtual void addElement(long type, long tag, long* node, std::size_t numNodes) = 0;
-};
+namespace puml {
 
 template <std::size_t D> struct GMSHSimplexType {};
 template <> struct GMSHSimplexType<0u> {
@@ -30,7 +23,7 @@ template <> struct GMSHSimplexType<3u> {
   static constexpr long type = 4;
 }; // 4 -> tetrahedron
 
-template <std::size_t D> class GMSHBuilder : public GMSHMeshBuilder {
+template <std::size_t D> class GMSHBuilder : public tndm::GMSHMeshBuilder {
   public:
   using vertex_t = std::array<double, D>;
   using element_t = std::array<int, D + 1u>;

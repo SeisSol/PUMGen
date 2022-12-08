@@ -1,9 +1,9 @@
 #ifndef GMSH2PARSER_20200901_H
 #define GMSH2PARSER_20200901_H
 
-#include "meshreader/GMSHParser.h"
-#include "meshreader/GMSHLexer.h"
-#include "meshreader/GMSHBuilder.h"
+#include "GMSHParser.h"
+#include "GMSHLexer.h"
+#include "GMSHMeshBuilder.h"
 
 #include <array>
 #include <optional>
@@ -13,9 +13,9 @@
 
 namespace tndm {
 
-class GMSH2Parser: public puml::GMSHParser {
+class GMSH2Parser: public GMSHParser {
 public:
-    using puml::GMSHParser::GMSHParser;
+    using GMSHParser::GMSHParser;
 private:
     bool parseNodes();
     bool parseElements();

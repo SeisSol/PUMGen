@@ -21,15 +21,15 @@ bool GMSH4Parser::parse_() {
   bool hasNodes = false;
   bool hasElements = false;
 
-  while (curTok != GMSHToken::eof) {
+  while (curTok != tndm::GMSHToken::eof) {
     switch (curTok) {
-    case GMSHToken::entities:
+    case tndm::GMSHToken::entities:
       hasEntities = parseEntities();
       break;
-    case GMSHToken::nodes:
+    case tndm::GMSHToken::nodes:
       hasNodes = parseNodes();
       break;
-    case GMSHToken::elements:
+    case tndm::GMSHToken::elements:
       hasElements = parseElements();
       break;
     default:
@@ -180,7 +180,7 @@ bool GMSH4Parser::parseEntities() {
   }
   // logInfo() << "Processed all volumes, currently at" << curLoc.line << "," << curLoc.col;
   getNextToken();
-  if (curTok != puml::GMSHToken::end_entities) {
+  if (curTok != tndm::GMSHToken::end_entities) {
     return logErrorAnnotated<bool>("Expected $EndEntities");
   }
   getNextToken();
@@ -235,7 +235,7 @@ bool GMSH4Parser::parseNodes() {
   }
   // logInfo() << "Processed all nodes, currently at" << curLoc.line << "," << curLoc.col;
   getNextToken();
-  if (curTok != puml::GMSHToken::end_nodes) {
+  if (curTok != tndm::GMSHToken::end_nodes) {
     return logErrorAnnotated<bool>("Expected $EndNodes");
   }
   getNextToken();
@@ -286,7 +286,7 @@ bool GMSH4Parser::parseElements() {
   }
   // logInfo() << "Processed all elements, currently at" << curLoc.line << "," << curLoc.col;
   getNextToken();
-  if (curTok != puml::GMSHToken::end_elements) {
+  if (curTok != tndm::GMSHToken::end_elements) {
     return logErrorAnnotated<bool>("Expected $EndElements");
   }
   getNextToken();
