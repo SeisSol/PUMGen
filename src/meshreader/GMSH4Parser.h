@@ -16,15 +16,15 @@ class GMSH4Parser : public tndm::GMSHParser {
   using tndm::GMSHParser::GMSHParser;
 
   private:
-  std::map<long, long> physicalSurfaceIds;
-  std::map<long, long> physicalVolumeIds;
+  std::map<unsigned long, long> physicalSurfaceIds;
+  std::map<unsigned long, long> physicalVolumeIds;
 
-  long expectInt() {
+  unsigned long expectNonNegativeInt() {
     if (curTok != tndm::GMSHToken::integer || lexer.getInteger() < 0) {
-      return logErrorAnnotated<bool>("Expected non-zero integer");
+      return logErrorAnnotated<bool>("Expected non-negative integer");
     }
-    return lexer.getInteger();
-  };
+    return static_cast<unsigned long>(lexer.getInteger());
+  }
 
   double expectNumber() {
     auto num = getNumber();
@@ -32,7 +32,7 @@ class GMSH4Parser : public tndm::GMSHParser {
       return logErrorAnnotated<bool>("Expected number");
     }
     return num.value();
-  };
+  }
 
   bool parseEntities();
   bool parseNodes();
