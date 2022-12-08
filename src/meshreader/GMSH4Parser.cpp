@@ -43,26 +43,26 @@ bool GMSH4Parser::parse_() {
 
 bool GMSH4Parser::parseEntities() {
   getNextToken();
-  std::size_t numPoints = expectNonNegativeInt();
+  const std::size_t numPoints = expectNonNegativeInt();
   getNextToken();
-  std::size_t numCurves = expectNonNegativeInt();
+  const std::size_t numCurves = expectNonNegativeInt();
   getNextToken();
-  std::size_t numSurfaces = expectNonNegativeInt();
+  const std::size_t numSurfaces = expectNonNegativeInt();
   getNextToken();
-  std::size_t numVolumes = expectNonNegativeInt();
+  const std::size_t numVolumes = expectNonNegativeInt();
 
   // ignore points
   for (std::size_t i = 0; i < numPoints; ++i) {
     getNextToken();
-    [[maybe_unused]] std::size_t id = expectNonNegativeInt();
+    [[maybe_unused]] const std::size_t id = expectNonNegativeInt();
     getNextToken();
-    [[maybe_unused]] double x_1 = expectNumber();
+    [[maybe_unused]] const double x_1 = expectNumber();
     getNextToken();
-    [[maybe_unused]] double y_1 = expectNumber();
+    [[maybe_unused]] const double y_1 = expectNumber();
     getNextToken();
-    [[maybe_unused]] double z_1 = expectNumber();
+    [[maybe_unused]] const double z_1 = expectNumber();
     getNextToken();
-    std::size_t numTags = expectNonNegativeInt();
+    const std::size_t numTags = expectNonNegativeInt();
     // ignore tags
     for (std::size_t tagIdx = 0; tagIdx < numTags; tagIdx++) {
       getNextToken();
@@ -72,21 +72,21 @@ bool GMSH4Parser::parseEntities() {
   //  ignore curves
   for (std::size_t i = 0; i < numCurves; ++i) {
     getNextToken();
-    [[maybe_unused]] std::size_t id = expectNonNegativeInt();
+    [[maybe_unused]] const std::size_t id = expectNonNegativeInt();
     getNextToken();
-    [[maybe_unused]] double x_1 = expectNumber();
+    [[maybe_unused]] const double x_1 = expectNumber();
     getNextToken();
-    [[maybe_unused]] double y_1 = expectNumber();
+    [[maybe_unused]] const double y_1 = expectNumber();
     getNextToken();
-    [[maybe_unused]] auto z_1 = expectNumber();
+    [[maybe_unused]] const double z_1 = expectNumber();
     getNextToken();
-    [[maybe_unused]] double x_2 = expectNumber();
+    [[maybe_unused]] const double x_2 = expectNumber();
     getNextToken();
-    [[maybe_unused]] double y_2 = expectNumber();
+    [[maybe_unused]] const double y_2 = expectNumber();
     getNextToken();
-    [[maybe_unused]] double z_2 = expectNumber();
+    [[maybe_unused]] const double z_2 = expectNumber();
     getNextToken();
-    std::size_t numPhysicalTags = expectNonNegativeInt();
+    const std::size_t numPhysicalTags = expectNonNegativeInt();
     getNextToken();
     // ignore tags
     for (std::size_t tagIdx = 0; tagIdx < numPhysicalTags; tagIdx++) {
@@ -102,21 +102,21 @@ bool GMSH4Parser::parseEntities() {
   //  read surfaces
   for (std::size_t i = 0; i < numSurfaces; ++i) {
     getNextToken();
-    std::size_t id = expectNonNegativeInt();
+    const std::size_t id = expectNonNegativeInt();
     getNextToken();
-    [[maybe_unused]] double x_1 = expectNumber();
+    [[maybe_unused]] const double x_1 = expectNumber();
     getNextToken();
-    [[maybe_unused]] double y_1 = expectNumber();
+    [[maybe_unused]] const double y_1 = expectNumber();
     getNextToken();
-    [[maybe_unused]] double z_1 = expectNumber();
+    [[maybe_unused]] const double z_1 = expectNumber();
     getNextToken();
-    [[maybe_unused]] double x_2 = expectNumber();
+    [[maybe_unused]] const double x_2 = expectNumber();
     getNextToken();
-    [[maybe_unused]] double y_2 = expectNumber();
+    [[maybe_unused]] const double y_2 = expectNumber();
     getNextToken();
-    [[maybe_unused]] double z_2 = expectNumber();
+    [[maybe_unused]] const double z_2 = expectNumber();
     getNextToken();
-    std::size_t numPhysicalTags = expectNonNegativeInt();
+    const std::size_t numPhysicalTags = expectNonNegativeInt();
     std::vector<std::size_t> tags;
     for (std::size_t tagIdx = 0; tagIdx < numPhysicalTags; ++tagIdx) {
       getNextToken();
@@ -136,21 +136,21 @@ bool GMSH4Parser::parseEntities() {
   //  read volumes
   for (std::size_t i = 0; i < numVolumes; ++i) {
     getNextToken();
-    std::size_t id = expectNonNegativeInt();
+    const std::size_t id = expectNonNegativeInt();
     getNextToken();
-    [[maybe_unused]] double x_1 = expectNumber();
+    [[maybe_unused]] const double x_1 = expectNumber();
     getNextToken();
-    [[maybe_unused]] double y_1 = expectNumber();
+    [[maybe_unused]] const double y_1 = expectNumber();
     getNextToken();
-    [[maybe_unused]] double z_1 = expectNumber();
+    [[maybe_unused]] const double z_1 = expectNumber();
     getNextToken();
-    [[maybe_unused]] double x_2 = expectNumber();
+    [[maybe_unused]] const double x_2 = expectNumber();
     getNextToken();
-    [[maybe_unused]] double y_2 = expectNumber();
+    [[maybe_unused]] const double y_2 = expectNumber();
     getNextToken();
-    [[maybe_unused]] double z_2 = expectNumber();
+    [[maybe_unused]] const double z_2 = expectNumber();
     getNextToken();
-    std::size_t numPhysicalTags = expectNonNegativeInt();
+    const std::size_t numPhysicalTags = expectNonNegativeInt();
     std::vector<std::size_t> tags;
     for (std::size_t tagIdx = 0; tagIdx < numPhysicalTags; ++tagIdx) {
       getNextToken();
@@ -158,7 +158,7 @@ bool GMSH4Parser::parseEntities() {
     }
     physicalVolumeIds.insert_or_assign(id, tags.at(0));
     getNextToken();
-    std::size_t numBoundaryTags = expectNonNegativeInt();
+    const std::size_t numBoundaryTags = expectNonNegativeInt();
     // ignore boundary
     for (std::size_t curveIdx = 0; curveIdx < numBoundaryTags; ++curveIdx) {
       getNextToken();
@@ -174,24 +174,24 @@ bool GMSH4Parser::parseEntities() {
 
 bool GMSH4Parser::parseNodes() {
   getNextToken();
-  std::size_t numBlocks = expectNonNegativeInt();
+  const std::size_t numBlocks = expectNonNegativeInt();
   getNextToken();
-  std::size_t numVertices = expectNonNegativeInt();
+  const std::size_t numVertices = expectNonNegativeInt();
   getNextToken();
-  [[maybe_unused]] std::size_t minNodeTag = expectNonNegativeInt();
+  [[maybe_unused]] const std::size_t minNodeTag = expectNonNegativeInt();
   getNextToken();
-  [[maybe_unused]] std::size_t maxNodeTag = expectNonNegativeInt();
+  [[maybe_unused]] const std::size_t maxNodeTag = expectNonNegativeInt();
   builder->setNumVertices(numVertices);
 
   for (std::size_t blockIdx = 0; blockIdx < numBlocks; blockIdx++) {
     getNextToken();
-    [[maybe_unused]] std::size_t dim = expectNonNegativeInt();
+    [[maybe_unused]] const std::size_t dim = expectNonNegativeInt();
     getNextToken();
-    [[maybe_unused]] std::size_t entityTag = expectNonNegativeInt();
+    [[maybe_unused]] const std::size_t entityTag = expectNonNegativeInt();
     getNextToken();
-    [[maybe_unused]] std::size_t parametric = expectNonNegativeInt();
+    [[maybe_unused]] const std::size_t parametric = expectNonNegativeInt();
     getNextToken();
-    std::size_t numVerticesInBlock = expectNonNegativeInt();
+    const std::size_t numVerticesInBlock = expectNonNegativeInt();
     std::vector<std::size_t> vertexIds;
     vertexIds.reserve(numVerticesInBlock);
     // first read vertex ids
@@ -220,13 +220,13 @@ bool GMSH4Parser::parseNodes() {
 
 bool GMSH4Parser::parseElements() {
   getNextToken();
-  std::size_t numBlocks = expectNonNegativeInt();
+  const std::size_t numBlocks = expectNonNegativeInt();
   getNextToken();
-  std::size_t numElements = expectNonNegativeInt();
+  const std::size_t numElements = expectNonNegativeInt();
   getNextToken();
-  [[maybe_unused]] std::size_t minElementTag = expectNonNegativeInt();
+  [[maybe_unused]] const std::size_t minElementTag = expectNonNegativeInt();
   getNextToken();
-  [[maybe_unused]] std::size_t maxElementTag = expectNonNegativeInt();
+  [[maybe_unused]] const std::size_t maxElementTag = expectNonNegativeInt();
   builder->setNumElements(numElements);
 
   constexpr std::size_t MaxNodes = sizeof(NumNodes) / sizeof(std::size_t);
@@ -235,16 +235,16 @@ bool GMSH4Parser::parseElements() {
 
   for (std::size_t blockIdx = 0; blockIdx < numBlocks; blockIdx++) {
     getNextToken();
-    [[maybe_unused]] std::size_t dim = expectNonNegativeInt();
+    [[maybe_unused]] const std::size_t dim = expectNonNegativeInt();
     getNextToken();
-    std::size_t entityTag = expectNonNegativeInt();
+    const std::size_t entityTag = expectNonNegativeInt();
     getNextToken();
-    std::size_t type = expectNonNegativeInt();
+    const std::size_t type = expectNonNegativeInt();
     getNextToken();
-    std::size_t numElementsInBlock = expectNonNegativeInt();
+    const std::size_t numElementsInBlock = expectNonNegativeInt();
     for (std::size_t elementIdx = 0; elementIdx < numElementsInBlock; ++elementIdx) {
       getNextToken();
-      [[maybe_unused]] std::size_t id = expectNonNegativeInt();
+      [[maybe_unused]] const std::size_t id = expectNonNegativeInt();
       for (std::size_t nodeIdx = 0; nodeIdx < NumNodes[type - 1]; nodeIdx++) {
         getNextToken();
         nodes.at(nodeIdx) = expectNonNegativeInt() - 1;
