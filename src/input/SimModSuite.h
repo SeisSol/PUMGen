@@ -535,8 +535,8 @@ class SimModSuite : public MeshInput {
       if (face == nullptr) {
         logError() << "UseDiscreteMesh; faceid:" << iElem << "not found in model.";
       } else {
-        logInfo(PMU_rank()) << "UseDiscreteMesh; faceid, noModification:" << iElem <<
-            MeshAtt.UseDiscreteMesh_noModification;
+        logInfo(PMU_rank()) << "UseDiscreteMesh; faceid, noModification:" << iElem
+                            << MeshAtt.UseDiscreteMesh_noModification;
         MS_useDiscreteGeometryMesh(meshCase, face, MeshAtt.UseDiscreteMesh_noModification);
         // MS_limitSurfaceMeshModification(meshCase,face,UseDiscreteMesh_noModification);
       }
