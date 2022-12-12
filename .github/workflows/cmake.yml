@@ -28,14 +28,12 @@ jobs:
 
       - if: ${{ steps.cache-pumi.outputs.cache-hit != 'true' }}
         name: Install dependencies
-        continue-on-error: true
         run: |
           sudo apt-get update
           sudo apt-get install -qq g++ openmpi-bin openmpi-common libopenmpi-dev hdf5-tools libhdf5-openmpi-103 libhdf5-openmpi-dev libnetcdf-dev
 
       - if: ${{ steps.cache-pumi.outputs.cache-hit != 'true' }}
         name: Install PUMI
-        continue-on-error: true
         run: |
             cd ${{ runner.workspace }}/core
             git submodule update --init
