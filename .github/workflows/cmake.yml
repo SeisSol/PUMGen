@@ -79,3 +79,14 @@ jobs:
         working-directory: ${{ github.workspace }}/build_${{ matrix.build_type }}
         run: cmake --build .
   
+  clang-format:
+    runs-on: ubuntu-latest
+    steps: 
+      - uses: actions/checkout@v3
+
+      - name: clang-format
+        run: |
+          sudo apt-get update
+          sudo apt-get install -qq python3 clang-format
+          git submodule update --init
+          ./submodules/run-clang-format/run-clang-format.py --clang-format-executable clang-format --exclude src/third_party -r src
