@@ -2,13 +2,13 @@ jobs:
   - job:
     displayName: pumgen-build
     pool:
-      vmImage: 'ubuntu-18.04'
+      vmImage: 'ubuntu-22.04'
     steps:
       - bash: |
           set -euo pipefail
           export IFS=$'\n\t'
           sudo apt-get update
-          sudo apt-get install -qq g++-5 openmpi-bin openmpi-common libopenmpi-dev hdf5-tools libhdf5-openmpi-100 libhdf5-openmpi-dev libnetcdf-dev
+          sudo apt-get install -qq g++ openmpi-bin openmpi-common libopenmpi-dev hdf5-tools libhdf5-openmpi-103 libhdf5-openmpi-dev libnetcdf-dev
           cd ..
           # build pumi
           git clone https://github.com/SCOREC/core.git
