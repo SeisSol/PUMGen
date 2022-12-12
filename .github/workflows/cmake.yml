@@ -17,7 +17,7 @@ jobs:
             ls
             git clone https://github.com/SCOREC/core.git
             cd core
-            echo "::set-output name=pumi-id::$(git rev-parse --short HEAD)"
+            echo "pumi-id=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
       - name: Cache PUMI
         id: cache-pumi
