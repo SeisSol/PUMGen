@@ -13,8 +13,6 @@ jobs:
         run: |
             cd ${{ runner.workspace }}
             mkdir opt
-            pwd 
-            ls
             git clone https://github.com/SCOREC/core.git
             cd core
             echo "pumi-id=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
@@ -40,7 +38,6 @@ jobs:
             mkdir build && cd build
             cmake .. -DCMAKE_C_COMPILER="`which mpicc`" -DCMAKE_CXX_COMPILER="`which mpiCC`" -DCMAKE_C_FLAGS="-O2 -g -Wall" -DCMAKE_CXX_FLAGS="-O2 -g -Wall" -DCMAKE_INSTALL_PREFIX=${{ runner.workspace }}/opt
             make -j $(nproc) && make install
-            ls ${{ runner.workspace }}/opt
 
       - name: Upload PUMI
         uses: actions/upload-artifact@v3
@@ -74,8 +71,6 @@ jobs:
       - name: Configure PUMGen
         working-directory: ${{ github.workspace }}
         run: |
-          pwd
-          ls
           git submodule update --init
           mkdir build_${{ matrix.build_type}} && cd build_${{ matrix.build_type}}
           CC=mpicc CXX=mpiCC cmake .. -DCMAKE_PREFIX_PATH=${{ runner.workspace }}/opt -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
