@@ -3,15 +3,13 @@ name: CMake
 on: [push]
 
 jobs:
+  # look into the cache, if the latest PUMI build is cached, load the cache, otherwise build new cache.
+  # upload PUMI build into artifact to be picked up by the next job.
   install-pumi:
     runs-on: ubuntu-latest
     steps:
-      - name: Install dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -qq g++ openmpi-bin openmpi-common libopenmpi-dev hdf5-tools libhdf5-openmpi-103 libhdf5-openmpi-dev libnetcdf-dev
-  
-      - name: Build PUMI
+      - name: Checkout PUMI
+        id: checkout-pumi
         run: |
             cd ${{ runner.workspace }}
             mkdir opt
@@ -19,6 +17,27 @@ jobs:
             ls
             git clone https://github.com/SCOREC/core.git
             cd core
+            echo "::set-output name=pumi-id::$(git rev-parse --short HEAD)"
+
+      - name: Cache PUMI
+        id: cache-pumi
+        uses: actions/cache@v3
+        with:
+          path: ${{ runner.workspace }}/opt
+          key: ${{ steps.checkout-pumi.outputs.pumi-id }}
+
+      - if: ${{ steps.cache-pumi.outputs.cache-hit != 'true' }}
+        name: Install dependencies
+        continue-on-error: true
+        run: |
+          sudo apt-get update
+          sudo apt-get install -qq g++ openmpi-bin openmpi-common libopenmpi-dev hdf5-tools libhdf5-openmpi-103 libhdf5-openmpi-dev libnetcdf-dev
+
+      - if: ${{ steps.cache-pumi.outputs.cache-hit != 'true' }}
+        name: Install PUMI
+        continue-on-error: true
+        run: |
+            cd ${{ runner.workspace }}/core
             git submodule update --init
             mkdir build && cd build
             cmake .. -DCMAKE_C_COMPILER="`which mpicc`" -DCMAKE_CXX_COMPILER="`which mpiCC`" -DCMAKE_C_FLAGS="-O2 -g -Wall" -DCMAKE_CXX_FLAGS="-O2 -g -Wall" -DCMAKE_INSTALL_PREFIX=${{ runner.workspace }}/opt
@@ -31,26 +50,28 @@ jobs:
           name: pumi
           path: ${{ runner.workspace }}/opt
 
+  # Build pumgen in Release and Debug version
   build-pumgen:
     runs-on: ubuntu-latest
     needs: install-pumi
 
     strategy:
       matrix:
-        build_type: ["Release"]
+        build_type: ["Release", "Debug"]
 
     steps:
       - uses: actions/checkout@v3
-      - name: Download PUMI
-        uses: actions/download-artifact@v3
-        with:
-          name: pumi
-          path: ${{ runner.workspace }}/opt
 
       - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -qq g++ openmpi-bin openmpi-common libopenmpi-dev hdf5-tools libhdf5-openmpi-103 libhdf5-openmpi-dev libnetcdf-dev
+
+      - name: Download PUMI
+        uses: actions/download-artifact@v3
+        with:
+          name: pumi
+          path: ${{ runner.workspace }}/opt
   
       - name: Configure PUMGen
         working-directory: ${{ github.workspace }}
