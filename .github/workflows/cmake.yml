@@ -1,0 +1,67 @@
+name: CMake
+
+on: [push]
+
+jobs:
+  install-pumi:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -qq g++ openmpi-bin openmpi-common libopenmpi-dev hdf5-tools libhdf5-openmpi-103 libhdf5-openmpi-dev libnetcdf-dev
+  
+      - name: Build PUMI
+        run: |
+            cd ${{ runner.workspace }}
+            mkdir opt
+            pwd 
+            ls
+            git clone https://github.com/SCOREC/core.git
+            cd core
+            git submodule update --init
+            mkdir build && cd build
+            cmake .. -DCMAKE_C_COMPILER="`which mpicc`" -DCMAKE_CXX_COMPILER="`which mpiCC`" -DCMAKE_C_FLAGS="-O2 -g -Wall" -DCMAKE_CXX_FLAGS="-O2 -g -Wall" -DCMAKE_INSTALL_PREFIX=${{ runner.workspace }}/opt
+            make -j $(nproc) && make install
+            ls ${{ runner.workspace }}/opt
+
+      - name: Upload PUMI
+        uses: actions/upload-artifact@v3
+        with:
+          name: pumi
+          path: ${{ runner.workspace }}/opt
+
+  build-pumgen:
+    runs-on: ubuntu-latest
+    needs: install-pumi
+
+    strategy:
+      matrix:
+        build_type: ["Release"]
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Download PUMI
+        uses: actions/download-artifact@v3
+        with:
+          name: pumi
+          path: ${{ runner.workspace }}/opt
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -qq g++ openmpi-bin openmpi-common libopenmpi-dev hdf5-tools libhdf5-openmpi-103 libhdf5-openmpi-dev libnetcdf-dev
+  
+      - name: Configure PUMGen
+        working-directory: ${{ github.workspace }}
+        run: |
+          pwd
+          ls
+          git submodule update --init
+          mkdir build_${{ matrix.build_type}} && cd build_${{ matrix.build_type}}
+          CC=mpicc CXX=mpiCC cmake .. -DCMAKE_PREFIX_PATH=${{ runner.workspace }}/opt -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+  
+      - name: Build
+        working-directory: ${{ github.workspace }}/build_${{ matrix.build_type }}
+        run: cmake --build .
+  
