@@ -11,9 +11,10 @@ jobs:
           sudo apt-get install -qq g++ openmpi-bin openmpi-common libopenmpi-dev hdf5-tools libhdf5-openmpi-103 libhdf5-openmpi-dev libnetcdf-dev
           cd ..
           # build pumi
-          git clone https://github.com/SCOREC/core.git
-          mkdir core/build
+          git clone --recursive --branch v2.2.7 https://github.com/SCOREC/core.git
           cd core
+          git --no-pager log --pretty=oneline -1
+          mkdir build
           git submodule update --init
           cd build
           cmake .. -DCMAKE_C_COMPILER="`which mpicc`" -DCMAKE_CXX_COMPILER="`which mpiCC`" -DCMAKE_C_FLAGS="-O2 -g -Wall" -DCMAKE_CXX_FLAGS="-O2 -g -Wall" -DCMAKE_INSTALL_PREFIX=../../pumi
