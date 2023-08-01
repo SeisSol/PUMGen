@@ -13,7 +13,7 @@ jobs:
         run: |
             cd ${{ runner.workspace }}
             mkdir opt
-            git clone https://github.com/SCOREC/core.git
+            git clone --recursive --branch v2.2.7 --depth 1 https://github.com/SCOREC/core.git
             cd core
             echo "pumi-id=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
