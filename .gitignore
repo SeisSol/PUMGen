@@ -5,8 +5,5 @@
 # VS Code
 .vscode/
 
-# SCons
+# CMake build directory
 build/
-config.log
-.sconsign.dblite
-.sconf_temp/

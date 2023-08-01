@@ -1,6 +1,3 @@
-[submodule "submodules/scons-tools"]
-	path = submodules/scons-tools
-	url = ../../TUM-I5/scons-tools.git
 [submodule "submodules/utils"]
 	path = submodules/utils
 	url = ../../TUM-I5/utils.git
