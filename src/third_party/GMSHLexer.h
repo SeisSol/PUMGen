@@ -1,8 +1,7 @@
 #ifndef GMSHLEXER_20200901_H
 #define GMSHLEXER_20200901_H
 
-#include <cstdint>
-#include <istream>
+#include <fstream>
 
 namespace tndm {
 
@@ -13,6 +12,8 @@ enum class GMSHToken {
     string,
     mesh_format,
     end_mesh_format,
+    entities,
+    end_entities,
     nodes,
     end_nodes,
     elements,
@@ -34,9 +35,8 @@ private:
     char lastChar = ' ';
     std::istream* in = nullptr;
     GMSHSourceLocation loc = {1, 1};
-
+protected:
     void advance();
-
 public:
     static constexpr std::size_t MaxNumberLength = 128;
 
@@ -46,12 +46,12 @@ public:
     }
 
     GMSHToken getToken();
-    auto getIdentifier() const { return identifier; }
-    auto getInteger() const { return integer; }
-    auto getReal() const { return real; }
-    auto getSourceLoc() const { return loc; }
-};
+    uint64_t getIdentifier() const { return identifier; }
+    long getInteger() const { return integer; }
+    double getReal() const { return real; }
+    GMSHSourceLocation getSourceLoc() const { return loc; }
 
+};
 } // namespace tndm
 
 #endif // GMSHLEXER_20200901_H

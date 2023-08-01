@@ -2,21 +2,21 @@ jobs:
   - job:
     displayName: pumgen-build
     pool:
-      vmImage: 'ubuntu-18.04'
+      vmImage: 'ubuntu-22.04'
     steps:
       - bash: |
           set -euo pipefail
           export IFS=$'\n\t'
           sudo apt-get update
-          sudo apt-get install -qq g++-5 openmpi-bin openmpi-common libopenmpi-dev hdf5-tools libhdf5-openmpi-100 libhdf5-openmpi-dev libnetcdf-dev
+          sudo apt-get install -qq g++ openmpi-bin openmpi-common libopenmpi-dev hdf5-tools libhdf5-openmpi-103 libhdf5-openmpi-dev libnetcdf-dev
           cd ..
           # build pumi
-          git clone https://github.com/SCOREC/core.git
-          mkdir core/build
+          git clone --recursive --branch v2.2.7 https://github.com/SCOREC/core.git
           cd core
-          git submodule update --init
+          git --no-pager log --pretty=oneline -1
+          mkdir build
           cd build
-          cmake .. -DCMAKE_C_COMPILER="`which mpicc`" -DCMAKE_CXX_COMPILER="`which mpiCC`" -DCMAKE_C_FLAGS="-O2 -g -Wall" -DCMAKE_CXX_FLAGS="-O2 -g -Wall" -DCMAKE_INSTALL_PREFIX=../../pumi
+          cmake .. -DCMAKE_C_COMPILER="`which mpicc`" -DCMAKE_CXX_COMPILER="`which mpiCC`" -DCMAKE_C_FLAGS="-O2 -g -Wall" -DCMAKE_CXX_FLAGS="-O2 -g -Wall" -DSCOREC_CXX_WARNINGS=OFF -DCMAKE_INSTALL_PREFIX=../../pumi
           make -j $(nproc) && make install
           #Go back to PUMGen and build it
           cd ../../s

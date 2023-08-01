@@ -535,8 +535,8 @@ class SimModSuite : public MeshInput {
       if (face == nullptr) {
         logError() << "UseDiscreteMesh; faceid:" << iElem << "not found in model.";
       } else {
-        logInfo(PMU_rank()) << "UseDiscreteMesh; faceid, noModification:" << iElem,
-            MeshAtt.UseDiscreteMesh_noModification;
+        logInfo(PMU_rank()) << "UseDiscreteMesh; faceid, noModification:" << iElem
+                            << MeshAtt.UseDiscreteMesh_noModification;
         MS_useDiscreteGeometryMesh(meshCase, face, MeshAtt.UseDiscreteMesh_noModification);
         // MS_limitSurfaceMeshModification(meshCase,face,UseDiscreteMesh_noModification);
       }
@@ -653,7 +653,7 @@ class SimModSuite : public MeshInput {
     int kAR;
     for (int i = 0; i < num_partMeshes; i++) {
       reg_it = M_regionIter(PM_mesh(m_simMesh, i));
-      while (reg = RIter_next(reg_it)) {
+      while ((reg = RIter_next(reg_it))) {
         kAR = num_bins;
         for (int k = 1; k < num_bins; k++) {
           elAR = R_aspectRatio(reg);

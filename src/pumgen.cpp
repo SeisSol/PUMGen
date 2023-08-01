@@ -37,9 +37,11 @@
 #ifdef USE_SIMMOD
 #include "input/SimModSuite.h"
 #endif // USE_SIMMOD
+#include "meshreader/GMSH4Parser.h"
 #include "meshreader/ParallelFidapReader.h"
 #include "meshreader/ParallelGMSHReader.h"
 #include "meshreader/ParallelGambitReader.h"
+#include "third_party/GMSH2Parser.h"
 
 template <typename TT> static void _checkH5Err(TT status, const char* file, int line) {
   if (status < 0)
@@ -61,7 +63,7 @@ int main(int argc, char* argv[]) {
 
   // Parse command line arguments
   utils::Args args;
-  const char* source[] = {"gambit", "fidap", "msh2", "netcdf", "apf", "simmodsuite"};
+  const char* source[] = {"gambit", "fidap", "msh2", "msh4", "netcdf", "apf", "simmodsuite"};
   args.addEnumOption("source", source, 's', "Mesh source (default: gambit)", false);
   args.addOption("dump", 'd', "Dump APF mesh before partitioning it", utils::Args::Required, false);
   args.addOption("model", 0, "Dump/Load a specific model file", utils::Args::Required, false);
@@ -128,9 +130,13 @@ int main(int argc, char* argv[]) {
     break;
   case 2:
     logInfo(rank) << "Using GMSH mesh format 2 (msh2) mesh";
-    meshInput = new SerialMeshFile<puml::ParallelGMSHReader>(inputFile);
+    meshInput = new SerialMeshFile<puml::ParallelGMSHReader<tndm::GMSH2Parser>>(inputFile);
     break;
   case 3:
+    logInfo(rank) << "Using GMSH mesh format 4 (msh4) mesh";
+    meshInput = new SerialMeshFile<puml::ParallelGMSHReader<puml::GMSH4Parser>>(inputFile);
+    break;
+  case 4:
 #ifdef USE_NETCDF
     logInfo(rank) << "Using netCDF mesh";
     meshInput = new NetCDFMesh(inputFile);
@@ -138,11 +144,11 @@ int main(int argc, char* argv[]) {
     logError() << "netCDF is not supported in this version";
 #endif // USE_NETCDF
     break;
-  case 4:
+  case 5:
     logInfo(rank) << "Using APF native format";
     meshInput = new ApfNative(inputFile, args.getArgument<const char*>("model", 0L));
     break;
-  case 5:
+  case 6:
 #ifdef USE_SIMMOD
     logInfo(rank) << "Using SimModSuite";
 

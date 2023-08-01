@@ -1,11 +1,6 @@
 #include "GMSHLexer.h"
 #include "Hash.h"
 
-#include <cctype>
-#include <cstdlib>
-#include <stdexcept>
-#include <string>
-
 namespace tndm {
 
 void GMSHLexer::advance() {
@@ -46,6 +41,12 @@ GMSHToken GMSHLexer::getToken() {
             break;
         case "EndMeshFormat"_fnv1a:
             token = GMSHToken::end_mesh_format;
+            break;
+        case "Entities"_fnv1a:
+            token = GMSHToken::entities;
+            break;
+        case "EndEntities"_fnv1a:
+            token = GMSHToken::end_entities;
             break;
         case "Nodes"_fnv1a:
             token = GMSHToken::nodes;

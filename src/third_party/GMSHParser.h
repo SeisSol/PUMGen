@@ -1,50 +1,18 @@
 #ifndef GMSHPARSER_20200901_H
 #define GMSHPARSER_20200901_H
 
-#include "GMSHLexer.h"
-
-#include <array>
+#include <fstream>
 #include <optional>
-#include <streambuf>
+#include <sstream>
 #include <string>
 #include <string_view>
 
+#include "GMSHMeshBuilder.h"
+#include "GMSHLexer.h"
+
 namespace tndm {
 
-struct membuf : std::streambuf {
-    membuf(char* b, char* e) { this->setg(b, b, e); }
-};
-
-class GMSHMeshBuilder {
-public:
-    virtual ~GMSHMeshBuilder() {}
-    virtual void setNumVertices(std::size_t numVertices) = 0;
-    virtual void setVertex(long id, std::array<double, 3> const& x) = 0;
-    virtual void setNumElements(std::size_t numElements) = 0;
-    virtual void addElement(long type, long tag, long* node, std::size_t numNodes) = 0;
-};
-
 class GMSHParser {
-private:
-    GMSHMeshBuilder* builder;
-    GMSHToken curTok;
-    GMSHSourceLocation curLoc;
-    GMSHLexer lexer;
-    std::string errorMsg;
-
-    GMSHToken getNextToken() {
-        curLoc = lexer.getSourceLoc();
-        return curTok = lexer.getToken();
-    }
-
-    template <typename T> T logError(std::string_view msg);
-    template <typename T> T logErrorAnnotated(std::string_view msg);
-    std::optional<double> getNumber();
-    double parseMeshFormat();
-    bool parseNodes();
-    bool parseElements();
-    bool parse_();
-
 public:
     // Look-up table from gmsh type to number of nodes
     static constexpr std::size_t NumNodes[] = {
@@ -64,16 +32,76 @@ public:
         14, // P2 pyramid
         1,  // point
     };
+    static constexpr const char* ElementTypes[] = {
+        "line",
+        "triangle",
+        "quadrangle",
+        "tetrahedron",
+        "hexahedron",
+        "prism",
+        "pyramid",
+        "P1 line",
+        "P1 triangle",
+        "P1 quadrangle",
+        "P1 tetrahedron",
+        "P2 hexahedron",
+        "P2 prism",
+        "P2 pyramid",
+        "point",
+    };
 
-    GMSHParser(GMSHMeshBuilder* builder) : builder(builder) {}
+    explicit GMSHParser(GMSHMeshBuilder* builder) : builder(builder){};
+    [[nodiscard]] std::string_view getErrorMessage() const { return errorMsg; }
 
-    bool parse(std::string& msh);
-    bool parse(char* msh, std::size_t len);
-    bool parseFile(std::string const& fileName);
+    bool parseFile(std::string const& fileName) {
+        std::ifstream in(fileName);
+        if (!in.is_open()) {
+            return logError<bool>("Unable to open MSH file");
+        }
+        lexer.setIStream(&in);
+        return parse_();
+    }
 
-    std::string_view getErrorMessage() const { return errorMsg; }
+protected:
+    template <typename T> T logErrorAnnotated(std::string_view msg) {
+        std::stringstream ss;
+        ss << "GMSH parser error in line " << curLoc.line << " in column " << curLoc.col << ":\n";
+        ss << '\t' << msg << '\n';
+        errorMsg += ss.str();
+        return {};
+    }
+
+    template <typename T> T logError(std::string_view msg) {
+        errorMsg += "GMSH parser error:\n\t";
+        errorMsg += msg;
+        errorMsg += '\n';
+        return {};
+    }
+
+    GMSHMeshBuilder* builder;
+    GMSHSourceLocation curLoc = {0, 0};
+    GMSHToken curTok;
+    GMSHLexer lexer;
+    std::string errorMsg;
+
+    GMSHToken getNextToken() {
+        curLoc = lexer.getSourceLoc();
+        return curTok = lexer.getToken();
+    }
+
+    std::optional<double> getNumber() {
+        if (curTok == GMSHToken::integer) {
+            return {lexer.getInteger()};
+        } else if (curTok == GMSHToken::real) {
+            return {lexer.getReal()};
+        }
+        return std::nullopt;
+    }
+
+    virtual bool parse_() = 0;
+
+    double parseMeshFormat();
 };
-
-}; // namespace tndm
+} // namespace tndm
 
 #endif // GMSHPARSER_20200901_H

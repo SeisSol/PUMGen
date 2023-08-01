@@ -1,11 +1,11 @@
 #ifndef GMSHBUILDER_20201014_H
 #define GMSHBUILDER_20201014_H
 
-#include "third_party/GMSHParser.h"
-
 #include <array>
 #include <cassert>
 #include <vector>
+
+#include "third_party/GMSHMeshBuilder.h"
 
 namespace puml {
 
