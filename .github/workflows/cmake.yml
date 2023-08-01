@@ -13,7 +13,7 @@ jobs:
         run: |
             cd ${{ runner.workspace }}
             mkdir opt
-            git clone https://github.com/SCOREC/core.git
+            git clone --recursive --branch v2.2.7 --depth 1 https://github.com/SCOREC/core.git
             cd core
             echo "pumi-id=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
@@ -36,7 +36,7 @@ jobs:
             cd ${{ runner.workspace }}/core
             git submodule update --init
             mkdir build && cd build
-            cmake .. -DCMAKE_C_COMPILER="`which mpicc`" -DCMAKE_CXX_COMPILER="`which mpiCC`" -DCMAKE_C_FLAGS="-O2 -g -Wall" -DCMAKE_CXX_FLAGS="-O2 -g -Wall" -DCMAKE_INSTALL_PREFIX=${{ runner.workspace }}/opt
+            cmake .. -DCMAKE_C_COMPILER="`which mpicc`" -DCMAKE_CXX_COMPILER="`which mpiCC`" -DSCOREC_CXX_FLAGS="-O2 -g -Wall -DOMPI_SKIP_MPICXX" -DCMAKE_INSTALL_PREFIX=${{ runner.workspace }}/opt
             make -j $(nproc) && make install
 
       - name: Upload PUMI
