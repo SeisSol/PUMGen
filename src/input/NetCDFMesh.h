@@ -19,7 +19,7 @@
 #include <netcdf_par.h>
 
 #include <PCU.h>
-#include <apfConvert.h>
+#include "ApfConvertWrapper.h"
 #include <apfMDS.h>
 #include <apfMesh2.h>
 #include <gmi_null.h>
@@ -73,7 +73,7 @@ class NetCDFMesh : public MeshInput {
 
     unsigned int nElements = 0;
     unsigned int nVertices = 0;
-    int* elements = 0L;
+    ElementID* elements = 0L;
     double* vertices = 0L;
     int* boundaries = 0L;
     int* groups = 0L;
@@ -157,7 +157,7 @@ class NetCDFMesh : public MeshInput {
 
       // Copy to the buffer
       unsigned int* elementsLocal = new unsigned int[nElements * 4];
-      elements = new int[nElements * 4];
+      elements = new ElementID[nElements * 4];
       vertices = new double[nVertices * 3];
 
       boundaries = new int[nElements * 4];
