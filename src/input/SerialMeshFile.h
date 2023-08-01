@@ -17,8 +17,8 @@
 #include <mpi.h>
 #endif // PARALLEL
 
-#include <PCU.h>
 #include "ApfConvertWrapper.h"
+#include <PCU.h>
 #include <apfMDS.h>
 #include <apfMesh2.h>
 #include <gmi_null.h>
@@ -87,9 +87,9 @@ template <typename T> class SerialMeshFile : public MeshInput {
     apf::GlobalToVert vertMap;
     int* elementsI = new int[nLocalElements * 4];
     m_meshReader.readElements(elementsI);
-    ElementID* elements = new ElementID[nLocalElements*4];
-    for (int i = 0;i < nLocalElements*4;++i) {
-	elements[i] = elementsI[i];
+    ElementID* elements = new ElementID[nLocalElements * 4];
+    for (int i = 0; i < nLocalElements * 4; ++i) {
+      elements[i] = elementsI[i];
     }
     delete[] elementsI;
     logInfo(m_rank) << "Create APF connectivity";

@@ -18,8 +18,8 @@
 #include <netcdf.h>
 #include <netcdf_par.h>
 
-#include <PCU.h>
 #include "ApfConvertWrapper.h"
+#include <PCU.h>
 #include <apfMDS.h>
 #include <apfMesh2.h>
 #include <gmi_null.h>
