@@ -1,6 +1,7 @@
 #ifndef GMSHLEXER_20200901_H
 #define GMSHLEXER_20200901_H
 
+#include <cstdint>
 #include <fstream>
 
 namespace tndm {
