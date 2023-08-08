@@ -2,8 +2,8 @@
 *.kdev4
 *.kdev4/
 
-# SCons
+# VS Code
+.vscode/
+
+# CMake build directory
 build/
-config.log
-.sconsign.dblite
-.sconf_temp/
