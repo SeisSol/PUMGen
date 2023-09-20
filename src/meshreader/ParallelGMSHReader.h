@@ -43,10 +43,10 @@ template <typename P> class ParallelGMSHReader {
     MPI_Bcast(&nElements_, 1, tndm::mpi_type_t<decltype(nVertices_)>(), 0, comm_);
   }
 
-  [[nodiscard]] unsigned int nVertices() const { return nVertices_; }
-  [[nodiscard]] unsigned int nElements() const { return nElements_; }
-  void readElements(int* elements) const {
-    static_assert(sizeof(GMSHBuilder<Dim>::element_t) == (Dim + 1) * sizeof(int));
+  [[nodiscard]] std::size_t nVertices() const { return nVertices_; }
+  [[nodiscard]] std::size_t nElements() const { return nElements_; }
+  void readElements(std::size_t* elements) const {
+    static_assert(sizeof(GMSHBuilder<Dim>::element_t) == (Dim + 1) * sizeof(std::size_t));
     scatter(builder_.elements.data()->data(), elements, nElements(), Dim + 1);
   }
   void readVertices(double* vertices) const {
@@ -88,18 +88,18 @@ template <typename P> class ParallelGMSHReader {
       std::sort(v2f.begin(), v2f.end());
     }
 
-    for (unsigned elNo = 0; elNo < nElements; ++elNo) {
-      for (unsigned localFctNo = 0; localFctNo < nFacetsPerTet; ++localFctNo) {
-        unsigned nodes[nVertsPerTri];
-        for (unsigned localNo = 0; localNo < nVertsPerTri; ++localNo) {
+    for (std::size_t elNo = 0; elNo < nElements; ++elNo) {
+      for (int localFctNo = 0; localFctNo < nFacetsPerTet; ++localFctNo) {
+        std::array<std::size_t, nVertsPerTri> nodes;
+        for (int localNo = 0; localNo < nVertsPerTri; ++localNo) {
           const auto localNoElement = Facet2Nodes[localFctNo][localNo];
           nodes[localNo] = builder_.elements[elNo][localNoElement];
         }
-        std::vector<unsigned> intersect[nVertsPerTri - 1];
+        std::array<std::vector<std::size_t>, nVertsPerTri - 1> intersect;
         std::set_intersection(vertex2facets[nodes[0]].begin(), vertex2facets[nodes[0]].end(),
                               vertex2facets[nodes[1]].begin(), vertex2facets[nodes[1]].end(),
                               std::back_inserter(intersect[0]));
-        for (unsigned node = 2; node < nVertsPerTri; ++node) {
+        for (int node = 2; node < nVertsPerTri; ++node) {
           std::set_intersection(intersect[node - 2].begin(), intersect[node - 2].end(),
                                 vertex2facets[nodes[node]].begin(),
                                 vertex2facets[nodes[node]].end(),
@@ -158,8 +158,8 @@ template <typename P> class ParallelGMSHReader {
   MPI_Comm comm_;
   GMSHBuilder<Dim> builder_;
   std::vector<bc_t> bcs_;
-  unsigned int nVertices_ = 0;
-  unsigned int nElements_ = 0;
+  std::size_t nVertices_ = 0;
+  std::size_t nElements_ = 0;
 };
 
 } // namespace puml

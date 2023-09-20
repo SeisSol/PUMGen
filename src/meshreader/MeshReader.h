@@ -23,7 +23,7 @@ class MeshReader {
     /** Start of the section */
     size_t seekPosition;
     /** Number of elements (lines) in the section */
-    unsigned int nLines;
+    std::size_t nLines;
     /** Line size */
     size_t lineSize;
   };
@@ -45,12 +45,12 @@ class MeshReader {
       logError() << "Could not open mesh file" << meshFile;
   }
 
-  virtual unsigned int nVertices() const = 0;
-  virtual unsigned int nElements() const = 0;
+  virtual std::size_t nVertices() const = 0;
+  virtual std::size_t nElements() const = 0;
   /**
    * @return Number of boundary faces
    */
-  virtual unsigned int nBoundaries() const = 0;
+  virtual std::size_t nBoundaries() const = 0;
 
   /**
    * Reads vertices from start tp start+count from the file and stores them in
@@ -60,12 +60,12 @@ class MeshReader {
    * responsible for allocating the buffer. The size of the buffer must be
    * count*dimensions
    */
-  virtual void readVertices(unsigned int start, unsigned int count, double* vertices) = 0;
+  virtual void readVertices(std::size_t start, std::size_t count, double* vertices) = 0;
 
   /**
    * Read all vertices
    *
-   * @see readVertices(unsigned int, unsigned int, double*)
+   * @see readVertices(size_t, size_t, double*)
    */
   void readVertices(double* vertices) {
     logInfo() << "Reading vertices";
@@ -80,14 +80,14 @@ class MeshReader {
    * responsible for allocating the buffer. The Size of the buffer must be
    * count*vertices_per_element.
    */
-  virtual void readElements(unsigned int start, unsigned int count, int* elements) = 0;
+  virtual void readElements(std::size_t start, std::size_t count, std::size_t* elements) = 0;
 
   /**
    * Reads all elements
    *
-   * @see readElements(unsigned int, unsigned int, unsinged int*)
+   * @see readElements(size_t, size_t, size_t*)
    */
-  void readElements(int* elements) {
+  void readElements(std::size_t* elements) {
     logInfo() << "Reading elements";
     readElements(0, nElements(), elements);
   }

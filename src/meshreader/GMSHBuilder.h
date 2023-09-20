@@ -18,7 +18,7 @@ template <> struct GMSHSimplexType<3u> { static constexpr long type = 4; };  // 
 template <std::size_t D> class GMSHBuilder : public tndm::GMSHMeshBuilder {
   public:
   using vertex_t = std::array<double, D>;
-  using element_t = std::array<int, D + 1u>;
+  using element_t = std::array<std::size_t, D + 1u>;
   using facet_t = std::array<int, D>;
 
   std::vector<vertex_t> vertices;

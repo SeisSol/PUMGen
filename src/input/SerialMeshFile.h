@@ -71,10 +71,10 @@ template <typename T> class SerialMeshFile : public MeshInput {
   void open(const char* meshFile) {
     m_meshReader.open(meshFile);
 
-    unsigned int nVertices = m_meshReader.nVertices();
-    unsigned int nElements = m_meshReader.nElements();
-    unsigned int nLocalVertices = (nVertices + m_nProcs - 1) / m_nProcs;
-    unsigned int nLocalElements = (nElements + m_nProcs - 1) / m_nProcs;
+    const std::size_t nVertices = m_meshReader.nVertices();
+    const std::size_t nElements = m_meshReader.nElements();
+    std::size_t nLocalVertices = (nVertices + m_nProcs - 1) / m_nProcs;
+    std::size_t nLocalElements = (nElements + m_nProcs - 1) / m_nProcs;
     if (m_rank == m_nProcs - 1) {
       nLocalVertices = nVertices - (m_nProcs - 1) * nLocalVertices;
       nLocalElements = nElements - (m_nProcs - 1) * nLocalElements;
@@ -89,7 +89,7 @@ template <typename T> class SerialMeshFile : public MeshInput {
     {
       std::vector<ElementID> elements;
       {
-        std::vector<int> elementsInt(nLocalElements * 4);
+        std::vector<std::size_t> elementsInt(nLocalElements * 4);
         m_meshReader.readElements(elementsInt.data());
         elements = std::vector<ElementID>(elementsInt.begin(), elementsInt.end());
       }
@@ -114,12 +114,12 @@ template <typename T> class SerialMeshFile : public MeshInput {
       std::vector<int> boundaries(nLocalElements * 4);
       m_meshReader.readBoundaries(boundaries.data());
       apf::MeshIterator* it = m_mesh->begin(3);
-      unsigned int i = 0;
+      std::size_t i = 0;
       while (apf::MeshEntity* element = m_mesh->iterate(it)) {
         apf::Adjacent adjacent;
         m_mesh->getAdjacent(element, 2, adjacent);
 
-        for (unsigned int j = 0; j < 4; j++) {
+        for (int j = 0; j < 4; j++) {
           if (!boundaries[i * 4 + j]) {
             continue;
           }
@@ -138,7 +138,7 @@ template <typename T> class SerialMeshFile : public MeshInput {
       std::vector<int> groups(nLocalElements);
       m_meshReader.readGroups(groups.data());
       apf::MeshIterator* it = m_mesh->begin(3);
-      unsigned int i = 0;
+      std::size_t i = 0;
       while (apf::MeshEntity* element = m_mesh->iterate(it)) {
         m_mesh->setIntTag(element, groupTag, &groups[i]);
         i++;

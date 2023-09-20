@@ -18,6 +18,8 @@
 #include "GambitReader.h"
 #include "ParallelMeshReader.h"
 
+#include "third_party/MPITraits.h"
+
 namespace puml {
 
 class ParallelGambitReader : public ParallelMeshReader<GambitReader> {
@@ -35,35 +37,33 @@ class ParallelGambitReader : public ParallelMeshReader<GambitReader> {
    * This is a collective operation.
    */
   void readGroups(int* groups) {
-    unsigned int chunkSize = (nElements() + m_nProcs - 1) / m_nProcs;
+    std::size_t chunkSize = (nElements() + m_nProcs - 1) / m_nProcs;
 
     if (m_rank == 0) {
-      unsigned int maxChunkSize = chunkSize;
-      ElementGroup* map = new ElementGroup[maxChunkSize];
+      std::size_t maxChunkSize = chunkSize;
+      std::vector<ElementGroup> map (maxChunkSize);
 
-      std::vector<int>* aggregator = new std::vector<int>[m_nProcs - 1];
-      unsigned int* sizes = new unsigned int[m_nProcs - 1];
-      MPI_Request* requests = new MPI_Request[(m_nProcs - 1) * 2];
-      for (int i = 0; i < m_nProcs - 1; i++) {
-        requests[i * 2] = MPI_REQUEST_NULL;
-        requests[i * 2 + 1] = MPI_REQUEST_NULL;
-      }
+      std::vector<std::vector<int>> aggregator (m_nProcs - 1);
+      std::vector<std::size_t> sizes (m_nProcs - 1);
+      std::vector<MPI_Request> requests ((m_nProcs - 1) * 2, MPI_REQUEST_NULL);
 
       for (int i = 0; i < m_nProcs; i++) {
         logInfo() << "Reading group information part" << (i + 1) << "of" << m_nProcs;
 
-        if (i == m_nProcs - 1)
+        if (i == m_nProcs - 1) {
           chunkSize = nElements() - (m_nProcs - 1) * chunkSize;
+        }
 
-        m_serialReader.readGroups(i * maxChunkSize, chunkSize, map);
+        m_serialReader.readGroups(i * maxChunkSize, chunkSize, map.data());
 
         // Wait for all sending from last iteration
-        MPI_Waitall((m_nProcs - 1) * 2, requests, MPI_STATUSES_IGNORE);
-        for (int j = 0; j < m_nProcs - 1; j++)
+        MPI_Waitall((m_nProcs - 1) * 2, requests.data(), MPI_STATUSES_IGNORE);
+        for (int j = 0; j < m_nProcs - 1; j++) {
           aggregator[j].clear();
+        }
 
         // Sort group numbers into the corresponding aggregator
-        for (unsigned int j = 0; j < chunkSize; j++) {
+        for (std::size_t j = 0; j < chunkSize; j++) {
           if (map[j].element < maxChunkSize)
             // Local element
             groups[map[j].element] = map[j].group;
@@ -78,43 +78,39 @@ class ParallelGambitReader : public ParallelMeshReader<GambitReader> {
 
         // Send send aggregated mapping
         for (int j = 0; j < m_nProcs - 1; j++) {
-          if (aggregator[j].empty())
+          if (aggregator[j].empty()) {
             continue;
+          }
 
           sizes[j] = aggregator[j].size() / 2; // element id + group number
-          MPI_Isend(&sizes[j], 1, MPI_UNSIGNED, j + 1, 0, m_comm, &requests[j * 2]);
+          MPI_Isend(&sizes[j], 1, tndm::mpi_type_t<std::size_t>(), j + 1, 0, m_comm, &requests[j * 2]);
           MPI_Isend(&aggregator[j][0], aggregator[j].size(), MPI_INT, j + 1, 0, m_comm,
                     &requests[j * 2 + 1]);
         }
       }
 
-      MPI_Waitall((m_nProcs - 1) * 2, requests, MPI_STATUSES_IGNORE);
-
-      delete[] map;
-      delete[] aggregator;
-      delete[] sizes;
-      delete[] requests;
+      MPI_Waitall((m_nProcs - 1) * 2, requests.data(), MPI_STATUSES_IGNORE);
     } else {
-      if (m_rank == m_nProcs - 1)
+      if (m_rank == m_nProcs - 1) {
         chunkSize = nElements() - (m_nProcs - 1) * chunkSize;
+      }
 
       // Allocate enough memory
-      unsigned int* buf = new unsigned int[chunkSize * 2];
+      std::vector<int> buf(chunkSize * 2);
 
       unsigned int recieved = 0;
 
       while (recieved < chunkSize) {
-        unsigned int size;
-        MPI_Recv(&size, 1, MPI_UNSIGNED, 0, 0, m_comm, MPI_STATUS_IGNORE);
-        MPI_Recv(buf, size * 2, MPI_INT, 0, 0, m_comm, MPI_STATUS_IGNORE);
+        std::size_t size;
+        MPI_Recv(&size, 1, tndm::mpi_type_t<std::size_t>(), 0, 0, m_comm, MPI_STATUS_IGNORE);
+        MPI_Recv(buf.data(), size * 2, MPI_INT, 0, 0, m_comm, MPI_STATUS_IGNORE);
 
-        for (unsigned int i = 0; i < size * 2; i += 2)
+        for (std::size_t i = 0; i < size * 2; i += 2) {
           groups[buf[i]] = buf[i + 1];
+        }
 
         recieved += size;
       }
-
-      delete[] buf;
     }
   }
 
@@ -129,36 +125,33 @@ class ParallelGambitReader : public ParallelMeshReader<GambitReader> {
    * @todo Only tetrahedral meshes are supported
    */
   void readBoundaries(int* boundaries) {
-    unsigned int chunkSize = (nElements() + m_nProcs - 1) / m_nProcs;
+    std::size_t chunkSize = (nElements() + m_nProcs - 1) / m_nProcs;
 
     if (m_rank == 0) {
-      unsigned int maxChunkSize = chunkSize;
-      GambitBoundaryFace* faces = new GambitBoundaryFace[maxChunkSize];
+      std::size_t maxChunkSize = chunkSize;
+      std::vector<GambitBoundaryFace> faces (maxChunkSize);
 
-      std::vector<int>* aggregator = new std::vector<int>[m_nProcs - 1];
-      unsigned int* sizes = new unsigned int[m_nProcs - 1];
-      MPI_Request* requests = new MPI_Request[(m_nProcs - 1) * 2];
-      for (int i = 0; i < m_nProcs - 1; i++) {
-        requests[i * 2] = MPI_REQUEST_NULL;
-        requests[i * 2 + 1] = MPI_REQUEST_NULL;
-      }
+      std::vector<std::vector<int>> aggregator (m_nProcs - 1);
+      std::vector<std::size_t> sizes (m_nProcs - 1);
+      std::vector<MPI_Request> requests ((m_nProcs - 1) * 2, MPI_REQUEST_NULL);
 
-      unsigned int nChunks = (nBoundaries() + chunkSize - 1) / chunkSize;
-      for (unsigned int i = 0; i < nChunks; i++) {
+      std::size_t nChunks = (nBoundaries() + chunkSize - 1) / chunkSize;
+      for (std::size_t i = 0; i < nChunks; i++) {
         logInfo() << "Reading boundary conditions part" << (i + 1) << "of" << nChunks;
 
-        if (i == nChunks - 1)
+        if (i == nChunks - 1) {
           chunkSize = nBoundaries() - (nChunks - 1) * chunkSize;
+        }
 
-        m_serialReader.readBoundaries(i * maxChunkSize, chunkSize, faces);
+        m_serialReader.readBoundaries(i * maxChunkSize, chunkSize, faces.data());
 
         // Wait for all sending from last iteration
-        MPI_Waitall((m_nProcs - 1) * 2, requests, MPI_STATUSES_IGNORE);
+        MPI_Waitall((m_nProcs - 1) * 2, requests.data(), MPI_STATUSES_IGNORE);
         for (int j = 0; j < m_nProcs - 1; j++)
           aggregator[j].clear();
 
         // Sort boundary conditions into the corresponding aggregator
-        for (unsigned int j = 0; j < chunkSize; j++) {
+        for (std::size_t j = 0; j < chunkSize; j++) {
           if (faces[j].element < maxChunkSize)
             // Local element
             boundaries[faces[j].element * 4 + faces[j].face] = faces[j].type;
@@ -173,50 +166,47 @@ class ParallelGambitReader : public ParallelMeshReader<GambitReader> {
 
         // Send send aggregated values
         for (int j = 0; j < m_nProcs - 1; j++) {
-          if (aggregator[j].empty())
+          if (aggregator[j].empty()) {
             continue;
+          }
 
           sizes[j] = aggregator[j].size() / 2; // element id + face type
-          MPI_Isend(&sizes[j], 1, MPI_UNSIGNED, j + 1, 0, m_comm, &requests[j * 2]);
+          MPI_Isend(&sizes[j], 1, tndm::mpi_type_t<std::size_t>(), j + 1, 0, m_comm, &requests[j * 2]);
           MPI_Isend(&aggregator[j][0], aggregator[j].size(), MPI_INT, j + 1, 0, m_comm,
                     &requests[j * 2 + 1]);
         }
       }
 
-      MPI_Waitall((m_nProcs - 1) * 2, requests, MPI_STATUSES_IGNORE);
-
-      delete[] faces;
-      delete[] aggregator;
+      MPI_Waitall((m_nProcs - 1) * 2, requests.data(), MPI_STATUSES_IGNORE);
 
       // Send finish signal to all other processes
-      memset(sizes, 0, (m_nProcs - 1) * sizeof(unsigned int));
-      for (int i = 0; i < m_nProcs - 1; i++)
-        MPI_Isend(&sizes[i], 1, MPI_UNSIGNED, i + 1, 0, m_comm, &requests[i]);
-      MPI_Waitall(m_nProcs - 1, requests, MPI_STATUSES_IGNORE);
-
-      delete[] sizes;
-      delete[] requests;
+      std::fill(sizes.begin(), sizes.end(), 0);
+      for (int i = 0; i < m_nProcs - 1; i++) {
+        MPI_Isend(&sizes[i], 1, tndm::mpi_type_t<std::size_t>(), i + 1, 0, m_comm, &requests[i]);
+      }
+      MPI_Waitall(m_nProcs - 1, requests.data(), MPI_STATUSES_IGNORE);
     } else {
-      if (m_rank == m_nProcs - 1)
+      if (m_rank == m_nProcs - 1) {
         chunkSize = nElements() - (m_nProcs - 1) * chunkSize;
-
-      // Allocate enough memory
-      int* buf = new int[chunkSize * 2];
-
-      while (true) {
-        unsigned int size;
-        MPI_Recv(&size, 1, MPI_UNSIGNED, 0, 0, m_comm, MPI_STATUS_IGNORE);
-        if (size == 0)
-          // Finished
-          break;
-
-        MPI_Recv(buf, size * 2, MPI_INT, 0, 0, m_comm, MPI_STATUS_IGNORE);
-
-        for (unsigned int i = 0; i < size * 2; i += 2)
-          boundaries[buf[i]] = buf[i + 1];
       }
 
-      delete[] buf;
+      // Allocate enough memory
+      std::vector<int> buf (chunkSize * 2);
+
+      while (true) {
+        std::size_t size;
+        MPI_Recv(&size, 1, tndm::mpi_type_t<std::size_t>(), 0, 0, m_comm, MPI_STATUS_IGNORE);
+        if (size == 0) {
+          // Finished
+          break;
+        }
+
+        MPI_Recv(buf.data(), size * 2, MPI_INT, 0, 0, m_comm, MPI_STATUS_IGNORE);
+
+        for (std::size_t i = 0; i < size * 2; i += 2) {
+          boundaries[buf[i]] = buf[i + 1];
+        }
+      }
     }
   }
 };
