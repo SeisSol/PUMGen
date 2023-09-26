@@ -41,11 +41,11 @@ class ParallelGambitReader : public ParallelMeshReader<GambitReader> {
 
     if (m_rank == 0) {
       std::size_t maxChunkSize = chunkSize;
-      std::vector<ElementGroup> map (maxChunkSize);
+      std::vector<ElementGroup> map(maxChunkSize);
 
-      std::vector<std::vector<int>> aggregator (m_nProcs - 1);
-      std::vector<std::size_t> sizes (m_nProcs - 1);
-      std::vector<MPI_Request> requests ((m_nProcs - 1) * 2, MPI_REQUEST_NULL);
+      std::vector<std::vector<int>> aggregator(m_nProcs - 1);
+      std::vector<std::size_t> sizes(m_nProcs - 1);
+      std::vector<MPI_Request> requests((m_nProcs - 1) * 2, MPI_REQUEST_NULL);
 
       for (int i = 0; i < m_nProcs; i++) {
         logInfo() << "Reading group information part" << (i + 1) << "of" << m_nProcs;
@@ -83,7 +83,8 @@ class ParallelGambitReader : public ParallelMeshReader<GambitReader> {
           }
 
           sizes[j] = aggregator[j].size() / 2; // element id + group number
-          MPI_Isend(&sizes[j], 1, tndm::mpi_type_t<std::size_t>(), j + 1, 0, m_comm, &requests[j * 2]);
+          MPI_Isend(&sizes[j], 1, tndm::mpi_type_t<std::size_t>(), j + 1, 0, m_comm,
+                    &requests[j * 2]);
           MPI_Isend(&aggregator[j][0], aggregator[j].size(), MPI_INT, j + 1, 0, m_comm,
                     &requests[j * 2 + 1]);
         }
@@ -129,11 +130,11 @@ class ParallelGambitReader : public ParallelMeshReader<GambitReader> {
 
     if (m_rank == 0) {
       std::size_t maxChunkSize = chunkSize;
-      std::vector<GambitBoundaryFace> faces (maxChunkSize);
+      std::vector<GambitBoundaryFace> faces(maxChunkSize);
 
-      std::vector<std::vector<int>> aggregator (m_nProcs - 1);
-      std::vector<std::size_t> sizes (m_nProcs - 1);
-      std::vector<MPI_Request> requests ((m_nProcs - 1) * 2, MPI_REQUEST_NULL);
+      std::vector<std::vector<int>> aggregator(m_nProcs - 1);
+      std::vector<std::size_t> sizes(m_nProcs - 1);
+      std::vector<MPI_Request> requests((m_nProcs - 1) * 2, MPI_REQUEST_NULL);
 
       std::size_t nChunks = (nBoundaries() + chunkSize - 1) / chunkSize;
       for (std::size_t i = 0; i < nChunks; i++) {
@@ -171,7 +172,8 @@ class ParallelGambitReader : public ParallelMeshReader<GambitReader> {
           }
 
           sizes[j] = aggregator[j].size() / 2; // element id + face type
-          MPI_Isend(&sizes[j], 1, tndm::mpi_type_t<std::size_t>(), j + 1, 0, m_comm, &requests[j * 2]);
+          MPI_Isend(&sizes[j], 1, tndm::mpi_type_t<std::size_t>(), j + 1, 0, m_comm,
+                    &requests[j * 2]);
           MPI_Isend(&aggregator[j][0], aggregator[j].size(), MPI_INT, j + 1, 0, m_comm,
                     &requests[j * 2 + 1]);
         }
@@ -191,7 +193,7 @@ class ParallelGambitReader : public ParallelMeshReader<GambitReader> {
       }
 
       // Allocate enough memory
-      std::vector<int> buf (chunkSize * 2);
+      std::vector<int> buf(chunkSize * 2);
 
       while (true) {
         std::size_t size;

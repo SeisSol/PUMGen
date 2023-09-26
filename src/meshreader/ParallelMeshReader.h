@@ -166,7 +166,8 @@ template <class R> class ParallelMeshReader {
         logInfo() << "Reading elements part" << (m_nProcs - 1) << "of" << m_nProcs;
         m_serialReader.readElements((m_nProcs - 1) * chunkSize, lastChunkSize, elements);
         MPI_Wait(&request, MPI_STATUS_IGNORE);
-        MPI_Isend(elements, lastChunkSize * 4, tndm::mpi_type_t<std::size_t>(), m_nProcs - 1, 0, m_comm, &request);
+        MPI_Isend(elements, lastChunkSize * 4, tndm::mpi_type_t<std::size_t>(), m_nProcs - 1, 0,
+                  m_comm, &request);
         swap(elements, elements2);
       }
 
@@ -178,7 +179,8 @@ template <class R> class ParallelMeshReader {
       if (m_rank == m_nProcs - 1)
         chunkSize = m_nElements - (m_nProcs - 1) * chunkSize;
 
-      MPI_Recv(elements, chunkSize * 4, tndm::mpi_type_t<std::size_t>(), 0, 0, m_comm, MPI_STATUS_IGNORE);
+      MPI_Recv(elements, chunkSize * 4, tndm::mpi_type_t<std::size_t>(), 0, 0, m_comm,
+               MPI_STATUS_IGNORE);
     }
   }
 

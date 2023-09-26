@@ -14,11 +14,11 @@
 #define FIDAP_READER_H
 
 #include <algorithm>
+#include <array>
 #include <map>
 #include <sstream>
 #include <string>
 #include <vector>
-#include <array>
 
 #include "utils/stringutils.h"
 

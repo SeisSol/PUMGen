@@ -302,7 +302,7 @@ class GambitReader : public MeshReader {
     m_mesh.seekg(m_vertices.seekPosition + start * m_vertices.lineSize + m_vertices.lineSize -
                  3 * COORDINATE_SIZE - 1);
 
-    std::vector<char> buf(3* COORDINATE_SIZE);
+    std::vector<char> buf(3 * COORDINATE_SIZE);
 
     for (std::size_t i = 0; i < count; i++) {
       m_mesh.read(buf.data(), 3 * COORDINATE_SIZE);
@@ -444,8 +444,7 @@ class GambitReader : public MeshReader {
 
         if (section->variableLineLength) {
           buf.resize(0);
-        }
-        else {
+        } else {
           buf.resize(section->elementSize + section->elementTypeSize + section->faceSize);
         }
       }
@@ -456,13 +455,15 @@ class GambitReader : public MeshReader {
         m_mesh >> elementType;
         m_mesh >> boundaries[i].face;
       } else {
-        m_mesh.read(buf.data(), section->elementSize + section->elementTypeSize + section->faceSize);
+        m_mesh.read(buf.data(),
+                    section->elementSize + section->elementTypeSize + section->faceSize);
 
         std::istringstream ssE(std::string(buf.begin(), buf.begin() + section->elementSize));
         ssE >> boundaries[i].element;
 
-        std::istringstream ssF(
-            std::string(buf.begin() + section->elementSize + section->elementTypeSize, buf.begin() + section->elementSize + section->elementTypeSize + section->faceSize));
+        std::istringstream ssF(std::string(
+            buf.begin() + section->elementSize + section->elementTypeSize,
+            buf.begin() + section->elementSize + section->elementTypeSize + section->faceSize));
         ssF >> boundaries[i].face;
 
         // Seek to next position

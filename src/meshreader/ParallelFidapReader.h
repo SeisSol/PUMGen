@@ -161,7 +161,8 @@ class ParallelFidapReader : public ParallelMeshReader<FidapReader> {
             // Face for another processor
             // Serials the struct to make sending easier
             int proc = v.vertices[1] / vertexChunk;
-            aggregator[proc - 1].insert(aggregator[proc - 1].end(), v.vertices.begin(), v.vertices.end());
+            aggregator[proc - 1].insert(aggregator[proc - 1].end(), v.vertices.begin(),
+                                        v.vertices.end());
             aggregator[proc - 1].push_back(faces[j].type);
           }
         }
@@ -172,7 +173,8 @@ class ParallelFidapReader : public ParallelMeshReader<FidapReader> {
             continue;
 
           sizes[j] = aggregator[j].size() / 4; // 3 vertices + face type
-          MPI_Isend(&sizes[j], 1, tndm::mpi_type_t<std::size_t>(), j + 1, 0, m_comm, &requests[j * 2]);
+          MPI_Isend(&sizes[j], 1, tndm::mpi_type_t<std::size_t>(), j + 1, 0, m_comm,
+                    &requests[j * 2]);
           MPI_Isend(&aggregator[j][0], aggregator[j].size(), MPI_INT, j + 1, 0, m_comm,
                     &requests[j * 2 + 1]);
         }
@@ -200,10 +202,11 @@ class ParallelFidapReader : public ParallelMeshReader<FidapReader> {
           // Finished
           break;
 
-        MPI_Recv(buf.data(), size * 4, tndm::mpi_type_t<std::size_t>(), 0, 0, m_comm, MPI_STATUS_IGNORE);
+        MPI_Recv(buf.data(), size * 4, tndm::mpi_type_t<std::size_t>(), 0, 0, m_comm,
+                 MPI_STATUS_IGNORE);
 
         for (std::size_t i = 0; i < size * 4; i += 4) {
-          FaceVertex v(buf[i], buf[i+1], buf[i+2]);
+          FaceVertex v(buf[i], buf[i + 1], buf[i + 2]);
           facePos.push_back(m_faceMap.at(v));
           faceType.push_back(buf[i + 3]);
         }

@@ -18,10 +18,10 @@
 #include <cassert>
 #include <cstring>
 #include <fstream>
-#include <limits>
-#include <string>
-#include <memory>
 #include <functional>
+#include <limits>
+#include <memory>
+#include <string>
 
 #include <hdf5.h>
 
@@ -57,7 +57,7 @@ template <typename TT> static TT _checkH5Err(TT&& status, const char* file, int 
 
 #define checkH5Err(...) _checkH5Err(__VA_ARGS__, __FILE__, __LINE__)
 
-static int ilog(std::size_t value, int expbase=1) {
+static int ilog(std::size_t value, int expbase = 1) {
   int count = 0;
   while (value > 0) {
     value >>= expbase;
@@ -66,8 +66,7 @@ static int ilog(std::size_t value, int expbase=1) {
   return count;
 }
 
-template<typename F>
-static void iterate(apf::Mesh* mesh, int dim, F&& function) {
+template <typename F> static void iterate(apf::Mesh* mesh, int dim, F&& function) {
   apf::MeshIterator* it = mesh->begin(dim);
   while (apf::MeshEntity* element = mesh->iterate(it)) {
     std::invoke(function, element);
@@ -94,10 +93,16 @@ int main(int argc, char* argv[]) {
   args.addOption("model", 0, "Dump/Load a specific model file", utils::Args::Required, false);
   args.addOption("vtk", 0, "Dump mesh to VTK files", utils::Args::Required, false);
 
-  const char* filters[] = { "none", "scaleoffset", "deflate1", "deflate2", "deflate3", "deflate4", "deflate5", "deflate6", "deflate7", "deflate8", "deflate9" };
-  args.addOption("compactify-datatypes", 0, "Compress index and group data types to minimum byte size (no HDF5 filters)", utils::Args::Required, false);
-  args.addEnumOption("filter-enable", filters, 0, "Apply HDF5 filters (i.e. compression). Disabled by default.", false);
-  args.addOption("filter-chunksize", 0, "Chunksize for filters (default=4096).", utils::Args::Required, false);
+  const char* filters[] = {"none",     "scaleoffset", "deflate1", "deflate2",
+                           "deflate3", "deflate4",    "deflate5", "deflate6",
+                           "deflate7", "deflate8",    "deflate9"};
+  args.addOption("compactify-datatypes", 0,
+                 "Compress index and group data types to minimum byte size (no HDF5 filters)",
+                 utils::Args::Required, false);
+  args.addEnumOption("filter-enable", filters, 0,
+                     "Apply HDF5 filters (i.e. compression). Disabled by default.", false);
+  args.addOption("filter-chunksize", 0, "Chunksize for filters (default=4096).",
+                 utils::Args::Required, false);
 
   args.addOption("license", 'l', "License file (only used by SimModSuite)", utils::Args::Required,
                  false);
@@ -141,21 +146,21 @@ int main(int argc, char* argv[]) {
 
   bool reduceInts = args.isSet("compactify-datatypes");
   int filterEnable = args.getArgument("filter-enable", 0);
-  std::size_t filterChunksize = args.getArgument<std::size_t>("filter-chunksize", 4096);
+  hsize_t filterChunksize = args.getArgument<hsize_t>("filter-chunksize", 4096);
   bool applyFilters = filterEnable > 0;
   if (reduceInts) {
     logInfo(rank) << "Using compact integer types.";
   }
   if (filterEnable == 0) {
     logInfo(rank) << "No filtering enabled (contiguous storage)";
-  }
-  else {
+  } else {
     logInfo(rank) << "Using filtering. Chunksize:" << filterChunksize;
     if (filterEnable == 1) {
       logInfo(rank) << "Compression: scale-offset compression for integers (disabled for floats)";
-    }
-    else if (filterEnable < 11) {
-      logInfo(rank) << "Compression: deflate, strength" << filterEnable - 1 << "(note: this requires HDF5 to be compiled with GZIP support; this applies to SeisSol as well)";
+    } else if (filterEnable < 11) {
+      logInfo(rank) << "Compression: deflate, strength" << filterEnable - 1
+                    << "(note: this requires HDF5 to be compiled with GZIP support; this applies "
+                       "to SeisSol as well)";
     }
   }
 
@@ -165,8 +170,7 @@ int main(int argc, char* argv[]) {
   }
   if (utils::StringUtils::endsWith(outputFile, ".h5")) {
     utils::StringUtils::replaceLast(xdmfFile, ".h5", ".xdmf");
-  }
-  else {
+  } else {
     xdmfFile.append(".xdmf");
   }
 
@@ -267,7 +271,8 @@ int main(int argc, char* argv[]) {
   // Get local/global size
   std::size_t localSize[2] = {countOwnedLong(3), countOwnedLong(0)};
   std::size_t globalSize[2] = {localSize[0], localSize[1]};
-  MPI_Allreduce(MPI_IN_PLACE, globalSize, 2, tndm::mpi_type_t<std::size_t>(), MPI_SUM, MPI_COMM_WORLD);
+  MPI_Allreduce(MPI_IN_PLACE, globalSize, 2, tndm::mpi_type_t<std::size_t>(), MPI_SUM,
+                MPI_COMM_WORLD);
 
   logInfo(rank) << "Mesh size:" << globalSize[0];
 
@@ -323,7 +328,8 @@ int main(int argc, char* argv[]) {
       std::size_t unsignedSize = (bits + 7) / 8;
       checkH5Err(connectType);
       checkH5Err(H5Tset_size(connectType, unsignedSize));
-      checkH5Err(H5Tcommit(h5file, "/connectType", connectType, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT));
+      checkH5Err(
+          H5Tcommit(h5file, "/connectType", connectType, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT));
     }
 
     hid_t connectFilter = H5P_DEFAULT;
@@ -333,15 +339,14 @@ int main(int argc, char* argv[]) {
       checkH5Err(H5Pset_chunk(connectFilter, 2, chunk));
       if (filterEnable == 1) {
         checkH5Err(H5Pset_scaleoffset(connectFilter, H5Z_SO_INT, H5Z_SO_INT_MINBITS_DEFAULT));
-      }
-      else if (filterEnable < 11) {
+      } else if (filterEnable < 11) {
         int deflateStrength = filterEnable - 1;
         checkH5Err(H5Pset_deflate(connectFilter, deflateStrength));
       }
     }
 
-    hid_t h5connect =
-        H5Dcreate(h5file, "/connect", connectType, h5space, H5P_DEFAULT, connectFilter, H5P_DEFAULT);
+    hid_t h5connect = H5Dcreate(h5file, "/connect", connectType, h5space, H5P_DEFAULT,
+                                connectFilter, H5P_DEFAULT);
     checkH5Err(h5connect);
 
     hsize_t start[2] = {offsets[0], 0};
@@ -367,7 +372,8 @@ int main(int argc, char* argv[]) {
     }
     mesh->end(it);
 
-    checkH5Err(H5Dwrite(h5connect, H5T_NATIVE_ULONG, h5memspace, h5space, h5dxlist, connect.data()));
+    checkH5Err(
+        H5Dwrite(h5connect, H5T_NATIVE_ULONG, h5memspace, h5space, h5dxlist, connect.data()));
 
     if (applyFilters) {
       checkH5Err(H5Pclose(connectFilter));
@@ -383,9 +389,9 @@ int main(int argc, char* argv[]) {
   // Vertices
   logInfo(rank) << "Writing vertices";
   {
-    hsize_t sizes[2] = {0,0};
-    hsize_t start[2] = {0,0};
-    hsize_t count[2] = {0,0};
+    hsize_t sizes[2] = {0, 0};
+    hsize_t start[2] = {0, 0};
+    hsize_t count[2] = {0, 0};
     sizes[0] = globalSize[1];
     sizes[1] = 3;
     hid_t h5space = H5Screate_simple(2, sizes, 0L);
@@ -398,16 +404,16 @@ int main(int argc, char* argv[]) {
       checkH5Err(H5Pset_chunk(geometryFilter, 2, chunk));
       if (filterEnable == 1) {
         // float compression disabled at the moment (would be lossy)
-        // checkH5Err(H5Pset_scaleoffset(geometryFilter, H5Z_SO_FLOAT_DSCALE, H5Z_SO_INT_MINBITS_DEFAULT));
-      }
-      else if (filterEnable < 11) {
+        // checkH5Err(H5Pset_scaleoffset(geometryFilter, H5Z_SO_FLOAT_DSCALE,
+        // H5Z_SO_INT_MINBITS_DEFAULT));
+      } else if (filterEnable < 11) {
         int deflateStrength = filterEnable - 1;
         checkH5Err(H5Pset_deflate(geometryFilter, deflateStrength));
       }
     }
 
     hid_t h5geometry = H5Dcreate(h5file, "/geometry", H5T_IEEE_F64LE, h5space, H5P_DEFAULT,
-                                geometryFilter, H5P_DEFAULT);
+                                 geometryFilter, H5P_DEFAULT);
     checkH5Err(h5geometry);
 
     start[0] = offsets[1];
@@ -441,7 +447,8 @@ int main(int argc, char* argv[]) {
     }
     mesh->end(it);
 
-    checkH5Err(H5Dwrite(h5geometry, H5T_NATIVE_DOUBLE, h5memspace, h5space, h5dxlist, geometry.data()));
+    checkH5Err(
+        H5Dwrite(h5geometry, H5T_NATIVE_DOUBLE, h5memspace, h5space, h5dxlist, geometry.data()));
 
     if (applyFilters && filterEnable > 1) {
       checkH5Err(H5Pclose(geometryFilter));
@@ -498,8 +505,7 @@ int main(int argc, char* argv[]) {
       checkH5Err(H5Pset_chunk(groupFilter, 1, chunk));
       if (filterEnable == 1) {
         checkH5Err(H5Pset_scaleoffset(groupFilter, H5Z_SO_INT, H5Z_SO_INT_MINBITS_DEFAULT));
-      }
-      else if (filterEnable < 11) {
+      } else if (filterEnable < 11) {
         int deflateStrength = filterEnable - 1;
         checkH5Err(H5Pset_deflate(groupFilter, deflateStrength));
       }
@@ -552,15 +558,14 @@ int main(int argc, char* argv[]) {
       checkH5Err(H5Pset_chunk(boundaryFilter, 1, chunk));
       if (filterEnable == 1) {
         checkH5Err(H5Pset_scaleoffset(boundaryFilter, H5Z_SO_INT, H5Z_SO_INT_MINBITS_DEFAULT));
-      }
-      else if (filterEnable < 11) {
+      } else if (filterEnable < 11) {
         int deflateStrength = filterEnable - 1;
         checkH5Err(H5Pset_deflate(boundaryFilter, deflateStrength));
       }
     }
 
-    hid_t h5boundary =
-        H5Dcreate(h5file, "/boundary", H5T_STD_I32LE, h5space, H5P_DEFAULT, boundaryFilter, H5P_DEFAULT);
+    hid_t h5boundary = H5Dcreate(h5file, "/boundary", H5T_STD_I32LE, h5space, H5P_DEFAULT,
+                                 boundaryFilter, H5P_DEFAULT);
     checkH5Err(h5boundary);
 
     start[0] = offsets[0];
@@ -595,7 +600,8 @@ int main(int argc, char* argv[]) {
     }
     mesh->end(it);
 
-    checkH5Err(H5Dwrite(h5boundary, H5T_NATIVE_INT, h5memspace, h5space, h5dxlist, boundary.data()));
+    checkH5Err(
+        H5Dwrite(h5boundary, H5T_NATIVE_INT, h5memspace, h5space, h5dxlist, boundary.data()));
 
     if (boundaryFilter) {
       checkH5Err(H5Pclose(boundaryFilter));
@@ -629,7 +635,8 @@ int main(int argc, char* argv[]) {
          << std::endl
          // This should be UInt but for some reason this does not work with
          // binary data
-         << "    <DataItem NumberType=\"Int\" Precision=\""<<connectSize<<"\" Format=\"HDF\" "
+         << "    <DataItem NumberType=\"Int\" Precision=\"" << connectSize
+         << "\" Format=\"HDF\" "
             "Dimensions=\""
          << globalSize[0] << " 4\">" << basename << ":/connect</DataItem>" << std::endl
          << "   </Topology>" << std::endl
@@ -640,7 +647,8 @@ int main(int argc, char* argv[]) {
          << ":/geometry</DataItem>" << std::endl
          << "   </Geometry>" << std::endl
          << "   <Attribute Name=\"group\" Center=\"Cell\">" << std::endl
-         << "    <DataItem  NumberType=\"Int\" Precision=\""<<groupSize<<"\" Format=\"HDF\" "
+         << "    <DataItem  NumberType=\"Int\" Precision=\"" << groupSize
+         << "\" Format=\"HDF\" "
             "Dimensions=\""
          << globalSize[0] << "\">" << basename << ":/group</DataItem>" << std::endl
          << "   </Attribute>" << std::endl
