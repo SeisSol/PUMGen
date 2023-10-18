@@ -29,6 +29,7 @@
 #include <apfNumbering.h>
 // #include <apfZoltan.h>
 #include <maMesh.h>
+#include <type_traits>
 
 #include "third_party/MPITraits.h"
 #include "utils/args.h"
@@ -74,6 +75,112 @@ template <typename F> static void iterate(apf::Mesh* mesh, int dim, F&& function
   mesh->end(it);
 }
 
+constexpr std::size_t NoSecondDim = 0;
+
+template <typename T, std::size_t SecondDim, typename F>
+static void writeH5Data(F&& handler, hid_t h5file, const std::string& name, apf::Mesh* mesh, int meshdim, hid_t h5memtype, hid_t h5outtype, std::size_t chunk, std::size_t localSize, std::size_t globalSize, bool reduceInts, int filterEnable, std::size_t filterChunksize) {
+  constexpr std::size_t SecondSize = std::max(SecondDim, static_cast<std::size_t>(1));
+  constexpr std::size_t Dimensions = SecondDim == 0 ? 1 : 2;
+  const std::size_t chunkSize = chunk / SecondSize / sizeof(T);
+  const std::size_t bufferSize = std::min(localSize, chunkSize);
+  std::vector<T> data(SecondSize * bufferSize);
+
+  std::size_t rounds = (localSize + chunk - 1) / chunk;
+
+  MPI_Allreduce(MPI_IN_PLACE, &rounds, 1, tndm::mpi_type_t<decltype(rounds)>(), MPI_MAX, MPI_COMM_WORLD);
+
+  hsize_t globalSizes[2] = {globalSize, SecondDim};
+  hid_t h5space = H5Screate_simple(Dimensions, globalSizes, nullptr);
+
+  hsize_t sizes[2] = {bufferSize, SecondDim};
+  hid_t h5memspace = H5Screate_simple(Dimensions, sizes, nullptr);
+
+  std::size_t offset = localSize;
+
+  MPI_Scan(MPI_IN_PLACE, &offset, 1, tndm::mpi_type_t<decltype(offset)>(), MPI_SUM, MPI_COMM_WORLD);
+
+  offset -= localSize;
+
+  hsize_t start[2] = {offset, 0};
+  hsize_t count[2] = {bufferSize, SecondDim};
+
+  hid_t h5dxlist = H5Pcreate(H5P_DATASET_XFER);
+  checkH5Err(h5dxlist);
+  checkH5Err(H5Pset_dxpl_mpio(h5dxlist, H5FD_MPIO_COLLECTIVE));
+
+  hid_t h5type = h5outtype;
+  if (reduceInts && std::is_integral_v<T>) {
+    h5type = H5Tcopy(h5outtype);
+    std::size_t bits = ilog(globalSize);
+    std::size_t unsignedSize = (bits + 7) / 8;
+    checkH5Err(h5type);
+    checkH5Err(H5Tset_size(h5type, unsignedSize));
+    checkH5Err(
+        H5Tcommit(h5file, (std::string("/") + name + std::string("Type")).c_str(), h5type, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT));
+  }
+
+  hid_t h5filter = H5P_DEFAULT;
+  if (filterEnable > 0) {
+    h5filter = checkH5Err(H5Pcreate(H5P_DATASET_CREATE));
+    hsize_t chunk[2] = {std::min(filterChunksize, bufferSize), SecondDim};
+    checkH5Err(H5Pset_chunk(h5filter, 2, chunk));
+    if (filterEnable == 1 && std::is_integral_v<T>) {
+      checkH5Err(H5Pset_scaleoffset(h5filter, H5Z_SO_INT, H5Z_SO_INT_MINBITS_DEFAULT));
+    } else if (filterEnable < 11) {
+      int deflateStrength = filterEnable - 1;
+      checkH5Err(H5Pset_deflate(h5filter, deflateStrength));
+    }
+  }
+
+  hid_t h5data = H5Dcreate(h5file, (std::string("/") + name).c_str(), h5type, h5space, H5P_DEFAULT,
+                              h5filter, H5P_DEFAULT);
+
+  std::size_t written = 0;
+  std::size_t index = 0;
+
+  apf::MeshIterator* it = mesh->begin(meshdim);
+
+  hsize_t nullstart[2] = {0,0};
+
+  for (std::size_t i = 0; i < rounds; ++i) {
+    index = 0;
+    start[0] = offset + written;
+    count[0] = std::min(localSize - written, bufferSize);
+
+    while (apf::MeshEntity* element = mesh->iterate(it)) {
+      if (handler(element, data.begin() + index * SecondSize)) {
+        ++index;
+      }
+
+      if (index >= count[0]) {
+        break;
+      }
+    }
+
+    checkH5Err(H5Sselect_hyperslab(h5memspace, H5S_SELECT_SET, nullstart, nullptr, count, nullptr));
+
+    checkH5Err(H5Sselect_hyperslab(h5space, H5S_SELECT_SET, start, nullptr, count, nullptr));
+
+    checkH5Err(
+        H5Dwrite(h5data, h5memtype, h5memspace, h5space, h5dxlist, data.data()));
+    
+    written += count[0];
+  }
+    
+  mesh->end(it);
+
+  if (filterEnable > 0) {
+    checkH5Err(H5Pclose(h5filter));
+  }
+  if (reduceInts) {
+    checkH5Err(H5Tclose(h5type));
+  }
+  checkH5Err(H5Sclose(h5space));
+  checkH5Err(H5Sclose(h5memspace));
+  checkH5Err(H5Dclose(h5data));
+  checkH5Err(H5Pclose(h5dxlist));
+}
+
 int main(int argc, char* argv[]) {
   int rank = 0;
   int processes = 1;
@@ -102,6 +209,8 @@ int main(int argc, char* argv[]) {
   args.addEnumOption("filter-enable", filters, 0,
                      "Apply HDF5 filters (i.e. compression). Disabled by default.", false);
   args.addOption("filter-chunksize", 0, "Chunksize for filters (default=4096).",
+                 utils::Args::Required, false);
+  args.addOption("chunksize", 0, "Chunksize for writing (default=1 GiB).",
                  utils::Args::Required, false);
 
   args.addOption("license", 'l', "License file (only used by SimModSuite)", utils::Args::Required,
@@ -139,10 +248,13 @@ int main(int argc, char* argv[]) {
     // Compute default output filename
     outputFile = inputFile;
     size_t dotPos = outputFile.find_last_of('.');
-    if (dotPos != std::string::npos)
+    if (dotPos != std::string::npos) {
       outputFile.erase(dotPos);
+    }
     outputFile.append(".puml.h5");
   }
+
+  hsize_t chunksize = args.getArgument<hsize_t>("filter-chunksize", static_cast<hsize_t>(1)<<30);
 
   bool reduceInts = args.isSet("compactify-datatypes");
   int filterEnable = args.getArgument("filter-enable", 0);
@@ -225,6 +337,8 @@ int main(int argc, char* argv[]) {
   }
 
   mesh = meshInput->getMesh();
+
+  logInfo(rank) << "Parsed mesh successfully, writing output...";
 
   // Check mesh
   if (alignMdsMatches(mesh))
@@ -309,309 +423,85 @@ int main(int argc, char* argv[]) {
   checkH5Err(h5file);
   checkH5Err(H5Pclose(h5falist));
 
-  hid_t h5dxlist = H5Pcreate(H5P_DATASET_XFER);
-  checkH5Err(h5dxlist);
-  checkH5Err(H5Pset_dxpl_mpio(h5dxlist, H5FD_MPIO_COLLECTIVE));
-
   // Write cells
   std::size_t connectSize = 8;
   logInfo(rank) << "Writing cells";
-  {
-    hsize_t sizes[2] = {globalSize[0], 4};
-    hid_t h5space = H5Screate_simple(2, sizes, 0L);
-    checkH5Err(h5space);
+  writeH5Data<unsigned long, 4>([&](auto& element, auto&& data) {
+    apf::NewArray<long> vn;
+    apf::getElementNumbers(vertexNum, element, vn);
 
-    hid_t connectType = H5T_STD_U64LE;
-    if (reduceInts) {
-      connectType = H5Tcopy(H5T_STD_U64LE);
-      std::size_t bits = ilog(globalSize[0]);
-      std::size_t unsignedSize = (bits + 7) / 8;
-      checkH5Err(connectType);
-      checkH5Err(H5Tset_size(connectType, unsignedSize));
-      checkH5Err(
-          H5Tcommit(h5file, "/connectType", connectType, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT));
+    for (int i = 0; i < 4; i++) {
+      *(data + i) = vn[i];
     }
-
-    hid_t connectFilter = H5P_DEFAULT;
-    if (applyFilters) {
-      connectFilter = checkH5Err(H5Pcreate(H5P_DATASET_CREATE));
-      hsize_t chunk[2] = {std::min(filterChunksize, sizes[0]), 4};
-      checkH5Err(H5Pset_chunk(connectFilter, 2, chunk));
-      if (filterEnable == 1) {
-        checkH5Err(H5Pset_scaleoffset(connectFilter, H5Z_SO_INT, H5Z_SO_INT_MINBITS_DEFAULT));
-      } else if (filterEnable < 11) {
-        int deflateStrength = filterEnable - 1;
-        checkH5Err(H5Pset_deflate(connectFilter, deflateStrength));
-      }
-    }
-
-    hid_t h5connect = H5Dcreate(h5file, "/connect", connectType, h5space, H5P_DEFAULT,
-                                connectFilter, H5P_DEFAULT);
-    checkH5Err(h5connect);
-
-    hsize_t start[2] = {offsets[0], 0};
-    hsize_t count[2] = {localSize[0], 4};
-    checkH5Err(H5Sselect_hyperslab(h5space, H5S_SELECT_SET, start, 0L, count, 0L));
-
-    sizes[0] = localSize[0];
-    hid_t h5memspace = H5Screate_simple(2, sizes, 0L);
-    checkH5Err(h5memspace);
-
-    std::vector<unsigned long> connect(localSize[0] * 4);
-    it = mesh->begin(3);
-    std::size_t index = 0;
-    while (apf::MeshEntity* element = mesh->iterate(it)) {
-      apf::NewArray<long> vn;
-      apf::getElementNumbers(vertexNum, element, vn);
-
-      for (int i = 0; i < 4; i++) {
-        connect[index * 4 + i] = vn[i];
-      }
-
-      index++;
-    }
-    mesh->end(it);
-
-    checkH5Err(
-        H5Dwrite(h5connect, H5T_NATIVE_ULONG, h5memspace, h5space, h5dxlist, connect.data()));
-
-    if (applyFilters) {
-      checkH5Err(H5Pclose(connectFilter));
-    }
-    if (reduceInts) {
-      checkH5Err(H5Tclose(connectType));
-    }
-    checkH5Err(H5Sclose(h5space));
-    checkH5Err(H5Sclose(h5memspace));
-    checkH5Err(H5Dclose(h5connect));
-  }
+    return true;
+  }, h5file, "connect", mesh, 3, H5T_NATIVE_ULONG, H5T_STD_U64LE, chunksize, localSize[0], globalSize[0], reduceInts, filterEnable, filterChunksize);
 
   // Vertices
   logInfo(rank) << "Writing vertices";
-  {
-    hsize_t sizes[2] = {0, 0};
-    hsize_t start[2] = {0, 0};
-    hsize_t count[2] = {0, 0};
-    sizes[0] = globalSize[1];
-    sizes[1] = 3;
-    hid_t h5space = H5Screate_simple(2, sizes, 0L);
-    checkH5Err(h5space);
-
-    hid_t geometryFilter = H5P_DEFAULT;
-    if (applyFilters && filterEnable > 1) {
-      geometryFilter = checkH5Err(H5Pcreate(H5P_DATASET_CREATE));
-      hsize_t chunk[2] = {std::min(filterChunksize, sizes[0]), 3};
-      checkH5Err(H5Pset_chunk(geometryFilter, 2, chunk));
-      if (filterEnable == 1) {
-        // float compression disabled at the moment (would be lossy)
-        // checkH5Err(H5Pset_scaleoffset(geometryFilter, H5Z_SO_FLOAT_DSCALE,
-        // H5Z_SO_INT_MINBITS_DEFAULT));
-      } else if (filterEnable < 11) {
-        int deflateStrength = filterEnable - 1;
-        checkH5Err(H5Pset_deflate(geometryFilter, deflateStrength));
-      }
+  writeH5Data<double, 3>([&](auto& element, auto&& data) {
+    if (!sharing->isOwned(element)) {
+      return false;
     }
 
-    hid_t h5geometry = H5Dcreate(h5file, "/geometry", H5T_IEEE_F64LE, h5space, H5P_DEFAULT,
-                                 geometryFilter, H5P_DEFAULT);
-    checkH5Err(h5geometry);
+    /*long gid = apf::getNumber(vertexNum, apf::Node(element, 0));
 
-    start[0] = offsets[1];
-    count[0] = localSize[1];
-    count[1] = 3;
-    checkH5Err(H5Sselect_hyperslab(h5space, H5S_SELECT_SET, start, 0L, count, 0L));
+    if (gid != static_cast<long>(offsets[1] + index)) {
+      logError() << "Global vertex numbering is incorrect";
+    }*/
 
-    sizes[0] = localSize[1];
-    hid_t h5memspace = H5Screate_simple(2, sizes, 0L);
-    checkH5Err(h5memspace);
+    apf::Vector3 point;
+    mesh->getPoint(element, 0, point);
+    double geometry[3];
+    point.toArray(geometry);
 
-    std::vector<double> geometry(localSize[1] * 3);
-    it = mesh->begin(0);
-    std::size_t index = 0;
-    while (apf::MeshEntity* element = mesh->iterate(it)) {
-      if (!sharing->isOwned(element)) {
-        continue;
-      }
+    *(data + 0) = geometry[0];
+    *(data + 1) = geometry[1];
+    *(data + 2) = geometry[2];
 
-      long gid = apf::getNumber(vertexNum, apf::Node(element, 0));
-
-      if (gid != static_cast<long>(offsets[1] + index)) {
-        logError() << "Global vertex numbering is incorrect";
-      }
-
-      apf::Vector3 point;
-      mesh->getPoint(element, 0, point);
-      point.toArray(&geometry[index * 3]);
-
-      index++;
-    }
-    mesh->end(it);
-
-    checkH5Err(
-        H5Dwrite(h5geometry, H5T_NATIVE_DOUBLE, h5memspace, h5space, h5dxlist, geometry.data()));
-
-    if (applyFilters && filterEnable > 1) {
-      checkH5Err(H5Pclose(geometryFilter));
-    }
-
-    checkH5Err(H5Sclose(h5space));
-    checkH5Err(H5Sclose(h5memspace));
-    checkH5Err(H5Dclose(h5geometry));
-  }
+    return true;
+  }, h5file, "geometry", mesh, 0, H5T_IEEE_F64LE, H5T_IEEE_F64LE, chunksize, localSize[1], globalSize[1], reduceInts, filterEnable, filterChunksize);
 
   // Group information
   apf::MeshTag* groupTag = mesh->findTag("group");
+
   std::size_t groupSize = 4;
   if (groupTag) {
     logInfo(rank) << "Writing group information";
-
-    hsize_t sizes[1] = {0};
-    hsize_t start[1] = {0};
-    hsize_t count[1] = {0};
-
-    sizes[0] = globalSize[0];
-    hid_t h5space = H5Screate_simple(1, sizes, 0L);
-    checkH5Err(h5space);
-
-    std::vector<int> group(localSize[0]);
-    it = mesh->begin(3);
-    std::size_t index = 0;
-    while (apf::MeshEntity* element = mesh->iterate(it)) {
-      assert(mesh->hasTag(element, groupTag));
-
-      mesh->getIntTag(element, groupTag, &group[index]);
-      index++;
-    }
-    mesh->end(it);
-
-    hid_t groupType = H5T_STD_I32LE;
-    if (reduceInts) {
-      groupType = H5Tcopy(H5T_STD_I32LE);
-      uint32_t minvalue = std::max(-(*std::min_element(group.begin(), group.end()) + 1), 0);
-      uint32_t maxvalue = *std::max_element(group.begin(), group.end());
-      uint32_t totalmax = std::max(minvalue, maxvalue);
-      MPI_Allreduce(MPI_IN_PLACE, &totalmax, 1, MPI_UNSIGNED, MPI_MAX, MPI_COMM_WORLD);
-      std::size_t bits = ilog(totalmax);
-      std::size_t signedSize = (bits + 7 + 1) / 8;
-      checkH5Err(groupType);
-      checkH5Err(H5Tset_size(groupType, signedSize));
-      checkH5Err(H5Tcommit(h5file, "/groupType", groupType, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT));
-    }
-
-    hid_t groupFilter = H5P_DEFAULT;
-    if (applyFilters) {
-      groupFilter = checkH5Err(H5Pcreate(H5P_DATASET_CREATE));
-      hsize_t chunk[1] = {std::min(filterChunksize, sizes[0])};
-      checkH5Err(H5Pset_chunk(groupFilter, 1, chunk));
-      if (filterEnable == 1) {
-        checkH5Err(H5Pset_scaleoffset(groupFilter, H5Z_SO_INT, H5Z_SO_INT_MINBITS_DEFAULT));
-      } else if (filterEnable < 11) {
-        int deflateStrength = filterEnable - 1;
-        checkH5Err(H5Pset_deflate(groupFilter, deflateStrength));
-      }
-    }
-
-    hid_t h5group =
-        H5Dcreate(h5file, "/group", H5T_STD_I32LE, h5space, H5P_DEFAULT, groupFilter, H5P_DEFAULT);
-    checkH5Err(h5group);
-
-    start[0] = offsets[0];
-    count[0] = localSize[0];
-    checkH5Err(H5Sselect_hyperslab(h5space, H5S_SELECT_SET, start, 0L, count, 0L));
-
-    sizes[0] = localSize[0];
-    hid_t h5memspace = H5Screate_simple(1, sizes, 0L);
-    checkH5Err(h5memspace);
-
-    checkH5Err(H5Dwrite(h5group, H5T_NATIVE_INT, h5memspace, h5space, h5dxlist, group.data()));
-
-    if (applyFilters) {
-      checkH5Err(H5Pclose(groupFilter));
-    }
-    if (reduceInts) {
-      checkH5Err(H5Tclose(groupType));
-    }
-    checkH5Err(H5Sclose(h5space));
-    checkH5Err(H5Sclose(h5memspace));
-    checkH5Err(H5Dclose(h5group));
+    writeH5Data<int, NoSecondDim>([&](auto& element, auto&& data) {
+      int group;
+      mesh->getIntTag(element, groupTag, &group);
+      *data = group;
+      return true;
+    }, h5file, "group", mesh, 3, H5T_NATIVE_INT, H5T_STD_I32LE, chunksize, localSize[0], globalSize[0], reduceInts, filterEnable, filterChunksize);
   } else {
     logInfo() << "No group information found in mesh";
   }
 
   // Write boundary condition
   logInfo(rank) << "Writing boundary condition";
-  {
-    apf::MeshTag* boundaryTag = mesh->findTag("boundary condition");
-    assert(boundaryTag);
+  apf::MeshTag* boundaryTag = mesh->findTag("boundary condition");
+  assert(boundaryTag);
+  writeH5Data<int, NoSecondDim>([&](auto& element, auto&& data) {
+    int boundary = 0;
+    apf::Downward faces;
+    mesh->getDownward(element, 2, faces);
 
-    hsize_t sizes[1] = {0};
-    hsize_t start[1] = {0};
-    hsize_t count[1] = {0};
-    sizes[0] = globalSize[0];
-    hid_t h5space = H5Screate_simple(1, sizes, 0L);
-    checkH5Err(h5space);
+    for (int i = 0; i < 4; i++) {
+      if (mesh->hasTag(faces[i], boundaryTag)) {
+        int b;
+        mesh->getIntTag(faces[i], boundaryTag, &b);
 
-    hid_t boundaryFilter = H5P_DEFAULT;
-    if (applyFilters) {
-      boundaryFilter = checkH5Err(H5Pcreate(H5P_DATASET_CREATE));
-      hsize_t chunk[1] = {std::min(filterChunksize, sizes[0])};
-      checkH5Err(H5Pset_chunk(boundaryFilter, 1, chunk));
-      if (filterEnable == 1) {
-        checkH5Err(H5Pset_scaleoffset(boundaryFilter, H5Z_SO_INT, H5Z_SO_INT_MINBITS_DEFAULT));
-      } else if (filterEnable < 11) {
-        int deflateStrength = filterEnable - 1;
-        checkH5Err(H5Pset_deflate(boundaryFilter, deflateStrength));
-      }
-    }
-
-    hid_t h5boundary = H5Dcreate(h5file, "/boundary", H5T_STD_I32LE, h5space, H5P_DEFAULT,
-                                 boundaryFilter, H5P_DEFAULT);
-    checkH5Err(h5boundary);
-
-    start[0] = offsets[0];
-    count[0] = localSize[0];
-    checkH5Err(H5Sselect_hyperslab(h5space, H5S_SELECT_SET, start, 0L, count, 0L));
-
-    sizes[0] = localSize[0];
-    hid_t h5memspace = H5Screate_simple(1, sizes, 0L);
-    checkH5Err(h5memspace);
-
-    std::vector<int> boundary(localSize[0]);
-
-    it = mesh->begin(3);
-    std::size_t index = 0;
-    while (apf::MeshEntity* element = mesh->iterate(it)) {
-      apf::Downward faces;
-      mesh->getDownward(element, 2, faces);
-
-      for (int i = 0; i < 4; i++) {
-        if (mesh->hasTag(faces[i], boundaryTag)) {
-          int b;
-          mesh->getIntTag(faces[i], boundaryTag, &b);
-
-          if (b <= 0 || b > std::numeric_limits<unsigned char>::max())
-            logError() << "Cannot handle boundary condition" << b;
-
-          boundary[index] += b << (i * 8);
+        if (b <= 0 || b > std::numeric_limits<unsigned char>::max()) {
+          logError() << "Cannot handle boundary condition" << b;
         }
+
+        boundary |= b << (i * 8);
       }
-
-      index++;
     }
-    mesh->end(it);
 
-    checkH5Err(
-        H5Dwrite(h5boundary, H5T_NATIVE_INT, h5memspace, h5space, h5dxlist, boundary.data()));
-
-    if (boundaryFilter) {
-      checkH5Err(H5Pclose(boundaryFilter));
-    }
-    checkH5Err(H5Sclose(h5space));
-    checkH5Err(H5Sclose(h5memspace));
-    checkH5Err(H5Dclose(h5boundary));
-  }
-
-  checkH5Err(H5Pclose(h5dxlist));
+    *data = boundary;
+    return true;
+  }, h5file, "boundary", mesh, 3, H5T_NATIVE_INT, H5T_STD_I32LE, chunksize, localSize[0], globalSize[0], reduceInts, filterEnable, filterChunksize);
 
   // Writing XDMF file
   if (rank == 0) {
