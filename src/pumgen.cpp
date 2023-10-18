@@ -579,9 +579,9 @@ int main(int argc, char* argv[]) {
          << globalSize[0] << "\">" << basename << ":/group</DataItem>" << std::endl
          << "   </Attribute>" << std::endl
          << "   <Attribute Name=\"boundary\" Center=\"Cell\">" << std::endl
-         << "    <DataItem NumberType=\"Int\" Precision=\"4\" Format=\"HDF\" "
-            "Dimensions=\""
-         << globalSize[0] << "\">" << basename << ":/boundary</DataItem>" << std::endl
+         << "    <DataItem NumberType=\"Int\" Precision=\"" << (boundaryType == 0 ? "4" : "8")
+         << "\" Format=\"HDF\" Dimensions=\"" << globalSize[0] << "\">" << basename
+         << ":/boundary</DataItem>" << std::endl
          << "   </Attribute>" << std::endl
          << "  </Grid>" << std::endl
          << " </Domain>" << std::endl
