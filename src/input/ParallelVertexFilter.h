@@ -194,8 +194,8 @@ public:
     // Allocate buffer for the vertices and exchange them
     std::vector<double> sortVertices(3 * numSortVertices);
 
-    std::vector<int> sDispls(m_numProcs);
-    std::vector<int> rDispls(m_numProcs);
+    std::vector<std::size_t> sDispls(m_numProcs);
+    std::vector<std::size_t> rDispls(m_numProcs);
     sDispls[0] = 0;
     rDispls[0] = 0;
     for (int i = 1; i < m_numProcs; i++) {

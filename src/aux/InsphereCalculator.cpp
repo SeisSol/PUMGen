@@ -43,8 +43,8 @@ std::vector<double> calculateInsphere(const std::vector<std::size_t>& connectivi
 
   MPI_Alltoall(outrequests.data(), 1, MPI_INT, inrequests.data(), 1, MPI_INT, comm);
 
-  std::vector<int> outdisp(commsize + 1);
-  std::vector<int> indisp(commsize + 1);
+  std::vector<std::size_t> outdisp(commsize + 1);
+  std::vector<std::size_t> indisp(commsize + 1);
   for (std::size_t i = 1; i < commsize + 1; ++i) {
     outdisp[i] = outdisp[i - 1] + outrequests[i - 1];
     indisp[i] = indisp[i - 1] + inrequests[i - 1];
