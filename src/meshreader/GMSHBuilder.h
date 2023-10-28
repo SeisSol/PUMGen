@@ -36,7 +36,7 @@ template <std::size_t D> class GMSHBuilder : public tndm::GMSHMeshBuilder {
   std::vector<int> bcs;
 
   void setNumVertices(std::size_t numVertices) { vertices.resize(numVertices); }
-  void setVertex(long id, std::array<double, 3> const& x) {
+  void setVertex(long id, std::array<double, D> const& x) {
     for (std::size_t i = 0; i < D; ++i) {
       vertices[id][i] = x[i];
     }

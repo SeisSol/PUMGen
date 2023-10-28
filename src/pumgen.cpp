@@ -300,19 +300,19 @@ int main(int argc, char* argv[]) {
   switch (args.getArgument<int>("source", 0)) {
   case 0:
     logInfo(rank) << "Using Gambit mesh";
-    // meshInput = new SerialMeshFile<puml::ParallelGambitReader>(inputFile);
+    meshInput = new SerialMeshFile<puml::ParallelGambitReader>(inputFile);
     break;
   case 1:
     logInfo(rank) << "Using Fidap mesh";
-    // meshInput = new SerialMeshFile<ParallelFidapReader>(inputFile);
+    meshInput = new SerialMeshFile<ParallelFidapReader>(inputFile);
     break;
   case 2:
     logInfo(rank) << "Using GMSH mesh format 2 (msh2) mesh";
-    // meshInput = new SerialMeshFile<puml::ParallelGMSHReader<tndm::GMSH2Parser>>(inputFile);
+    meshInput = new SerialMeshFile<puml::ParallelGMSHReader<tndm::GMSH2Parser>>(inputFile);
     break;
   case 3:
     logInfo(rank) << "Using GMSH mesh format 4 (msh4) mesh";
-    // meshInput = new SerialMeshFile<puml::ParallelGMSHReader<puml::GMSH4Parser>>(inputFile);
+    meshInput = new SerialMeshFile<puml::ParallelGMSHReader<puml::GMSH4Parser>>(inputFile);
     break;
   case 4:
 #ifdef USE_NETCDF
