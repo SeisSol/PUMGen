@@ -49,6 +49,8 @@
 #include "meshreader/ParallelGambitReader.h"
 #include "third_party/GMSH2Parser.h"
 
+#include "aux/InsphereCalculator.h"
+
 template <typename TT> static TT _checkH5Err(TT&& status, const char* file, int line) {
   if (status < 0) {
     logError() << utils::nospace << "An HDF5 error occurred (" << file << ": " << line << ")";
@@ -78,7 +80,7 @@ template <typename F> static void iterate(apf::Mesh* mesh, int dim, F&& function
 constexpr std::size_t NoSecondDim = 0;
 
 template <typename T, std::size_t SecondDim, typename F>
-static void writeH5Data(F&& handler, hid_t h5file, const std::string& name, apf::Mesh* mesh,
+static void writeH5Data(const F& handler, hid_t h5file, const std::string& name, void* mesh,
                         int meshdim, hid_t h5memtype, hid_t h5outtype, std::size_t chunk,
                         std::size_t localSize, std::size_t globalSize, bool reduceInts,
                         int filterEnable, std::size_t filterChunksize) {
@@ -142,8 +144,6 @@ static void writeH5Data(F&& handler, hid_t h5file, const std::string& name, apf:
   std::size_t written = 0;
   std::size_t index = 0;
 
-  apf::MeshIterator* it = mesh->begin(meshdim);
-
   hsize_t nullstart[2] = {0, 0};
 
   for (std::size_t i = 0; i < rounds; ++i) {
@@ -151,15 +151,7 @@ static void writeH5Data(F&& handler, hid_t h5file, const std::string& name, apf:
     start[0] = offset + written;
     count[0] = std::min(localSize - written, bufferSize);
 
-    while (apf::MeshEntity* element = mesh->iterate(it)) {
-      if (handler(element, data.begin() + index * SecondSize)) {
-        ++index;
-      }
-
-      if (index >= count[0]) {
-        break;
-      }
-    }
+    std::copy_n(handler.begin() + written * SecondSize, count[0] * SecondSize, data.begin());
 
     checkH5Err(H5Sselect_hyperslab(h5memspace, H5S_SELECT_SET, nullstart, nullptr, count, nullptr));
 
@@ -169,8 +161,6 @@ static void writeH5Data(F&& handler, hid_t h5file, const std::string& name, apf:
 
     written += count[0];
   }
-
-  mesh->end(it);
 
   if (filterEnable > 0) {
     checkH5Err(H5Pclose(h5filter));
@@ -306,24 +296,23 @@ int main(int argc, char* argv[]) {
   }
 
   // Create/read the mesh
-  MeshInput* meshInput = 0L;
-  apf::Mesh2* mesh = 0L;
+  MeshData* meshInput = nullptr;
   switch (args.getArgument<int>("source", 0)) {
   case 0:
     logInfo(rank) << "Using Gambit mesh";
-    meshInput = new SerialMeshFile<puml::ParallelGambitReader>(inputFile);
+    // meshInput = new SerialMeshFile<puml::ParallelGambitReader>(inputFile);
     break;
   case 1:
     logInfo(rank) << "Using Fidap mesh";
-    meshInput = new SerialMeshFile<ParallelFidapReader>(inputFile);
+    // meshInput = new SerialMeshFile<ParallelFidapReader>(inputFile);
     break;
   case 2:
     logInfo(rank) << "Using GMSH mesh format 2 (msh2) mesh";
-    meshInput = new SerialMeshFile<puml::ParallelGMSHReader<tndm::GMSH2Parser>>(inputFile);
+    // meshInput = new SerialMeshFile<puml::ParallelGMSHReader<tndm::GMSH2Parser>>(inputFile);
     break;
   case 3:
     logInfo(rank) << "Using GMSH mesh format 4 (msh4) mesh";
-    meshInput = new SerialMeshFile<puml::ParallelGMSHReader<puml::GMSH4Parser>>(inputFile);
+    // meshInput = new SerialMeshFile<puml::ParallelGMSHReader<puml::GMSH4Parser>>(inputFile);
     break;
   case 4:
 #ifdef USE_NETCDF
@@ -335,7 +324,7 @@ int main(int argc, char* argv[]) {
     break;
   case 5:
     logInfo(rank) << "Using APF native format";
-    meshInput = new ApfNative(inputFile, args.getArgument<const char*>("model", 0L));
+    // meshInput = new ApfNative(inputFile, args.getArgument<const char*>("model", 0L));
     break;
   case 6:
 #ifdef USE_SIMMOD
@@ -355,67 +344,24 @@ int main(int argc, char* argv[]) {
     logError() << "Unknown source";
   }
 
-  mesh = meshInput->getMesh();
-
   logInfo(rank) << "Parsed mesh successfully, writing output...";
 
-  // Check mesh
-  if (alignMdsMatches(mesh))
-    logWarning() << "Fixed misaligned matches";
-  mesh->verify();
-
-  // Dump mesh for later usage?
-  const char* dumpFile = args.getArgument<const char*>("dump", 0L);
-  if (dumpFile) {
-    logInfo(PCU_Comm_Self()) << "Writing native APF mesh";
-    mesh->writeNative(dumpFile);
-
-    const char* modelFile = args.getArgument<const char*>("model", 0L);
-    if (modelFile)
-      gmi_write_dmg(mesh->getModel(), modelFile);
-  }
-
-  // Dump VTK mesh
-  const char* vtkPrefix = args.getArgument<const char*>("vtk", 0L);
-  if (vtkPrefix) {
-    logInfo(PCU_Comm_Self()) << "Writing VTK mesh";
-    apf::writeVtkFiles(vtkPrefix, mesh);
-  }
-
-  apf::Sharing* sharing = apf::getSharing(mesh);
-
-  // oriented at the apf::countOwned method ... But with size_t
-  auto countOwnedLong = [sharing, mesh](int dim) {
-    std::size_t counter = 0;
-
-    apf::MeshIterator* it = mesh->begin(dim);
-    while (apf::MeshEntity* element = mesh->iterate(it)) {
-      if (sharing->isOwned(element)) {
-        ++counter;
-      }
-    }
-    mesh->end(it);
-
-    return counter;
-  };
+  void* mesh = nullptr;
 
   // TODO(David): replace by apf::countOwned again once extended
 
   // Get local/global size
-  std::size_t localSize[2] = {countOwnedLong(3), countOwnedLong(0)};
+  std::size_t localSize[2] = {meshInput->cellCount(), meshInput->vertexCount()};
   std::size_t globalSize[2] = {localSize[0], localSize[1]};
   MPI_Allreduce(MPI_IN_PLACE, globalSize, 2, tndm::mpi_type_t<std::size_t>(), MPI_SUM,
                 MPI_COMM_WORLD);
 
-  logInfo(rank) << "Mesh size:" << globalSize[0];
+  logInfo(rank) << "Total cell count:" << globalSize[0];
+  logInfo(rank) << "Total vertex count:" << globalSize[1];
 
-  // Compute min insphere radius
-  double min = std::numeric_limits<double>::max();
-  apf::MeshIterator* it = mesh->begin(3);
-  while (apf::MeshEntity* element = mesh->iterate(it)) {
-    min = std::min(min, ma::getInsphere(mesh, element));
-  }
-  mesh->end(it);
+  auto inspheres =
+      calculateInsphere(meshInput->connectivity(), meshInput->geometry(), MPI_COMM_WORLD);
+  double min = *std::min_element(inspheres.begin(), inspheres.end());
   MPI_Reduce((rank == 0 ? MPI_IN_PLACE : &min), &min, 1, MPI_DOUBLE, MPI_MIN, 0, MPI_COMM_WORLD);
   logInfo(rank) << "Minimum insphere found:" << min;
 
@@ -424,10 +370,6 @@ int main(int argc, char* argv[]) {
   MPI_Scan(MPI_IN_PLACE, offsets, 2, tndm::mpi_type_t<std::size_t>(), MPI_SUM, MPI_COMM_WORLD);
   offsets[0] -= localSize[0];
   offsets[1] -= localSize[1];
-
-  // Create numbering for the vertices/elements
-  apf::GlobalNumbering* vertexNum = apf::makeGlobal(apf::numberOwnedNodes(mesh, "vertices"));
-  apf::synchronize(vertexNum);
 
   // Create the H5 file
   hid_t h5falist = H5Pcreate(H5P_FILE_ACCESS);
@@ -445,99 +387,35 @@ int main(int argc, char* argv[]) {
   // Write cells
   std::size_t connectSize = 8;
   logInfo(rank) << "Writing cells";
-  writeH5Data<unsigned long, 4>(
-      [&](auto& element, auto&& data) {
-        apf::NewArray<long> vn;
-        apf::getElementNumbers(vertexNum, element, vn);
-
-        for (int i = 0; i < 4; i++) {
-          *(data + i) = vn[i];
-        }
-        return true;
-      },
-      h5file, "connect", mesh, 3, H5T_NATIVE_ULONG, H5T_STD_U64LE, chunksize, localSize[0],
-      globalSize[0], reduceInts, filterEnable, filterChunksize);
+  writeH5Data<unsigned long, 4>(meshInput->connectivity(), h5file, "connect", mesh, 3,
+                                H5T_NATIVE_ULONG, H5T_STD_U64LE, chunksize, localSize[0],
+                                globalSize[0], reduceInts, filterEnable, filterChunksize);
 
   // Vertices
   logInfo(rank) << "Writing vertices";
-  writeH5Data<double, 3>(
-      [&](auto& element, auto&& data) {
-        if (!sharing->isOwned(element)) {
-          return false;
-        }
-
-        /*long gid = apf::getNumber(vertexNum, apf::Node(element, 0));
-
-        if (gid != static_cast<long>(offsets[1] + index)) {
-          logError() << "Global vertex numbering is incorrect";
-        }*/
-
-        apf::Vector3 point;
-        mesh->getPoint(element, 0, point);
-        double geometry[3];
-        point.toArray(geometry);
-
-        *(data + 0) = geometry[0];
-        *(data + 1) = geometry[1];
-        *(data + 2) = geometry[2];
-
-        return true;
-      },
-      h5file, "geometry", mesh, 0, H5T_IEEE_F64LE, H5T_IEEE_F64LE, chunksize, localSize[1],
-      globalSize[1], reduceInts, filterEnable, filterChunksize);
+  writeH5Data<double, 3>(meshInput->geometry(), h5file, "geometry", mesh, 0, H5T_IEEE_F64LE,
+                         H5T_IEEE_F64LE, chunksize, localSize[1], globalSize[1], reduceInts,
+                         filterEnable, filterChunksize);
 
   // Group information
-  apf::MeshTag* groupTag = mesh->findTag("group");
 
   std::size_t groupSize = 4;
-  if (groupTag) {
+  if (true) {
     logInfo(rank) << "Writing group information";
-    writeH5Data<int, NoSecondDim>(
-        [&](auto& element, auto&& data) {
-          int group;
-          mesh->getIntTag(element, groupTag, &group);
-          *data = group;
-          return true;
-        },
-        h5file, "group", mesh, 3, H5T_NATIVE_INT, H5T_STD_I32LE, chunksize, localSize[0],
-        globalSize[0], reduceInts, filterEnable, filterChunksize);
+    writeH5Data<int, NoSecondDim>(meshInput->group(), h5file, "group", mesh, 3, H5T_NATIVE_INT,
+                                  H5T_STD_I32LE, chunksize, localSize[0], globalSize[0], reduceInts,
+                                  filterEnable, filterChunksize);
   } else {
     logInfo() << "No group information found in mesh";
   }
 
   // Write boundary condition
   logInfo(rank) << "Writing boundary condition";
-  apf::MeshTag* boundaryTag = mesh->findTag("boundary condition");
-  assert(boundaryTag);
   auto i32limit = std::numeric_limits<unsigned char>::max();
   auto i64limit = std::numeric_limits<unsigned short>::max();
-  writeH5Data<long, NoSecondDim>(
-      [&](auto& element, auto&& data) {
-        long boundary = 0;
-        apf::Downward faces;
-        mesh->getDownward(element, 2, faces);
-
-        for (int i = 0; i < 4; i++) {
-          if (mesh->hasTag(faces[i], boundaryTag)) {
-            int b;
-            mesh->getIntTag(faces[i], boundaryTag, &b);
-
-            if (b <= 0 || (b > i32limit && boundaryType == 0) ||
-                (b > i64limit && boundaryType == 1)) {
-              logError() << "Cannot handle boundary condition" << b;
-            }
-
-            // NOTE: this fails for boundary values per face larger than 2**31 - 1 due to sign
-            // extension
-            boundary |= static_cast<long>(b) << (i * faceOffset);
-          }
-        }
-
-        *data = boundary;
-        return true;
-      },
-      h5file, "boundary", mesh, 3, H5T_NATIVE_LONG, boundaryDatatype, chunksize, localSize[0],
-      globalSize[0], reduceInts, filterEnable, filterChunksize);
+  writeH5Data<long, NoSecondDim>(meshInput->boundary(), h5file, "boundary", mesh, 3,
+                                 H5T_NATIVE_LONG, boundaryDatatype, chunksize, localSize[0],
+                                 globalSize[0], reduceInts, filterEnable, filterChunksize);
 
   // Writing XDMF file
   if (rank == 0) {
@@ -590,8 +468,6 @@ int main(int argc, char* argv[]) {
 
   checkH5Err(H5Fclose(h5file));
 
-  delete sharing;
-  delete mesh;
   delete meshInput;
 
   logInfo(rank) << "Finished successfully";
