@@ -38,6 +38,8 @@ add_executable(pumgen
   ${CMAKE_CURRENT_SOURCE_DIR}/src/third_party/GMSHLexer.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/third_party/GMSHParser.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/third_party/GMSH2Parser.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/aux/InsphereCalculator.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/aux/MPIConvenience.cpp
   )
 
 target_include_directories(pumgen PUBLIC src

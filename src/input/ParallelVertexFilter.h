@@ -30,6 +30,8 @@
 
 #include "third_party/MPITraits.h"
 
+#include "aux/MPIConvenience.h"
+
 /**
  * Filters duplicate vertices in parallel
  */
@@ -200,8 +202,8 @@ public:
       sDispls[i] = sDispls[i - 1] + bucketSize[i - 1];
       rDispls[i] = rDispls[i - 1] + recvSize[i - 1];
     }
-    MPI_Alltoallv(sendVertices.data(), bucketSize.data(), sDispls.data(), vertexType,
-                  sortVertices.data(), recvSize.data(), rDispls.data(), vertexType, m_comm);
+    sparseAlltoallv(sendVertices.data(), bucketSize.data(), sDispls.data(), vertexType,
+                    sortVertices.data(), recvSize.data(), rDispls.data(), vertexType, m_comm);
 
     // Chop the last 4 bits to avoid numerical errors
     roundVertices.resize(numSortVertices * 3);
@@ -253,9 +255,9 @@ public:
 
     // Send result back
     std::vector<std::size_t> globalIds(numVertices);
-    MPI_Alltoallv(gids.data(), recvSize.data(), rDispls.data(), tndm::mpi_type_t<std::size_t>(),
-                  globalIds.data(), bucketSize.data(), sDispls.data(),
-                  tndm::mpi_type_t<std::size_t>(), m_comm);
+    sparseAlltoallv(gids.data(), recvSize.data(), rDispls.data(), tndm::mpi_type_t<std::size_t>(),
+                    globalIds.data(), bucketSize.data(), sDispls.data(),
+                    tndm::mpi_type_t<std::size_t>(), m_comm);
 
     // Assign the global ids to the correct vertices
     m_globalIds.resize(numVertices);
