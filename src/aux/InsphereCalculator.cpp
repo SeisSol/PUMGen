@@ -5,6 +5,7 @@
 #include <cmath>
 #include <iterator>
 #include <mpi.h>
+#include <unordered_map>
 
 #include "MPIConvenience.h"
 
@@ -35,10 +36,19 @@ std::vector<double> calculateInsphere(const std::vector<std::size_t>& connectivi
     vertexDist[i + 1] += vertexDist[i];
   }
 
+  std::vector<std::unordered_map<std::size_t, std::size_t>> outidxmap(commsize);
+
   for (const auto& vertex : connectivity) {
     auto itPosition = std::upper_bound(vertexDist.begin(), vertexDist.end(), vertex);
     auto position = std::distance(vertexDist.begin(), itPosition) - 1;
-    ++outrequests[position];
+    auto localVertex = vertex - vertexDist[position];
+
+    // only transfer each vertex coordinate once, and only if it's not already on the same rank
+    if (position != commrank &&
+        outidxmap[position].find(localVertex) == outidxmap[position].end()) {
+      outidxmap[position][localVertex] = outrequests[position];
+      ++outrequests[position];
+    }
   }
 
   MPI_Alltoall(outrequests.data(), 1, MPI_INT, inrequests.data(), 1, MPI_INT, comm);
@@ -53,16 +63,14 @@ std::vector<double> calculateInsphere(const std::vector<std::size_t>& connectivi
   std::vector<std::size_t> inidx(indisp[commsize]);
 
   {
-    std::vector<std::size_t> outidx(connectivity.size());
+    std::vector<std::size_t> outidx(outdisp[commsize]);
 
     std::vector<std::size_t> counter(commsize);
 
-    for (std::size_t i = 0; i < connectivity.size(); ++i) {
-      auto vertex = connectivity[i];
-      auto itPosition = std::upper_bound(vertexDist.begin(), vertexDist.end(), vertex);
-      auto position = std::distance(vertexDist.begin(), itPosition) - 1;
-      outidx[counter[position] + outdisp[position]] = vertex - vertexDist[position];
-      ++counter[position];
+    for (std::size_t i = 0; i < commsize; ++i) {
+      for (const auto& [localVertex, j] : outidxmap[i]) {
+        outidx[j + outdisp[i]] = localVertex;
+      }
     }
 
     // transfer indices
@@ -72,7 +80,6 @@ std::vector<double> calculateInsphere(const std::vector<std::size_t>& connectivi
                     tndm::mpi_type_t<std::size_t>(), comm);
   }
 
-  // this is a bit inefficient, since we don't look for duplicates... TODO: maybe improve
   std::vector<double> outvertices(3 * connectivity.size());
 
   {
@@ -94,29 +101,38 @@ std::vector<double> calculateInsphere(const std::vector<std::size_t>& connectivi
   std::vector<double> inspheres(connectivity.size() / 4);
 
   for (std::size_t i = 0; i < connectivity.size() / 4; ++i) {
-    std::array<std::size_t, 4> vertexIds{0, 0, 0, 0};
+    std::array<std::array<double, 3>, 4> vertices;
     for (int j = 0; j < 4; ++j) {
       auto vertex = connectivity[i * 4 + j];
       auto itPosition = std::upper_bound(vertexDist.begin(), vertexDist.end(), vertex);
       auto position = std::distance(vertexDist.begin(), itPosition) - 1;
-      vertexIds[j] = counter[position] + outdisp[position];
-      ++counter[position];
+      auto localVertex = vertex - vertexDist[position];
+      if (position == commrank) {
+        vertices[j][0] = geometry[localVertex * 3 + 0];
+        vertices[j][1] = geometry[localVertex * 3 + 1];
+        vertices[j][2] = geometry[localVertex * 3 + 2];
+      } else {
+        auto transferidx = outidxmap[position][localVertex] + outdisp[position];
+        vertices[j][0] = outvertices[transferidx * 3 + 0];
+        vertices[j][1] = outvertices[transferidx * 3 + 1];
+        vertices[j][2] = outvertices[transferidx * 3 + 2];
+      }
     }
-    double a11 = outvertices[3 * vertexIds[1] + 0] - outvertices[3 * vertexIds[0] + 0];
-    double a12 = outvertices[3 * vertexIds[1] + 1] - outvertices[3 * vertexIds[0] + 1];
-    double a13 = outvertices[3 * vertexIds[1] + 2] - outvertices[3 * vertexIds[0] + 2];
-    double a21 = outvertices[3 * vertexIds[2] + 0] - outvertices[3 * vertexIds[0] + 0];
-    double a22 = outvertices[3 * vertexIds[2] + 1] - outvertices[3 * vertexIds[0] + 1];
-    double a23 = outvertices[3 * vertexIds[2] + 2] - outvertices[3 * vertexIds[0] + 2];
-    double a31 = outvertices[3 * vertexIds[3] + 0] - outvertices[3 * vertexIds[0] + 0];
-    double a32 = outvertices[3 * vertexIds[3] + 1] - outvertices[3 * vertexIds[0] + 1];
-    double a33 = outvertices[3 * vertexIds[3] + 2] - outvertices[3 * vertexIds[0] + 2];
-    double b11 = outvertices[3 * vertexIds[2] + 0] - outvertices[3 * vertexIds[1] + 0];
-    double b12 = outvertices[3 * vertexIds[2] + 1] - outvertices[3 * vertexIds[1] + 1];
-    double b13 = outvertices[3 * vertexIds[2] + 2] - outvertices[3 * vertexIds[1] + 2];
-    double b21 = outvertices[3 * vertexIds[3] + 0] - outvertices[3 * vertexIds[1] + 0];
-    double b22 = outvertices[3 * vertexIds[3] + 1] - outvertices[3 * vertexIds[1] + 1];
-    double b23 = outvertices[3 * vertexIds[3] + 2] - outvertices[3 * vertexIds[1] + 2];
+    double a11 = vertices[1][0] - vertices[0][0];
+    double a12 = vertices[1][1] - vertices[0][1];
+    double a13 = vertices[1][2] - vertices[0][2];
+    double a21 = vertices[2][0] - vertices[0][0];
+    double a22 = vertices[2][1] - vertices[0][1];
+    double a23 = vertices[2][2] - vertices[0][2];
+    double a31 = vertices[3][0] - vertices[0][0];
+    double a32 = vertices[3][1] - vertices[0][1];
+    double a33 = vertices[3][2] - vertices[0][2];
+    double b11 = vertices[2][0] - vertices[1][0];
+    double b12 = vertices[2][1] - vertices[1][1];
+    double b13 = vertices[2][2] - vertices[1][2];
+    double b21 = vertices[3][0] - vertices[1][0];
+    double b22 = vertices[3][1] - vertices[1][1];
+    double b23 = vertices[3][2] - vertices[1][2];
     double det = a11 * a22 * a33 + a12 * a23 * a31 + a13 * a21 * a32 - a13 * a22 * a31 -
                  a12 * a21 * a33 - a11 * a23 * a32;
     double gram = std::abs(det);
