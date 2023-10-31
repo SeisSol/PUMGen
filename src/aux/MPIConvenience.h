@@ -2,6 +2,7 @@
 #define PUMGEN_AUX_MPI_CONVENIENCE_H_
 
 #include <mpi.h>
+#include <cstddef>
 
 void sparseAlltoallv(const void* sendbuf, const int* sendsize, const std::size_t* senddisp,
                      MPI_Datatype sendtype, void* recvbuf, const int* recvsize,

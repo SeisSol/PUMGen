@@ -60,6 +60,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <cstddef>
 
 // forward declare
 pAManager SModel_attManager(pModel model);

@@ -24,6 +24,7 @@
 #include <apfMesh2.h>
 #include <gmi_null.h>
 #include <vector>
+#include <cstddef>
 
 #include "MeshData.h"
 #include "utils/logger.h"

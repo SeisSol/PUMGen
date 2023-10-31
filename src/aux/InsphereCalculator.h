@@ -3,6 +3,7 @@
 
 #include <mpi.h>
 #include <vector>
+#include <cstddef>
 
 // assumes a contiguous distribution of all vertices over all processes
 
