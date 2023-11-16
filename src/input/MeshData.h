@@ -41,7 +41,7 @@ class FullStorageMeshData : public MeshData {
   int bndShift = 8;
 
   void setBoundary(std::size_t cell, int face, int value) {
-    boundaryData[cell] = static_cast<int64_t>(value) << (face * bndShift);
+    boundaryData[cell] |= static_cast<int64_t>(value) << (face * bndShift);
   }
 
   void setup(std::size_t cellCount, std::size_t vertexCount) {
