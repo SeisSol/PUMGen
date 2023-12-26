@@ -17,12 +17,7 @@
 #include <mpi.h>
 #endif // PARALLEL
 
-#include "ApfConvertWrapper.h"
 #include "aux/Distributor.h"
-#include <PCU.h>
-#include <apfMDS.h>
-#include <apfMesh2.h>
-#include <gmi_null.h>
 #include <vector>
 #include <cstddef>
 
