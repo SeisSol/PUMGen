@@ -21,7 +21,7 @@
 
 #include "MeshInput.h"
 
-class ApfNative : public MeshInput {
+class ApfNative : public ApfMeshInput {
   public:
   ApfNative(const char* mesh, const char* model = 0L) {
     if (model)

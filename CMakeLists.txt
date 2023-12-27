@@ -13,6 +13,7 @@ set(SIMMETRIX_ROOT "" CACHE STRING "Root directory of simmetrix dev files")
 set(SIM_MPI "mpich3" CACHE STRING "MPI version used by simmetrix")
 option(NETCDF "Use netcdf" OFF)
 option(PARASOLID "enable support for parasolid files" OFF)
+option(SCOREC "Use PUMI/APF" OFF)
 set(LOG_LEVEL "info" CACHE STRING "Log level for the code")
 set_property(CACHE LOG_LEVEL PROPERTY STRINGS "debug" "info" "warning" "error")
 
@@ -76,9 +77,12 @@ target_link_libraries(pumgen PUBLIC MPI::MPI_CXX)
 
 target_compile_definitions(pumgen PUBLIC PARALLEL)
 
-find_package(APF REQUIRED)
-target_include_directories(pumgen PUBLIC ${APF_INCLUDE_DIR})
-target_link_libraries(pumgen PUBLIC ${APF_LIBRARIES})
+if (SCOREC)
+  find_package(APF REQUIRED)
+  target_include_directories(pumgen PUBLIC ${APF_INCLUDE_DIR})
+  target_link_libraries(pumgen PUBLIC ${APF_LIBRARIES})
+  target_compile_definitions(pumgen PUBLIC USE_SCOREC)
+endif()
 
 add_library(tinyxml2 submodules/tinyxml2/tinyxml2.cpp)
 target_link_libraries(pumgen PUBLIC tinyxml2)

@@ -10,6 +10,7 @@
  * @author Sebastian Rettenberger <sebastian.rettenberger@tum.de>
  */
 
+#include "MeshData.h"
 #include <apfMesh2.h>
 
 #ifndef MESH_INTPUT_H
@@ -18,14 +19,18 @@
 /**
  * Interface for mesh input
  */
-class MeshInput {
+class ApfMeshInput {
   protected:
   apf::Mesh2* m_mesh;
 
   public:
-  virtual ~MeshInput() {}
-
   apf::Mesh2* getMesh() { return m_mesh; }
+
+  MeshData* generate() {
+    FullStorageMeshData* data = new FullStorageMeshData();
+
+    return data;
+  }
 };
 
 #endif // MESH_INPUT_H

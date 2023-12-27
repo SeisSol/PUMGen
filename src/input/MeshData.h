@@ -5,6 +5,10 @@
 #include <cstdint>
 #include <vector>
 
+// TODO: to save space, the connectivity, geometry, group, and boundary arrays can also be
+// constructed on the fly (for that, change the MeshData data structure to work on an iterator
+// instead)
+
 /**
  * Interface for mesh input
  */
