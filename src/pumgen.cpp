@@ -443,7 +443,7 @@ int main(int argc, char* argv[]) {
   checkH5Err(H5Pclose(h5falist));
 
   // Write cells
-  std::size_t connectSize = 8;
+  std::size_t connectBytesPerData = 8;
   logInfo(rank) << "Writing cells";
   writeH5Data<unsigned long, 4>(
       [&](auto& element, auto&& data) {
@@ -489,7 +489,7 @@ int main(int argc, char* argv[]) {
   // Group information
   apf::MeshTag* groupTag = mesh->findTag("group");
 
-  std::size_t groupSize = 4;
+  std::size_t groupBytesPerData = 4;
   if (groupTag) {
     logInfo(rank) << "Writing group information";
     writeH5Data<int, NoSecondDim>(
@@ -561,7 +561,7 @@ int main(int argc, char* argv[]) {
          << std::endl
          // This should be UInt but for some reason this does not work with
          // binary data
-         << "    <DataItem NumberType=\"Int\" Precision=\"" << connectSize
+         << "    <DataItem NumberType=\"Int\" Precision=\"" << connectBytesPerData
          << "\" Format=\"HDF\" "
             "Dimensions=\""
          << globalSize[0] << " 4\">" << basename << ":/connect</DataItem>" << std::endl
@@ -573,7 +573,7 @@ int main(int argc, char* argv[]) {
          << ":/geometry</DataItem>" << std::endl
          << "   </Geometry>" << std::endl
          << "   <Attribute Name=\"group\" Center=\"Cell\">" << std::endl
-         << "    <DataItem  NumberType=\"Int\" Precision=\"" << groupSize
+         << "    <DataItem  NumberType=\"Int\" Precision=\"" << groupBytesPerData
          << "\" Format=\"HDF\" "
             "Dimensions=\""
          << globalSize[0] << "\">" << basename << ":/group</DataItem>" << std::endl
