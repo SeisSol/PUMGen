@@ -18,12 +18,7 @@
 #include <netcdf.h>
 #include <netcdf_par.h>
 
-#include "ApfConvertWrapper.h"
-#include <PCU.h>
-#include <apfMDS.h>
-#include <apfMesh2.h>
-#include <gmi_null.h>
-
+#include "MeshData.h"
 #include "utils/logger.h"
 
 #include "MeshInput.h"
@@ -33,17 +28,13 @@
 /**
  * Read PUMGen generated mesh files
  */
-class NetCDFMesh : public MeshInput {
+class NetCDFMesh : public FullStorageMeshData {
   public:
   NetCDFMesh(const char* meshFile, MPI_Comm comm = MPI_COMM_WORLD) {
     int rank = 0;
     int nProcs = 1;
     MPI_Comm_rank(comm, &rank);
     MPI_Comm_size(comm, &nProcs);
-
-    gmi_register_null();
-    gmi_model* model = gmi_load(".null");
-    m_mesh = apf::makeEmptyMdsMesh(model, 3, false);
 
     int ncFile;
     checkNcError(nc_open_par(meshFile, NC_MPIIO, comm, MPI_INFO_NULL, &ncFile));
@@ -71,14 +62,8 @@ class NetCDFMesh : public MeshInput {
       checkNcError(nc_open_par(meshFile, NC_MPIIO, commIO, MPI_INFO_NULL, &ncFile));
     }
 
-    PCU_Switch_Comm(commIO);
-
     std::size_t nElements = 0;
     std::size_t nVertices = 0;
-    std::vector<ElementID> elements;
-    std::vector<double> vertices;
-    std::vector<int> boundaries;
-    std::vector<int> groups;
 
     if (nLocalPart > 0) {
       std::vector<Partition> partitions(nLocalPart);
@@ -161,94 +146,59 @@ class NetCDFMesh : public MeshInput {
 
       // Copy to the buffer
       std::vector<std::size_t> elementsLocal(nElements * 4);
-      elements.resize(nElements * 4);
-      vertices.resize(nVertices * 3);
+      std::vector<double> verticesLocal(nVertices * 3);
 
-      boundaries.resize(nElements * 4);
-      groups.resize(nElements);
-
-      std::size_t elementOffset = 0;
       std::size_t vertexOffset = 0;
       for (std::size_t i = 0; i < nLocalPart; i++) {
-#ifdef _OPENMP
-#pragma omp parallel schedule(static)
-#endif
-        for (std::size_t j = 0; j < partitions[i].nElements() * 4; j++) {
-          elementsLocal[elementOffset * 4 + j] = partitions[i].elements()[j] + vertexOffset;
-        }
-
         std::copy_n(partitions[i].vertices(), partitions[i].nVertices() * 3,
-                    vertices.begin() + vertexOffset * 3);
-
-        partitions[i].convertBoundary();
-        std::copy_n(partitions[i].boundaries(), partitions[i].nElements() * 4,
-                    boundaries.begin() + elementOffset * 4);
-        std::copy_n(partitions[i].groups(), partitions[i].nElements(),
-                    groups.begin() + elementOffset);
-
-        elementOffset += partitions[i].nElements();
+                    geometryData.begin() + vertexOffset * 3);
         vertexOffset += partitions[i].nVertices();
       }
 
       logInfo(rank) << "Running vertex filter";
       ParallelVertexFilter filter(commIO);
-      filter.filter(nVertices, vertices);
-
-      // Create filtered vertex list
+      filter.filter(nVertices, verticesLocal);
 
       nVertices = filter.numLocalVertices();
-      vertices.resize(nVertices * 3);
-      std::copy_n(filter.localVertices(), nVertices * 3, vertices.begin());
+
+      setup(nElements, nVertices);
+
+      std::copy_n(filter.localVertices().begin(), nVertices * 3, geometryData.begin());
+
+      std::size_t elementOffset = 0;
+      for (std::size_t i = 0; i < nLocalPart; i++) {
+#ifdef _OPENMP
+#pragma omp parallel for schedule(static)
+#endif
+        for (std::size_t j = 0; j < partitions[i].nElements() * 4; j++) {
+          elementsLocal[elementOffset * 4 + j] = partitions[i].elements()[j] + vertexOffset;
+        }
+
+        partitions[i].convertBoundary();
+
+#ifdef _OPENMP
+#pragma omp parallel for schedule(static)
+#endif
+        for (std::size_t j = 0; j < partitions[i].nElements(); ++j) {
+          for (int k = 0; k < 4; ++k) {
+            setBoundary(elementOffset + j, k, partitions[i].boundaries()[j * 4 + k]);
+          }
+        }
+
+        std::copy_n(partitions[i].groups(), partitions[i].nElements(),
+                    groupData.begin() + elementOffset);
+
+        elementOffset += partitions[i].nElements();
+      }
 
       logInfo(rank) << "Converting local to global vertex identifier";
 #ifdef _OPENMP
-#pragma omp parallel
+#pragma omp parallel for 
 #endif
       for (std::size_t i = 0; i < nElements * 4; i++) {
-        elements[i] = filter.globalIds()[elementsLocal[i]];
+        connectivityData[i] = filter.globalIds()[elementsLocal[i]];
       }
     }
-
-    logInfo(rank) << "Constructing the mesh";
-    apf::GlobalToVert vertMap;
-    apf::construct(m_mesh, elements.data(), nElements, apf::Mesh::TET, vertMap);
-
-    apf::alignMdsRemotes(m_mesh);
-    apf::deriveMdsModel(m_mesh);
-
-    logInfo(rank) << "Set coordinates in APF";
-    apf::setCoords(m_mesh, vertices.data(), nVertices, vertMap);
-
-    // Set boundaries
-    apf::MeshTag* boundaryTag = m_mesh->createIntTag("boundary condition", 1);
-    apf::MeshIterator* it = m_mesh->begin(3);
-    std::size_t i = 0;
-    while (apf::MeshEntity* element = m_mesh->iterate(it)) {
-      apf::Adjacent adjacent;
-      m_mesh->getAdjacent(element, 2, adjacent);
-
-      for (int j = 0; j < 4; j++) {
-        if (!boundaries[i * 4 + j])
-          continue;
-
-        m_mesh->setIntTag(adjacent[j], boundaryTag, &boundaries[i * 4 + j]);
-      }
-
-      i++;
-    }
-    m_mesh->end(it);
-
-    // Set groups
-    apf::MeshTag* groupTag = m_mesh->createIntTag("group", 1);
-    it = m_mesh->begin(3);
-    i = 0;
-    while (apf::MeshEntity* element = m_mesh->iterate(it)) {
-      m_mesh->setIntTag(element, groupTag, &groups[i]);
-      i++;
-    }
-    m_mesh->end(it);
-
-    PCU_Switch_Comm(MPI_COMM_WORLD);
   }
 
   private:
