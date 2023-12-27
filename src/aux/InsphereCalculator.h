@@ -1,9 +1,9 @@
 #ifndef PUMGEN_AUX_INSPHERE_CALCULATOR_H_
 #define PUMGEN_AUX_INSPHERE_CALCULATOR_H_
 
+#include <cstddef>
 #include <mpi.h>
 #include <vector>
-#include <cstddef>
 
 // assumes a contiguous distribution of all vertices over all processes
 

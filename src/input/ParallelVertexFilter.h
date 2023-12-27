@@ -164,15 +164,16 @@ public:
     }
 
     // Determine the (local and total) bucket size
-    std::vector<int> bucketSize(m_numProcs);
+    std::vector<std::size_t> bucketSize(m_numProcs);
     for (std::size_t i = 0; i < numVertices; i++) {
       ++bucketSize[bucket[i]];
     }
 
     // Tell all processes what we are going to send them
-    std::vector<int> recvSize(m_numProcs);
+    std::vector<std::size_t> recvSize(m_numProcs);
 
-    MPI_Alltoall(bucketSize.data(), 1, MPI_INT, recvSize.data(), 1, MPI_INT, m_comm);
+    MPI_Alltoall(bucketSize.data(), 1, tndm::mpi_type_t<std::size_t>(), recvSize.data(), 1,
+                 tndm::mpi_type_t<std::size_t>(), m_comm);
 
     std::size_t numSortVertices = 0;
 #ifdef _OPENMP

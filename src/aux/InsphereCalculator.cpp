@@ -22,8 +22,8 @@ std::vector<double> calculateInsphere(const std::vector<std::size_t>& connectivi
   MPI_Type_contiguous(3, MPI_DOUBLE, &vertexType);
   MPI_Type_commit(&vertexType);
 
-  std::vector<int> outrequests(commsize);
-  std::vector<int> inrequests(commsize);
+  std::vector<std::size_t> outrequests(commsize);
+  std::vector<std::size_t> inrequests(commsize);
 
   std::size_t localVertices = geometry.size() / 3;
 
@@ -51,7 +51,8 @@ std::vector<double> calculateInsphere(const std::vector<std::size_t>& connectivi
     }
   }
 
-  MPI_Alltoall(outrequests.data(), 1, MPI_INT, inrequests.data(), 1, MPI_INT, comm);
+  MPI_Alltoall(outrequests.data(), 1, tndm::mpi_type_t<std::size_t>(), inrequests.data(), 1,
+               tndm::mpi_type_t<std::size_t>(), comm);
 
   std::vector<std::size_t> outdisp(commsize + 1);
   std::vector<std::size_t> indisp(commsize + 1);
