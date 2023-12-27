@@ -15,14 +15,17 @@
 
 #include <mpi.h>
 
+#include <array>
 #include <vector>
+
+#include "third_party/MPITraits.h"
 
 template <class R> class ParallelMeshReader {
   private:
   // Some variables that are required by all processes
-  unsigned int m_nVertices;
-  unsigned int m_nElements;
-  unsigned int m_nBoundaries;
+  std::size_t m_nVertices;
+  std::size_t m_nElements;
+  std::size_t m_nBoundaries;
 
   protected:
   const MPI_Comm m_comm;
@@ -50,7 +53,7 @@ template <class R> class ParallelMeshReader {
   virtual ~ParallelMeshReader() {}
 
   void open(const char* meshFile) {
-    unsigned int vars[3];
+    std::array<std::size_t, 3> vars;
 
     if (m_rank == 0) {
       m_serialReader.open(meshFile);
@@ -60,21 +63,21 @@ template <class R> class ParallelMeshReader {
       vars[2] = m_serialReader.nBoundaries();
     }
 
-    MPI_Bcast(vars, 3, MPI_UNSIGNED, 0, m_comm);
+    MPI_Bcast(vars.data(), 3, tndm::mpi_type_t<std::size_t>(), 0, m_comm);
 
     m_nVertices = vars[0];
     m_nElements = vars[1];
     m_nBoundaries = vars[2];
   }
 
-  unsigned int nVertices() const { return m_nVertices; }
+  std::size_t nVertices() const { return m_nVertices; }
 
-  unsigned int nElements() const { return m_nElements; }
+  std::size_t nElements() const { return m_nElements; }
 
   /**
    * @return Number of boundary faces
    */
-  unsigned int nBoundaries() const { return m_nBoundaries; }
+  std::size_t nBoundaries() const { return m_nBoundaries; }
 
   /**
    * Reads all vertices
@@ -86,11 +89,12 @@ template <class R> class ParallelMeshReader {
    * @todo Only 3 dimensional meshes are supported
    */
   void readVertices(double* vertices) {
-    unsigned int chunkSize = (m_nVertices + m_nProcs - 1) / m_nProcs;
+    std::size_t chunkSize = (m_nVertices + m_nProcs - 1) / m_nProcs;
 
     if (m_rank == 0) {
       // Allocate second buffer so we can read and send in parallel
-      double* vertices2 = new double[chunkSize * 3];
+      std::vector<double> tempVertices(chunkSize * 3);
+      double* vertices2 = tempVertices.data();
       if (m_nProcs % 2 == 0)
         // swap once so we have the correct buffer at the end
         swap(vertices, vertices2);
@@ -106,7 +110,7 @@ template <class R> class ParallelMeshReader {
 
       if (m_nProcs > 1) {
         // Read last one
-        unsigned int lastChunkSize = m_nVertices - (m_nProcs - 1) * chunkSize;
+        const std::size_t lastChunkSize = m_nVertices - (m_nProcs - 1) * chunkSize;
         logInfo() << "Reading vertices part" << (m_nProcs - 1) << "of" << m_nProcs;
         m_serialReader.readVertices((m_nProcs - 1) * chunkSize, lastChunkSize, vertices);
         MPI_Wait(&request, MPI_STATUS_IGNORE);
@@ -118,8 +122,6 @@ template <class R> class ParallelMeshReader {
       logInfo() << "Reading vertices part" << m_nProcs << "of" << m_nProcs;
       m_serialReader.readVertices(0, chunkSize, vertices);
       MPI_Wait(&request, MPI_STATUS_IGNORE);
-
-      delete[] vertices2;
     } else {
       if (m_rank == m_nProcs - 1)
         chunkSize = m_nVertices - (m_nProcs - 1) * chunkSize;
@@ -137,12 +139,13 @@ template <class R> class ParallelMeshReader {
    *
    * @todo Only tetrahedral meshes are supported
    */
-  virtual void readElements(int* elements) {
-    unsigned int chunkSize = (m_nElements + m_nProcs - 1) / m_nProcs;
+  virtual void readElements(std::size_t* elements) {
+    std::size_t chunkSize = (m_nElements + m_nProcs - 1) / m_nProcs;
 
     if (m_rank == 0) {
       // Allocate second buffer so we can read and send in parallel
-      int* elements2 = new int[chunkSize * 4];
+      std::vector<std::size_t> tempElements(chunkSize * 4);
+      std::size_t* elements2 = tempElements.data();
       if (m_nProcs % 2 == 0)
         // swap once so we have the correct buffer at the end
         swap(elements, elements2);
@@ -153,17 +156,18 @@ template <class R> class ParallelMeshReader {
         logInfo() << "Reading elements part" << i << "of" << m_nProcs;
         m_serialReader.readElements(i * chunkSize, chunkSize, elements);
         MPI_Wait(&request, MPI_STATUS_IGNORE);
-        MPI_Isend(elements, chunkSize * 4, MPI_INT, i, 0, m_comm, &request);
+        MPI_Isend(elements, chunkSize * 4, tndm::mpi_type_t<std::size_t>(), i, 0, m_comm, &request);
         swap(elements, elements2);
       }
 
       if (m_nProcs > 1) {
         // Read last one
-        unsigned int lastChunkSize = m_nElements - (m_nProcs - 1) * chunkSize;
+        const std::size_t lastChunkSize = m_nElements - (m_nProcs - 1) * chunkSize;
         logInfo() << "Reading elements part" << (m_nProcs - 1) << "of" << m_nProcs;
         m_serialReader.readElements((m_nProcs - 1) * chunkSize, lastChunkSize, elements);
         MPI_Wait(&request, MPI_STATUS_IGNORE);
-        MPI_Isend(elements, lastChunkSize * 4, MPI_INT, m_nProcs - 1, 0, m_comm, &request);
+        MPI_Isend(elements, lastChunkSize * 4, tndm::mpi_type_t<std::size_t>(), m_nProcs - 1, 0,
+                  m_comm, &request);
         swap(elements, elements2);
       }
 
@@ -171,13 +175,12 @@ template <class R> class ParallelMeshReader {
       logInfo() << "Reading elements part" << m_nProcs << "of" << m_nProcs;
       m_serialReader.readElements(0, chunkSize, elements);
       MPI_Wait(&request, MPI_STATUS_IGNORE);
-
-      delete[] elements2;
     } else {
       if (m_rank == m_nProcs - 1)
         chunkSize = m_nElements - (m_nProcs - 1) * chunkSize;
 
-      MPI_Recv(elements, chunkSize * 4, MPI_INT, 0, 0, m_comm, MPI_STATUS_IGNORE);
+      MPI_Recv(elements, chunkSize * 4, tndm::mpi_type_t<std::size_t>(), 0, 0, m_comm,
+               MPI_STATUS_IGNORE);
     }
   }
 

@@ -20,8 +20,8 @@
  */
 class Partition {
   private:
-  unsigned int m_nElements;
-  unsigned int m_nVertices;
+  std::size_t m_nElements;
+  std::size_t m_nVertices;
 
   int* m_elements;
   double* m_vertices;
@@ -40,7 +40,7 @@ class Partition {
     delete[] m_groups;
   }
 
-  void setElemSize(unsigned int nElements) {
+  void setElemSize(std::size_t nElements) {
     if (m_nElements != 0)
       return;
 
@@ -53,7 +53,7 @@ class Partition {
     memset(m_groups, 0, nElements * sizeof(int));
   }
 
-  void setVrtxSize(unsigned int nVertices) {
+  void setVrtxSize(std::size_t nVertices) {
     if (m_nVertices != 0)
       return;
 
@@ -72,9 +72,9 @@ class Partition {
     }
   }
 
-  unsigned int nElements() const { return m_nElements; }
+  std::size_t nElements() const { return m_nElements; }
 
-  unsigned int nVertices() const { return m_nVertices; }
+  std::size_t nVertices() const { return m_nVertices; }
 
   int* elements() { return m_elements; }
 

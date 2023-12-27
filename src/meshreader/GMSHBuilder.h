@@ -10,15 +10,27 @@
 namespace puml {
 
 template <std::size_t D> struct GMSHSimplexType {};
-template <> struct GMSHSimplexType<0u> { static constexpr long type = 15; }; // 15 -> point
-template <> struct GMSHSimplexType<1u> { static constexpr long type = 1; };  // 1 -> line
-template <> struct GMSHSimplexType<2u> { static constexpr long type = 2; };  // 2 -> triangle
-template <> struct GMSHSimplexType<3u> { static constexpr long type = 4; };  // 4 -> tetrahedron
+
+// clang format seems to mess up the following lines from time to time, hence we disable it
+// clang-format off
+template <> struct GMSHSimplexType<0u> {
+  static constexpr long type = 15;
+}; // 15 -> point
+template <> struct GMSHSimplexType<1u> {
+  static constexpr long type = 1;
+}; // 1 -> line
+template <> struct GMSHSimplexType<2u> {
+  static constexpr long type = 2;
+}; // 2 -> triangle
+template <> struct GMSHSimplexType<3u> {
+  static constexpr long type = 4;
+}; // 4 -> tetrahedron
+// clang-format on
 
 template <std::size_t D> class GMSHBuilder : public tndm::GMSHMeshBuilder {
   public:
   using vertex_t = std::array<double, D>;
-  using element_t = std::array<int, D + 1u>;
+  using element_t = std::array<std::size_t, D + 1u>;
   using facet_t = std::array<int, D>;
 
   std::vector<vertex_t> vertices;

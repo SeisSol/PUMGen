@@ -55,10 +55,10 @@ class NetCDFMesh : public MeshInput {
     checkNcError(nc_inq_dimlen(ncFile, ncDimPart, &nPartitions));
 
     // Local partitions
-    unsigned int nMaxLocalPart = (nPartitions + nProcs - 1) / nProcs;
-    unsigned int nLocalPart = nMaxLocalPart;
-    if (nPartitions < (rank + 1) * nMaxLocalPart) {
-      nLocalPart = std::max(0, static_cast<int>(nPartitions - rank * nMaxLocalPart));
+    const std::size_t nMaxLocalPart = (nPartitions + nProcs - 1) / nProcs;
+    std::size_t nLocalPart = nMaxLocalPart;
+    if (nPartitions < (rank + 1) * nMaxLocalPart && nPartitions >= rank * nMaxLocalPart) {
+      nLocalPart = static_cast<std::size_t>(nPartitions - rank * nMaxLocalPart);
     }
 
     MPI_Comm commIO;
@@ -73,8 +73,8 @@ class NetCDFMesh : public MeshInput {
 
     PCU_Switch_Comm(commIO);
 
-    unsigned int nElements = 0;
-    unsigned int nVertices = 0;
+    std::size_t nElements = 0;
+    std::size_t nVertices = 0;
     std::vector<ElementID> elements;
     std::vector<double> vertices;
     std::vector<int> boundaries;
@@ -115,8 +115,10 @@ class NetCDFMesh : public MeshInput {
 
       // Read elements
       logInfo(rank) << "Reading netCDF file";
-      for (unsigned int i = 0; i < nMaxLocalPart; i++) {
-        unsigned int j = i % nLocalPart;
+      for (std::size_t i = 0; i < nMaxLocalPart; i++) {
+        std::size_t j = i % nLocalPart;
+
+        // for now, each partition stays limited to about 2^31 maximum elements
 
         size_t start[3] = {j + rank * nMaxLocalPart, 0, 0};
 
@@ -152,26 +154,26 @@ class NetCDFMesh : public MeshInput {
 
       checkNcError(nc_close(ncFile));
 
-      for (unsigned int i = 0; i < nLocalPart; i++) {
+      for (std::size_t i = 0; i < nLocalPart; i++) {
         nElements += partitions[i].nElements();
         nVertices += partitions[i].nVertices();
       }
 
       // Copy to the buffer
-      std::vector<unsigned int> elementsLocal(nElements * 4);
+      std::vector<std::size_t> elementsLocal(nElements * 4);
       elements.resize(nElements * 4);
       vertices.resize(nVertices * 3);
 
       boundaries.resize(nElements * 4);
       groups.resize(nElements);
 
-      unsigned int elementOffset = 0;
-      unsigned int vertexOffset = 0;
-      for (unsigned int i = 0; i < nLocalPart; i++) {
+      std::size_t elementOffset = 0;
+      std::size_t vertexOffset = 0;
+      for (std::size_t i = 0; i < nLocalPart; i++) {
 #ifdef _OPENMP
-#pragma omp parallel
+#pragma omp parallel schedule(static)
 #endif
-        for (unsigned int j = 0; j < partitions[i].nElements() * 4; j++) {
+        for (std::size_t j = 0; j < partitions[i].nElements() * 4; j++) {
           elementsLocal[elementOffset * 4 + j] = partitions[i].elements()[j] + vertexOffset;
         }
 
@@ -190,7 +192,7 @@ class NetCDFMesh : public MeshInput {
 
       logInfo(rank) << "Running vertex filter";
       ParallelVertexFilter filter(commIO);
-      filter.filter(nVertices, vertices.data());
+      filter.filter(nVertices, vertices);
 
       // Create filtered vertex list
 
@@ -202,7 +204,7 @@ class NetCDFMesh : public MeshInput {
 #ifdef _OPENMP
 #pragma omp parallel
 #endif
-      for (unsigned int i = 0; i < nElements * 4; i++) {
+      for (std::size_t i = 0; i < nElements * 4; i++) {
         elements[i] = filter.globalIds()[elementsLocal[i]];
       }
     }
@@ -220,12 +222,12 @@ class NetCDFMesh : public MeshInput {
     // Set boundaries
     apf::MeshTag* boundaryTag = m_mesh->createIntTag("boundary condition", 1);
     apf::MeshIterator* it = m_mesh->begin(3);
-    unsigned int i = 0;
+    std::size_t i = 0;
     while (apf::MeshEntity* element = m_mesh->iterate(it)) {
       apf::Adjacent adjacent;
       m_mesh->getAdjacent(element, 2, adjacent);
 
-      for (unsigned int j = 0; j < 4; j++) {
+      for (int j = 0; j < 4; j++) {
         if (!boundaries[i * 4 + j])
           continue;
 

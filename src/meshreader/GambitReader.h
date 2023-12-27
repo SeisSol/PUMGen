@@ -30,7 +30,7 @@ namespace puml {
  */
 struct ElementGroup {
   /** The element */
-  unsigned int element;
+  std::size_t element;
   /** The group for this element */
   int group;
 };
@@ -40,7 +40,7 @@ struct ElementGroup {
  */
 struct GambitBoundaryFace {
   /** The element the face belongs to */
-  unsigned int element;
+  std::size_t element;
   /** The face of the element */
   unsigned int face;
   /** The type of the boundary */
@@ -107,7 +107,7 @@ class GambitReader : public MeshReader {
 
     getline(m_mesh, line); // Skip problem size names
 
-    unsigned int nGroups, nBoundaries, dimensions;
+    std::size_t nGroups, nBoundaries, dimensions;
     m_mesh >> m_vertices.nLines;
     m_mesh >> m_elements.nLines;
     m_mesh >> nGroups;
@@ -166,7 +166,7 @@ class GambitReader : public MeshReader {
 
     // Groups
     m_groups.resize(nGroups);
-    for (unsigned int i = 0; i < nGroups; i++) {
+    for (std::size_t i = 0; i < nGroups; i++) {
       getline(m_mesh, line);
       if (line.find(ELEMENT_GROUP) == std::string::npos)
         logError() << "Invalid Gambit format: Group expected, found" << line;
@@ -213,7 +213,7 @@ class GambitReader : public MeshReader {
 
     // Boundaries
     m_boundaries.resize(nBoundaries);
-    for (unsigned int i = 0; i < nBoundaries; i++) {
+    for (std::size_t i = 0; i < nBoundaries; i++) {
       getline(m_mesh, line);
       if (line.find(BOUNDARY_CONDITIONS) == std::string::npos)
         logError() << "Invalid Gambit format: Boundaries expected, found" << line;
@@ -236,7 +236,7 @@ class GambitReader : public MeshReader {
 
       // Get element size
       std::istringstream ssE(line);
-      unsigned int element, type, face;
+      std::size_t element, type, face;
       ssE >> element;
       m_boundaries[i].elementSize = ssE.tellg();
       ssE >> type;
@@ -278,35 +278,34 @@ class GambitReader : public MeshReader {
     }
   }
 
-  unsigned int nVertices() const { return m_vertices.nLines; }
+  std::size_t nVertices() const { return m_vertices.nLines; }
 
-  unsigned int nElements() const { return m_elements.nLines; }
+  std::size_t nElements() const { return m_elements.nLines; }
 
-  unsigned int nBoundaries() const {
-    unsigned int count = 0;
-    for (std::vector<BoundarySection>::const_iterator i = m_boundaries.begin();
-         i != m_boundaries.end(); i++) {
-      count += i->nLines;
+  std::size_t nBoundaries() const {
+    std::size_t count = 0;
+    for (const auto& boundary : m_boundaries) {
+      count += boundary.nLines;
     }
 
     return count;
   }
 
   /**
-   * @copydoc MeshReader::readVertices(unsigned int, unsigned int, double*)
+   * @copydoc MeshReader::readVertices(size_t, size_t, double*)
    *
    * @todo Only 3 dimensional meshes are supported
    */
-  void readVertices(unsigned int start, unsigned int count, double* vertices) {
+  void readVertices(std::size_t start, std::size_t count, double* vertices) {
     m_mesh.clear();
 
     m_mesh.seekg(m_vertices.seekPosition + start * m_vertices.lineSize + m_vertices.lineSize -
                  3 * COORDINATE_SIZE - 1);
 
-    char* buf = new char[3 * COORDINATE_SIZE];
+    std::vector<char> buf(3 * COORDINATE_SIZE);
 
-    for (unsigned int i = 0; i < count; i++) {
-      m_mesh.read(buf, 3 * COORDINATE_SIZE);
+    for (std::size_t i = 0; i < count; i++) {
+      m_mesh.read(buf.data(), 3 * COORDINATE_SIZE);
 
       for (int j = 0; j < 3; j++) {
         std::istringstream ss(std::string(&buf[j * COORDINATE_SIZE], COORDINATE_SIZE));
@@ -315,25 +314,23 @@ class GambitReader : public MeshReader {
 
       m_mesh.seekg(m_vertices.lineSize - 3 * COORDINATE_SIZE, std::fstream::cur);
     }
-
-    delete[] buf;
   }
 
   /**
-   * @copydoc MeshReader::readElements(unsigned int, unsigned int, int*)
+   * @copydoc MeshReader::readElements(size_t, size_t, size_t*)
    *
    * @todo Only tetrahedral meshes are supported
    * @todo Support for varying coordinate/vertexid fields
    */
-  void readElements(unsigned int start, unsigned int count, int* elements) {
+  void readElements(std::size_t start, std::size_t count, std::size_t* elements) {
     m_mesh.clear();
 
     m_mesh.seekg(m_elements.seekPosition + start * m_elements.lineSize + m_elements.vertexStart);
 
-    char* buf = new char[4 * m_elements.vertexSize];
+    std::vector<char> buf(4 * m_elements.vertexSize);
 
-    for (unsigned int i = 0; i < count; i++) {
-      m_mesh.read(buf, 4 * m_elements.vertexSize);
+    for (std::size_t i = 0; i < count; i++) {
+      m_mesh.read(buf.data(), 4 * m_elements.vertexSize);
 
       for (int j = 0; j < 4; j++) {
         std::istringstream ss(std::string(&buf[j * m_elements.vertexSize], m_elements.vertexSize));
@@ -343,8 +340,6 @@ class GambitReader : public MeshReader {
 
       m_mesh.seekg(m_elements.lineSize - 4 * m_elements.vertexSize, std::fstream::cur);
     }
-
-    delete[] buf;
   }
 
   /**
@@ -353,24 +348,25 @@ class GambitReader : public MeshReader {
    * @param groups Buffer for storing the group numbers. The caller is
    * responsible for allocating the buffer.
    */
-  void readGroups(unsigned int start, unsigned int count, ElementGroup* groups) {
+  void readGroups(std::size_t start, std::size_t count, ElementGroup* groups) {
     m_mesh.clear();
 
     // Get the group, were we should start reading
     std::vector<GroupSection>::const_iterator section;
     for (section = m_groups.begin(); section != m_groups.end() && section->nLines < start;
-         section++)
+         section++) {
       start -= section->nLines;
+    }
 
     m_mesh.seekg(section->seekPosition + (start / ELEMENTS_PER_LINE_GROUP) * section->lineSize +
                  (start % ELEMENTS_PER_LINE_GROUP) * section->elementSize);
 
-    char* buf = new char[section->elementSize];
+    std::vector<char> buf(section->elementSize);
 
-    for (unsigned int i = 0; i < count; i++) {
-      m_mesh.read(buf, section->elementSize);
+    for (std::size_t i = 0; i < count; i++) {
+      m_mesh.read(buf.data(), section->elementSize);
 
-      std::istringstream ss(std::string(buf, section->elementSize));
+      std::istringstream ss(std::string(buf.begin(), buf.end()));
       ss >> groups[i].element;
       groups[i].element--;
       groups[i].group = section->group;
@@ -387,28 +383,25 @@ class GambitReader : public MeshReader {
         m_mesh.seekg(section->lineSize - section->elementSize * ELEMENTS_PER_LINE_GROUP,
                      std::fstream::cur);
     }
-
-    delete[] buf;
   }
 
   /**
    * Reads all groups numbers.
-   * In contrast to readGroups(unsigned int, unsigned int, ElementGroup*) it
+   * In contrast to readGroups(size_t, size_t, ElementGroup*) it
    * returns the group numbers sorted according to the elements.
    */
   void readGroups(int* groups) {
     logInfo() << "Reading group information";
 
-    ElementGroup* map = new ElementGroup[nElements()];
-    readGroups(0, nElements(), map);
+    std::vector<ElementGroup> map(nElements());
+    readGroups(0, nElements(), map.data());
 
 #ifdef _OPENMP
 #pragma omp parallel for schedule(static)
 #endif
-    for (unsigned int i = 0; i < nElements(); i++)
+    for (std::size_t i = 0; i < nElements(); i++) {
       groups[map[i].element] = map[i].group;
-
-    delete[] map;
+    }
   }
 
   /**
@@ -418,7 +411,7 @@ class GambitReader : public MeshReader {
    * @param elements Buffer to store boundaries. Each boundary consists of the
    * element, the face and the boundary type.
    */
-  void readBoundaries(unsigned int start, unsigned int count, GambitBoundaryFace* boundaries) {
+  void readBoundaries(std::size_t start, std::size_t count, GambitBoundaryFace* boundaries) {
     m_mesh.clear();
 
     // Get the boundary, were we should start reading
@@ -427,21 +420,21 @@ class GambitReader : public MeshReader {
          section++)
       start -= section->nLines;
 
-    char* buf;
+    std::vector<char> buf;
 
     if (section->variableLineLength) {
       m_mesh.seekg(section->seekPosition);
       for (size_t i = 0; i < start; i++)
         m_mesh.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
 
-      buf = 0L;
+      buf.resize(0);
     } else {
       m_mesh.seekg(section->seekPosition + start * section->lineSize);
 
-      buf = new char[section->elementSize + section->elementTypeSize + section->faceSize];
+      buf.resize(section->elementSize + section->elementTypeSize + section->faceSize);
     }
 
-    for (unsigned int i = 0; i < count; i++) {
+    for (std::size_t i = 0; i < count; i++) {
       if (start >= section->nLines) {
         // Are we starting a new section in this iteration?
         start = 0;
@@ -449,11 +442,11 @@ class GambitReader : public MeshReader {
 
         m_mesh.seekg(section->seekPosition);
 
-        delete[] buf;
-        if (section->variableLineLength)
-          buf = 0L;
-        else
-          buf = new char[section->elementSize + section->elementTypeSize + section->faceSize];
+        if (section->variableLineLength) {
+          buf.resize(0);
+        } else {
+          buf.resize(section->elementSize + section->elementTypeSize + section->faceSize);
+        }
       }
 
       if (section->variableLineLength) {
@@ -462,13 +455,15 @@ class GambitReader : public MeshReader {
         m_mesh >> elementType;
         m_mesh >> boundaries[i].face;
       } else {
-        m_mesh.read(buf, section->elementSize + section->elementTypeSize + section->faceSize);
+        m_mesh.read(buf.data(),
+                    section->elementSize + section->elementTypeSize + section->faceSize);
 
-        std::istringstream ssE(std::string(buf, section->elementSize));
+        std::istringstream ssE(std::string(buf.begin(), buf.begin() + section->elementSize));
         ssE >> boundaries[i].element;
 
-        std::istringstream ssF(
-            std::string(&buf[section->elementSize + section->elementTypeSize], section->faceSize));
+        std::istringstream ssF(std::string(
+            buf.begin() + section->elementSize + section->elementTypeSize,
+            buf.begin() + section->elementSize + section->elementTypeSize + section->faceSize));
         ssF >> boundaries[i].face;
 
         // Seek to next position
@@ -481,10 +476,8 @@ class GambitReader : public MeshReader {
       boundaries[i].face--;
       boundaries[i].type = section->type;
 
-      start++; // Line in the current section
+      ++start; // Line in the current section
     }
-
-    delete[] buf;
   }
 
   /**
@@ -499,14 +492,13 @@ class GambitReader : public MeshReader {
   void readBoundaries(int* boundaries) {
     logInfo() << "Reading boundary conditions";
 
-    unsigned int nBnds = nBoundaries();
-    GambitBoundaryFace* faces = new GambitBoundaryFace[nBoundaries()];
-    readBoundaries(0, nBnds, faces);
+    std::size_t nBnds = nBoundaries();
+    std::vector<GambitBoundaryFace> faces(nBnds);
+    readBoundaries(0, nBnds, faces.data());
 
-    for (unsigned int i = 0; i < nBnds; i++)
+    for (std::size_t i = 0; i < nBnds; i++) {
       boundaries[faces[i].element * 4 + faces[i].face] = faces[i].type;
-
-    delete[] faces;
+    }
   }
 
   private:

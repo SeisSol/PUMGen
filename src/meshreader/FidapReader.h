@@ -14,6 +14,7 @@
 #define FIDAP_READER_H
 
 #include <algorithm>
+#include <array>
 #include <map>
 #include <sstream>
 #include <string>
@@ -25,7 +26,7 @@
 
 struct FidapBoundaryFace {
   /** The vertices of the face */
-  int vertices[3];
+  std::array<std::size_t, 3> vertices;
   /** The type of the boundary */
   int type;
 };
@@ -34,16 +35,16 @@ struct FidapBoundaryFace {
 struct FaceVertex {
   FaceVertex() {}
 
-  FaceVertex(int v1, int v2, int v3) {
+  FaceVertex(std::size_t v1, std::size_t v2, std::size_t v3) {
     vertices[0] = v1;
     vertices[1] = v2;
     vertices[2] = v3;
-    std::sort(vertices, vertices + 3);
+    std::sort(vertices.begin(), vertices.end());
   }
 
-  FaceVertex(const int v[3]) {
-    memcpy(vertices, v, sizeof(vertices));
-    std::sort(vertices, vertices + 3);
+  FaceVertex(const std::array<std::size_t, 3>& v) {
+    std::copy(v.begin(), v.end(), vertices.begin());
+    std::sort(vertices.begin(), vertices.end());
   }
 
   bool operator<(const FaceVertex& other) const {
@@ -53,7 +54,7 @@ struct FaceVertex {
             vertices[2] < other.vertices[2]);
   }
 
-  int vertices[3];
+  std::array<std::size_t, 3> vertices;
 };
 
 /** Defines a face by element and face side */
@@ -63,12 +64,12 @@ struct FaceElement {
     side = -1;
   }
 
-  FaceElement(int e, int s) {
+  FaceElement(std::size_t e, int s) {
     element = e;
     side = s;
   }
 
-  int element;
+  std::size_t element;
   int side;
 };
 
@@ -109,7 +110,7 @@ class FidapReader : public MeshReader {
     getline(m_mesh, line); // Date
     getline(m_mesh, line); // Empty line
 
-    unsigned int nElements, nZones, t, dimensions;
+    std::size_t nElements, nZones, t, dimensions;
     m_mesh >> m_vertices.nLines;
     m_mesh >> nElements;
     m_mesh >> nZones;
@@ -147,10 +148,10 @@ class FidapReader : public MeshReader {
     if (line.find(ELEMENT_GROUPS) == std::string::npos)
       logError() << "Invalid Fidap format: Element groups expected, found" << line;
 
-    for (unsigned int i = 0; i < nZones; i++) {
+    for (std::size_t i = 0; i < nZones; i++) {
       FileSection sec;
 
-      // Group
+      // Group (unused)
       m_mesh >> name;
       if (name.find(ZONE_GROUP) == std::string::npos)
         logError() << "Invalid Fidap format: Expected group, found" << name;
@@ -167,13 +168,13 @@ class FidapReader : public MeshReader {
         logError() << "Invalid Fidap format: Expected nodes, found" << name;
       unsigned int nodeType;
       m_mesh >> nodeType;
-      // Geometry
+      // Geometry (unused)
       m_mesh >> name;
       if (name.find(ZONE_GEOMETRY) == std::string::npos)
         logError() << "Invalid Fidap format: Expected geometry, found" << name;
       unsigned int geoType;
       m_mesh >> geoType;
-      // Type
+      // Type (unused)
       m_mesh >> name;
       if (name.find(ZONE_TYPE) == std::string::npos)
         logError() << "Invalid Fidap format: Expected type, found" << name;
@@ -223,35 +224,33 @@ class FidapReader : public MeshReader {
     }
   }
 
-  unsigned int nVertices() const { return m_vertices.nLines; }
+  std::size_t nVertices() const { return m_vertices.nLines; }
 
-  unsigned int nElements() const {
-    unsigned int count = 0;
-    for (std::vector<ElementSection>::const_iterator i = m_elements.begin(); i != m_elements.end();
-         i++) {
-      count += i->nLines;
+  std::size_t nElements() const {
+    std::size_t count = 0;
+    for (const auto& element : m_elements) {
+      count += element.nLines;
     }
 
     return count;
   }
 
-  unsigned int nBoundaries() const {
-    unsigned int count = 0;
-    for (std::vector<BoundarySection>::const_iterator i = m_boundaries.begin();
-         i != m_boundaries.end(); i++) {
-      count += i->nLines;
+  std::size_t nBoundaries() const {
+    std::size_t count = 0;
+    for (const auto& boundary : m_boundaries) {
+      count += boundary.nLines;
     }
 
     return count;
   }
 
-  void readVertices(unsigned int start, unsigned int count, double* vertices) {
+  void readVertices(std::size_t start, std::size_t count, double* vertices) {
     m_mesh.clear();
 
     m_mesh.seekg(m_vertices.seekPosition + start * m_vertices.lineSize + m_vertices.lineSize -
                  3 * COORDINATE_SIZE - 1);
 
-    for (unsigned int i = 0; i < count; i++) {
+    for (std::size_t i = 0; i < count; i++) {
       for (int j = 0; j < 3; j++)
         m_mesh >> vertices[i * 3 + j];
 
@@ -259,7 +258,7 @@ class FidapReader : public MeshReader {
     }
   }
 
-  void readElements(unsigned int start, unsigned int count, int* elements) {
+  void readElements(std::size_t start, std::size_t count, std::size_t* elements) {
     m_mesh.clear();
 
     // Get the boundary, were we should start reading
@@ -271,7 +270,7 @@ class FidapReader : public MeshReader {
     m_mesh.seekg(section->seekPosition + start * section->lineSize + section->lineSize -
                  4 * VERTEX_ID_SIZE - 1);
 
-    for (unsigned int i = 0; i < count; i++) {
+    for (std::size_t i = 0; i < count; i++) {
       if (start >= section->nLines) {
         // Are we starting a new section in this iteration?
         start = 0;
@@ -280,7 +279,7 @@ class FidapReader : public MeshReader {
         m_mesh.seekg(section->seekPosition + section->lineSize - 4 * VERTEX_ID_SIZE - 1);
       }
 
-      for (unsigned int j = 0; j < 4; j++) {
+      for (int j = 0; j < 4; j++) {
         m_mesh >> elements[i * 4 + j];
         elements[i * 4 + j]--;
       }
@@ -295,14 +294,14 @@ class FidapReader : public MeshReader {
    * Read group ids from start to start+count. The group ids are sorted
    * in the same order as the elements.
    */
-  void readGroups(unsigned int start, unsigned int count, int* groups) {
+  void readGroups(std::size_t start, std::size_t count, int* groups) {
     // Get the boundary, were we should start reading
     std::vector<ElementSection>::const_iterator section;
     for (section = m_elements.begin(); section != m_elements.end() && section->nLines < start;
          section++)
       start -= section->nLines;
 
-    for (unsigned int i = 0; i < count; i++) {
+    for (std::size_t i = 0; i < count; i++) {
       if (start >= section->nLines) {
         // Are we starting a new section in this iteration?
         start = 0;
@@ -320,7 +319,7 @@ class FidapReader : public MeshReader {
    */
   void readGroups(int* groups) { readGroups(0, nElements(), groups); }
 
-  void readBoundaries(unsigned int start, unsigned int count, FidapBoundaryFace* boundaries) {
+  void readBoundaries(std::size_t start, std::size_t count, FidapBoundaryFace* boundaries) {
     m_mesh.clear();
 
     // Get the boundary, were we should start reading
@@ -332,7 +331,7 @@ class FidapReader : public MeshReader {
     m_mesh.seekg(section->seekPosition + start * section->lineSize + section->lineSize -
                  3 * VERTEX_ID_SIZE - 1);
 
-    for (unsigned int i = 0; i < count; i++) {
+    for (std::size_t i = 0; i < count; i++) {
       if (start >= section->nLines) {
         // Are we starting a new section in this iteration?
         start = 0;
@@ -341,7 +340,7 @@ class FidapReader : public MeshReader {
         m_mesh.seekg(section->seekPosition + section->lineSize - 3 * VERTEX_ID_SIZE - 1);
       }
 
-      for (unsigned int j = 0; j < 3; j++) {
+      for (int j = 0; j < 3; j++) {
         m_mesh >> boundaries[i].vertices[j];
         boundaries[i].vertices[j]--;
       }
@@ -354,7 +353,7 @@ class FidapReader : public MeshReader {
     }
   }
 
-  // TODO void readBoundaries(int* boundaries) {}
+  // TODO void readBoundaries(std::size_t* boundaries) {}
 
   public:
   /**
@@ -364,9 +363,9 @@ class FidapReader : public MeshReader {
    * @param n Number of elements
    * @param[out] map The map
    */
-  static void createFaceMap(const int* elements, unsigned int n,
+  static void createFaceMap(const std::size_t* elements, std::size_t n,
                             std::map<FaceVertex, FaceElement>& map) {
-    for (unsigned int i = 0; i < n; i++) {
+    for (std::size_t i = 0; i < n; i++) {
       FaceVertex v1(elements[i * 4], elements[i * 4 + 1], elements[i * 4 + 2]);
       FaceElement e1(i, 0);
       map[v1] = e1;

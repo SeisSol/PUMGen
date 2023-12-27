@@ -19,12 +19,16 @@
 #include <mpi.h>
 
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <cstdint>
 #include <cstring>
+#include <numeric>
 #include <vector>
 
 #include "utils/logger.h"
+
+#include "third_party/MPITraits.h"
 
 /**
  * Filters duplicate vertices in parallel
@@ -36,12 +40,12 @@ class ParallelVertexFilter {
    */
   class IndexedVertexComparator {
 private:
-    const double* m_vertices;
+    const std::vector<double>& m_vertices;
 
 public:
-    IndexedVertexComparator(const double* vertices) : m_vertices(vertices) {}
+    IndexedVertexComparator(const std::vector<double>& vertices) : m_vertices(vertices) {}
 
-    bool operator()(unsigned int i, unsigned int j) {
+    bool operator()(std::size_t i, std::size_t j) {
       i *= 3;
       j *= 3;
 
@@ -63,17 +67,16 @@ public:
   int m_numProcs;
 
   /** Global id after filtering */
-  unsigned long* m_globalIds;
+  std::vector<std::size_t> m_globalIds;
 
   /** Number of local vertices after filtering */
-  unsigned int m_numLocalVertices;
+  std::size_t m_numLocalVertices;
 
   /** Local vertices after filtering */
-  double* m_localVertices;
+  std::vector<double> m_localVertices;
 
   public:
-  ParallelVertexFilter(MPI_Comm comm = MPI_COMM_WORLD)
-      : m_comm(comm), m_globalIds(0L), m_numLocalVertices(0), m_localVertices(0L) {
+  ParallelVertexFilter(MPI_Comm comm = MPI_COMM_WORLD) : m_comm(comm), m_numLocalVertices(0) {
     MPI_Comm_rank(comm, &m_rank);
     MPI_Comm_size(comm, &m_numProcs);
 
@@ -83,26 +86,23 @@ public:
     }
   }
 
-  virtual ~ParallelVertexFilter() {
-    delete[] m_globalIds;
-    delete[] m_localVertices;
-  }
+  virtual ~ParallelVertexFilter() {}
 
   /**
    * @param vertices Vertices that should be filtered, must have the size
    * <code>numVertices * 3</code>
    */
-  void filter(unsigned int numVertices, const double* vertices) {
+  void filter(std::size_t numVertices, const std::vector<double>& vertices) {
     // Chop the last 4 bits to avoid numerical errors
-    double* roundVertices = new double[numVertices * 3];
-    removeRoundError(vertices, numVertices * 3, roundVertices);
+    std::vector<double> roundVertices(numVertices * 3);
+    removeRoundError(vertices, roundVertices);
 
     // Create indices and sort them locally
-    unsigned int* sortIndices = new unsigned int[numVertices];
-    createSortedIndices(roundVertices, numVertices, sortIndices);
+    std::vector<std::size_t> sortIndices(numVertices);
+    createSortedIndices(roundVertices, sortIndices);
 
     // Select BUCKETS_PER_RANK-1 splitter elements
-    double localSplitters[BUCKETS_PER_RANK - 1];
+    std::array<double, BUCKETS_PER_RANK - 1> localSplitters;
 #if 0 // Use omp only if we create a larger amount of buckets
 #ifdef _OPENMP
 #pragma omp parallel for schedule(static)
@@ -118,20 +118,22 @@ public:
     }
 
     // Collect all splitter elements on rank 0
-    double* allSplitters = 0L;
+    std::vector<double> allSplitters;
 
-    if (m_rank == 0)
-      allSplitters = new double[m_numProcs * (BUCKETS_PER_RANK - 1)];
+    if (m_rank == 0) {
+      allSplitters.resize(m_numProcs * (BUCKETS_PER_RANK - 1));
+    }
 
-    MPI_Gather(localSplitters, BUCKETS_PER_RANK - 1, MPI_DOUBLE, allSplitters, BUCKETS_PER_RANK - 1,
-               MPI_DOUBLE, 0, m_comm);
+    MPI_Gather(localSplitters.data(), BUCKETS_PER_RANK - 1, MPI_DOUBLE, allSplitters.data(),
+               BUCKETS_PER_RANK - 1, MPI_DOUBLE, 0, m_comm);
 
     // Sort splitter elements
-    if (m_rank == 0)
-      std::sort(allSplitters, allSplitters + (m_numProcs * (BUCKETS_PER_RANK - 1)));
+    if (m_rank == 0) {
+      std::sort(allSplitters.begin(), allSplitters.end());
+    }
 
     // Distribute splitter to all processes
-    double* splitters = new double[m_numProcs - 1];
+    std::vector<double> splitters(m_numProcs - 1);
 
     if (m_rank == 0) {
 #ifdef _OPENMP
@@ -145,157 +147,141 @@ public:
       }
     }
 
-    MPI_Bcast(splitters, m_numProcs - 1, MPI_DOUBLE, 0, m_comm);
-
-    delete[] allSplitters;
+    MPI_Bcast(splitters.data(), m_numProcs - 1, MPI_DOUBLE, 0, m_comm);
 
     // Determine the bucket for each vertex
-    unsigned int* bucket = new unsigned int[numVertices];
+    std::vector<std::size_t> bucket(numVertices);
 
 #ifdef _OPENMP
 #pragma omp parallel for schedule(static)
 #endif
-    for (unsigned int i = 0; i < numVertices; i++) {
-      double* ub = std::upper_bound(splitters, splitters + m_numProcs - 1, roundVertices[i * 3]);
+    for (std::size_t i = 0; i < numVertices; i++) {
+      auto ub = std::upper_bound(splitters.begin(), splitters.end(), roundVertices[i * 3]);
 
-      bucket[i] = ub - splitters;
+      bucket[i] = std::distance(splitters.begin(), ub);
     }
 
-    delete[] roundVertices;
-    delete[] splitters;
-
     // Determine the (local and total) bucket size
-    int* bucketSize = new int[m_numProcs];
-    memset(bucketSize, 0, sizeof(int) * m_numProcs);
-    for (unsigned int i = 0; i < numVertices; i++)
-      bucketSize[bucket[i]]++;
-
-    delete[] bucket;
+    std::vector<int> bucketSize(m_numProcs);
+    for (std::size_t i = 0; i < numVertices; i++) {
+      ++bucketSize[bucket[i]];
+    }
 
     // Tell all processes what we are going to send them
-    int* recvSize = new int[m_numProcs];
+    std::vector<int> recvSize(m_numProcs);
 
-    MPI_Alltoall(bucketSize, 1, MPI_INT, recvSize, 1, MPI_INT, m_comm);
+    MPI_Alltoall(bucketSize.data(), 1, MPI_INT, recvSize.data(), 1, MPI_INT, m_comm);
 
-    unsigned int numSortVertices = 0;
+    std::size_t numSortVertices = 0;
 #ifdef _OPENMP
 #pragma omp parallel for schedule(static) reduction(+ : numSortVertices)
 #endif
-    for (int i = 0; i < m_numProcs; i++)
+    for (int i = 0; i < m_numProcs; i++) {
       numSortVertices += recvSize[i];
+    }
 
     // Create sorted send buffer
-    double* sendVertices = new double[3 * numVertices];
+    std::vector<double> sendVertices(3 * numVertices);
 #ifdef _OPENMP
 #pragma omp parallel for schedule(static)
 #endif
-    for (unsigned int i = 0; i < numVertices; i++) {
-      memcpy(&sendVertices[i * 3], &vertices[sortIndices[i] * 3], sizeof(double) * 3);
+    for (std::size_t i = 0; i < numVertices; i++) {
+      std::copy_n(vertices.begin() + sortIndices[i] * 3, 3, sendVertices.begin() + i * 3);
     }
 
     // Allocate buffer for the vertices and exchange them
-    double* sortVertices = new double[3 * numSortVertices];
+    std::vector<double> sortVertices(3 * numSortVertices);
 
-    int* sDispls = new int[m_numProcs];
-    int* rDispls = new int[m_numProcs];
+    std::vector<int> sDispls(m_numProcs);
+    std::vector<int> rDispls(m_numProcs);
     sDispls[0] = 0;
     rDispls[0] = 0;
     for (int i = 1; i < m_numProcs; i++) {
       sDispls[i] = sDispls[i - 1] + bucketSize[i - 1];
       rDispls[i] = rDispls[i - 1] + recvSize[i - 1];
     }
-    MPI_Alltoallv(sendVertices, bucketSize, sDispls, vertexType, sortVertices, recvSize, rDispls,
-                  vertexType, m_comm);
-
-    delete[] sendVertices;
+    MPI_Alltoallv(sendVertices.data(), bucketSize.data(), sDispls.data(), vertexType,
+                  sortVertices.data(), recvSize.data(), rDispls.data(), vertexType, m_comm);
 
     // Chop the last 4 bits to avoid numerical errors
-    roundVertices = new double[numSortVertices * 3];
-    removeRoundError(sortVertices, numSortVertices * 3, roundVertices);
+    roundVertices.resize(numSortVertices * 3);
+    removeRoundError(sortVertices, roundVertices);
 
     // Create indices and sort them (such that the vertices are sorted)
-    unsigned int* sortSortIndices = new unsigned int[numSortVertices];
-    createSortedIndices(roundVertices, numSortVertices, sortSortIndices);
-
-    delete[] roundVertices;
+    std::vector<std::size_t> sortSortIndices(numSortVertices);
+    createSortedIndices(roundVertices, sortSortIndices);
 
     // Initialize the global ids we send back to the other processors
-    unsigned long* gids = new unsigned long[numSortVertices];
+    std::vector<std::size_t> gids(numSortVertices);
 
     if (numSortVertices > 0) {
       gids[sortSortIndices[0]] = 0;
-      for (unsigned int i = 1; i < numSortVertices; i++) {
+      for (std::size_t i = 1; i < numSortVertices; i++) {
         if (equals(&sortVertices[sortSortIndices[i - 1] * 3],
-                   &sortVertices[sortSortIndices[i] * 3]))
+                   &sortVertices[sortSortIndices[i] * 3])) {
           gids[sortSortIndices[i]] = gids[sortSortIndices[i - 1]];
-        else
+        } else {
           gids[sortSortIndices[i]] = gids[sortSortIndices[i - 1]] + 1;
+        }
       }
     }
 
     // Create the local vertices list
-    if (numSortVertices > 0)
+    if (numSortVertices > 0) {
       m_numLocalVertices = gids[sortSortIndices[numSortVertices - 1]] + 1;
-    else
+    } else {
       m_numLocalVertices = 0;
-    delete[] m_localVertices;
-    m_localVertices = new double[m_numLocalVertices * 3];
-    for (unsigned int i = 0; i < numSortVertices; i++)
-      memcpy(&m_localVertices[gids[i] * 3], &sortVertices[i * 3], sizeof(double) * 3);
+    }
 
-    delete[] sortVertices;
+    m_localVertices.resize(m_numLocalVertices * 3);
+    for (std::size_t i = 0; i < numSortVertices; i++) {
+      std::copy_n(sortVertices.begin() + i * 3, 3, m_localVertices.begin() + gids[i] * 3);
+    }
 
     // Get the vertices offset
-    unsigned int offset = m_numLocalVertices;
-    MPI_Scan(MPI_IN_PLACE, &offset, 1, MPI_UNSIGNED, MPI_SUM, m_comm);
+    std::size_t offset = m_numLocalVertices;
+    MPI_Scan(MPI_IN_PLACE, &offset, 1, tndm::mpi_type_t<std::size_t>(), MPI_SUM, m_comm);
     offset -= m_numLocalVertices;
 
     // Add offset to the global ids
 #ifdef _OPENMP
 #pragma omp parallel for schedule(static)
 #endif
-    for (unsigned int i = 0; i < numSortVertices; i++)
+    for (std::size_t i = 0; i < numSortVertices; i++) {
       gids[i] += offset;
+    }
 
     // Send result back
-    unsigned long* globalIds = new unsigned long[numVertices];
-    MPI_Alltoallv(gids, recvSize, rDispls, MPI_UNSIGNED_LONG, globalIds, bucketSize, sDispls,
-                  MPI_UNSIGNED_LONG, m_comm);
-
-    delete[] bucketSize;
-    delete[] recvSize;
-    delete[] sDispls;
-    delete[] rDispls;
-    delete[] gids;
+    std::vector<std::size_t> globalIds(numVertices);
+    MPI_Alltoallv(gids.data(), recvSize.data(), rDispls.data(), tndm::mpi_type_t<std::size_t>(),
+                  globalIds.data(), bucketSize.data(), sDispls.data(),
+                  tndm::mpi_type_t<std::size_t>(), m_comm);
 
     // Assign the global ids to the correct vertices
-    delete[] m_globalIds;
-    m_globalIds = new unsigned long[numVertices];
+    m_globalIds.resize(numVertices);
 #ifdef _OPENMP
 #pragma omp parallel for schedule(static)
 #endif
-    for (unsigned int i = 0; i < numVertices; i++)
+    for (std::size_t i = 0; i < numVertices; i++) {
       m_globalIds[sortIndices[i]] = globalIds[i];
-
-    delete[] sortIndices;
-    delete[] globalIds;
+    }
   }
 
   /**
    * @return The list of the global identifiers after filtering
    */
-  const unsigned long* globalIds() const { return m_globalIds; }
+  const std::vector<std::size_t>& globalIds() const { return m_globalIds; }
 
   /**
    * @return Number of vertices this process is responsible for after filtering
    */
-  unsigned int numLocalVertices() const { return m_numLocalVertices; }
+  std::size_t numLocalVertices() const { return m_numLocalVertices; }
 
   /**
    * @return The list of vertices this process is responsible for after
    * filtering
    */
-  const double* localVertices() const { return m_localVertices; }
+  const std::vector<double>& localVertices() const { return m_localVertices; }
 
   private:
   /**
@@ -329,29 +315,34 @@ public:
    * @param[out] roundValues The list of rounded values
    *  (the caller is responsible for allocating the memory)
    */
-  static void removeRoundError(const double* values, unsigned int count, double* roundValues) {
+  static void removeRoundError(const std::vector<double>& values,
+                               std::vector<double>& roundValues) {
+    assert(values.size() == roundValues.size());
+
 #ifdef _OPENMP
 #pragma omp parallel for schedule(static)
 #endif
-    for (unsigned int i = 0; i < count; i++)
+    for (std::size_t i = 0; i < roundValues.size(); i++) {
       roundValues[i] = removeRoundError(values[i]);
+    }
   }
 
   /**
    * Creates the list of sorted indices for the vertices.
    * The caller is responsible for allocating the memory.
    */
-  static void createSortedIndices(const double* vertices, unsigned int numVertices,
-                                  unsigned int* sortedIndices) {
+  static void createSortedIndices(const std::vector<double>& vertices,
+                                  std::vector<std::size_t>& sortedIndices) {
 
 #ifdef _OPENMP
 #pragma omp parallel for schedule(static)
 #endif
-    for (unsigned int i = 0; i < numVertices; i++)
+    for (std::size_t i = 0; i < sortedIndices.size(); i++) {
       sortedIndices[i] = i;
+    }
 
     IndexedVertexComparator comparator(vertices);
-    std::sort(sortedIndices, sortedIndices + numVertices, comparator);
+    std::sort(sortedIndices.begin(), sortedIndices.end(), comparator);
   }
 
   /**
@@ -366,7 +357,7 @@ public:
   static MPI_Datatype vertexType;
 
   /** The total buckets we create is <code>BUCKETS_PER_RANK * numProcs</code> */
-  const static int BUCKETS_PER_RANK = 8;
+  constexpr static int BUCKETS_PER_RANK = 8;
 };
 
 #endif // PARALLEL_VERTEX_FILTER_H

@@ -19,6 +19,7 @@
 
 #include "FidapReader.h"
 #include "ParallelMeshReader.h"
+#include "third_party/MPITraits.h"
 
 class ParallelFidapReader : public ParallelMeshReader<FidapReader> {
   private:
@@ -31,30 +32,32 @@ class ParallelFidapReader : public ParallelMeshReader<FidapReader> {
   ParallelFidapReader(const char* meshFile, MPI_Comm comm = MPI_COMM_WORLD)
       : ParallelMeshReader<FidapReader>(meshFile, comm) {}
 
-  void readElements(int* elements) {
+  void readElements(std::size_t* elements) {
     ParallelMeshReader<FidapReader>::readElements(elements);
 
     // Create the face map
-    unsigned int chunkSize = (nElements() + m_nProcs - 1) / m_nProcs;
-    unsigned int maxChunkSize = chunkSize;
-    if (m_rank == m_nProcs - 1)
+    std::size_t chunkSize = (nElements() + m_nProcs - 1) / m_nProcs;
+    const std::size_t maxChunkSize = chunkSize;
+    if (m_rank == m_nProcs - 1) {
       chunkSize = nElements() - (m_nProcs - 1) * chunkSize;
+    }
 
     FidapReader::createFaceMap(elements, chunkSize, m_faceMap);
-    for (std::map<FaceVertex, FaceElement>::iterator i = m_faceMap.begin(); i != m_faceMap.end();
-         i++)
-      i->second.element += m_rank * maxChunkSize;
+    for (auto& face : m_faceMap) {
+      face.second.element += m_rank * maxChunkSize;
+    }
   }
 
   /**
    * @copydoc ParallelGambitReader::readGroups
    */
   void readGroups(int* groups) {
-    unsigned int chunkSize = (nElements() + m_nProcs - 1) / m_nProcs;
+    std::size_t chunkSize = (nElements() + m_nProcs - 1) / m_nProcs;
 
     if (m_rank == 0) {
       // Allocate second buffer so we can read and send in parallel
-      int* groups2 = new int[chunkSize];
+      std::vector<int> tempGroups(chunkSize);
+      int* groups2 = tempGroups.data();
       if (m_nProcs % 2 == 0)
         // swap once so we have the correct buffer at the end
         swap(groups, groups2);
@@ -71,7 +74,7 @@ class ParallelFidapReader : public ParallelMeshReader<FidapReader> {
 
       if (m_nProcs > 1) {
         // Read last one
-        unsigned int lastChunkSize = nElements() - (m_nProcs - 1) * chunkSize;
+        const std::size_t lastChunkSize = nElements() - (m_nProcs - 1) * chunkSize;
         logInfo() << "Reading group information part" << (m_nProcs - 1) << "of" << m_nProcs;
         m_serialReader.readGroups((m_nProcs - 1) * chunkSize, lastChunkSize, groups);
         MPI_Wait(&request, MPI_STATUS_IGNORE);
@@ -83,8 +86,6 @@ class ParallelFidapReader : public ParallelMeshReader<FidapReader> {
       logInfo() << "Reading group information part" << m_nProcs << "of" << m_nProcs;
       m_serialReader.readGroups(0, chunkSize, groups);
       MPI_Wait(&request, MPI_STATUS_IGNORE);
-
-      delete[] groups2;
     } else {
       if (m_rank == m_nProcs - 1)
         chunkSize = nElements() - (m_nProcs - 1) * chunkSize;
@@ -123,36 +124,34 @@ class ParallelFidapReader : public ParallelMeshReader<FidapReader> {
     std::vector<FaceElement> facePos;
     std::vector<int> faceType;
 
-    unsigned int chunkSize = (nElements() + m_nProcs - 1) / m_nProcs;
-    unsigned int maxChunkSize = chunkSize;
+    std::size_t chunkSize = (nElements() + m_nProcs - 1) / m_nProcs;
+    const std::size_t maxChunkSize = chunkSize;
 
     if (m_rank == 0) {
-      FidapBoundaryFace* faces = new FidapBoundaryFace[maxChunkSize];
+      std::vector<FidapBoundaryFace> faces(maxChunkSize);
 
-      std::vector<int>* aggregator = new std::vector<int>[m_nProcs - 1];
-      unsigned int* sizes = new unsigned int[m_nProcs - 1];
-      MPI_Request* requests = new MPI_Request[(m_nProcs - 1) * 2];
-      for (int i = 0; i < m_nProcs - 1; i++) {
-        requests[i * 2] = MPI_REQUEST_NULL;
-        requests[i * 2 + 1] = MPI_REQUEST_NULL;
-      }
+      std::vector<std::vector<int>> aggregator(m_nProcs - 1);
+      std::vector<std::size_t> sizes(m_nProcs - 1);
+      std::vector<MPI_Request> requests((m_nProcs - 1) * 2, MPI_REQUEST_NULL);
 
-      unsigned int nChunks = (nBoundaries() + chunkSize - 1) / chunkSize;
-      for (unsigned int i = 0; i < nChunks; i++) {
+      const std::size_t nChunks = (nBoundaries() + chunkSize - 1) / chunkSize;
+      for (std::size_t i = 0; i < nChunks; i++) {
         logInfo() << "Reading boundary conditions part" << (i + 1) << "of" << nChunks;
 
-        if (i == nChunks - 1)
+        if (i == nChunks - 1) {
           chunkSize = nBoundaries() - (nChunks - 1) * chunkSize;
+        }
 
-        m_serialReader.readBoundaries(i * maxChunkSize, chunkSize, faces);
+        m_serialReader.readBoundaries(i * maxChunkSize, chunkSize, faces.data());
 
         // Wait for all sending from last iteration
-        MPI_Waitall((m_nProcs - 1) * 2, requests, MPI_STATUSES_IGNORE);
-        for (int j = 0; j < m_nProcs - 1; j++)
+        MPI_Waitall((m_nProcs - 1) * 2, requests.data(), MPI_STATUSES_IGNORE);
+        for (int j = 0; j < m_nProcs - 1; j++) {
           aggregator[j].clear();
+        }
 
         // Sort boundary conditions into the corresponding aggregator
-        for (unsigned int j = 0; j < chunkSize; j++) {
+        for (std::size_t j = 0; j < chunkSize; j++) {
           FaceVertex v(faces[j].vertices);
 
           if (v.vertices[1] < vertexChunk) {
@@ -161,8 +160,9 @@ class ParallelFidapReader : public ParallelMeshReader<FidapReader> {
           } else {
             // Face for another processor
             // Serials the struct to make sending easier
-            unsigned int proc = v.vertices[1] / vertexChunk;
-            aggregator[proc - 1].insert(aggregator[proc - 1].end(), v.vertices, v.vertices + 3);
+            int proc = v.vertices[1] / vertexChunk;
+            aggregator[proc - 1].insert(aggregator[proc - 1].end(), v.vertices.begin(),
+                                        v.vertices.end());
             aggregator[proc - 1].push_back(faces[j].type);
           }
         }
@@ -173,54 +173,49 @@ class ParallelFidapReader : public ParallelMeshReader<FidapReader> {
             continue;
 
           sizes[j] = aggregator[j].size() / 4; // 3 vertices + face type
-          MPI_Isend(&sizes[j], 1, MPI_UNSIGNED, j + 1, 0, m_comm, &requests[j * 2]);
+          MPI_Isend(&sizes[j], 1, tndm::mpi_type_t<std::size_t>(), j + 1, 0, m_comm,
+                    &requests[j * 2]);
           MPI_Isend(&aggregator[j][0], aggregator[j].size(), MPI_INT, j + 1, 0, m_comm,
                     &requests[j * 2 + 1]);
         }
       }
 
-      MPI_Waitall((m_nProcs - 1) * 2, requests, MPI_STATUSES_IGNORE);
-
-      delete[] faces;
-      delete[] aggregator;
+      MPI_Waitall((m_nProcs - 1) * 2, requests.data(), MPI_STATUSES_IGNORE);
 
       // Send finish signal to all other processes
-      memset(sizes, 0, (m_nProcs - 1) * sizeof(unsigned int));
-      for (int i = 0; i < m_nProcs - 1; i++)
-        MPI_Isend(&sizes[i], 1, MPI_UNSIGNED, i + 1, 0, m_comm, &requests[i]);
-      MPI_Waitall(m_nProcs - 1, requests, MPI_STATUSES_IGNORE);
-
-      delete[] sizes;
-      delete[] requests;
+      std::fill(sizes.begin(), sizes.end(), 0);
+      for (int i = 0; i < m_nProcs - 1; i++) {
+        MPI_Isend(&sizes[i], 1, tndm::mpi_type_t<std::size_t>(), i + 1, 0, m_comm, &requests[i]);
+      }
+      MPI_Waitall(m_nProcs - 1, requests.data(), MPI_STATUSES_IGNORE);
     } else {
       if (m_rank == m_nProcs - 1)
         chunkSize = nElements() - (m_nProcs - 1) * chunkSize;
 
       // Allocate enough memory
-      int* buf = new int[chunkSize * 4];
+      std::vector<std::size_t> buf(chunkSize * 4);
 
       while (true) {
-        unsigned int size;
-        MPI_Recv(&size, 1, MPI_UNSIGNED, 0, 0, m_comm, MPI_STATUS_IGNORE);
+        std::size_t size;
+        MPI_Recv(&size, 1, tndm::mpi_type_t<std::size_t>(), 0, 0, m_comm, MPI_STATUS_IGNORE);
         if (size == 0)
           // Finished
           break;
 
-        MPI_Recv(buf, size * 4, MPI_INT, 0, 0, m_comm, MPI_STATUS_IGNORE);
+        MPI_Recv(buf.data(), size * 4, tndm::mpi_type_t<std::size_t>(), 0, 0, m_comm,
+                 MPI_STATUS_IGNORE);
 
-        for (unsigned int i = 0; i < size * 4; i += 4) {
-          FaceVertex v(&buf[i]);
+        for (std::size_t i = 0; i < size * 4; i += 4) {
+          FaceVertex v(buf[i], buf[i + 1], buf[i + 2]);
           facePos.push_back(m_faceMap.at(v));
           faceType.push_back(buf[i + 3]);
         }
       }
-
-      delete[] buf;
     }
 
     // Distribute the faces to the final ranks
     PCU_Comm_Begin();
-    for (unsigned int i = 0; i < facePos.size(); i++) {
+    for (std::size_t i = 0; i < facePos.size(); i++) {
       if (facePos[i].element / maxChunkSize == static_cast<unsigned int>(m_rank))
         boundaries[(facePos[i].element % maxChunkSize) * 4 + facePos[i].side] = faceType[i];
       else {
