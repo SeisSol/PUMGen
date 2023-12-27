@@ -184,8 +184,8 @@ int main(int argc, char* argv[]) {
 
   // Parse command line arguments
   utils::Args args;
-  const char* source[] = {"gambit", "msh2",        "msh4",
-                          "netcdf", "apf",   "simmodsuite", "simmodsuite-apf"};
+  const char* source[] = {"gambit", "msh2",        "msh4",           "netcdf",
+                          "apf",    "simmodsuite", "simmodsuite-apf"};
   args.addEnumOption("source", source, 's', "Mesh source (default: gambit)", false);
 
   const char* filters[] = {"none",     "scaleoffset", "deflate1", "deflate2",
