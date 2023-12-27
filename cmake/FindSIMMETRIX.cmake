@@ -13,7 +13,8 @@ list(APPEND SIMMETRIX_INCLUDE_DIR
 find_library(GMI_SIM_LIB gmi_sim)
 find_library(APF_SIM_LIB apf_sim)
 
-set(SIM_LIB_HINT ${SIMMETRIX_ROOT}/lib/x64_rhel7_gcc48)
+message(SIMMETRIX_ROOT : ${SIMMETRIX_ROOT})
+set(SIM_LIB_HINT ${SIMMETRIX_ROOT}/lib/x64_rhel8_gcc83)
 
 find_library(SIM_DISCRETE_LIB SimDiscrete ${SIM_LIB_HINT})
 find_library(SIM_MESHING_LIB SimMeshing ${SIM_LIB_HINT})
@@ -26,6 +27,8 @@ find_library(SIM_PARTITIONED_MESH_LIB SimPartitionedMesh ${SIM_LIB_HINT})
 find_library(SIM_PARTITIONED_MESH_MPI_LIB SimPartitionedMesh-mpi ${SIM_LIB_HINT})
 find_library(SIM_PARTITINED_WRAPPER_LIB SimPartitionWrapper-${SIM_MPI} ${SIM_LIB_HINT})
 find_library(SIM_PS_KRNL_LIB pskernel ${SIM_LIB_HINT}/psKrnl)
+find_library(SIM_LICENSE_LIB SimLicense ${SIM_LIB_HINT})
+
   
 get_filename_component(SIM_PS_KRNL_LIB_DIR ${SIM_PS_KRNL_LIB} DIRECTORY)
 
@@ -40,6 +43,7 @@ list(APPEND SIMMETRIX_LIBRARIES
   "${SIM_PARTITINED_WRAPPER_LIB}"
   "${SIM_MODEL_LIB}"
   "${SIM_PS_KRNL_LIB}"
+  "${SIM_LICENSE_LIB}"
 )
 
 if (PARASOLID)
@@ -55,8 +59,15 @@ find_library(TIRPC tirpc)
 if (TIRPC)
     list(APPEND SIMMETRIX_LIBRARIES ${TIRPC})
 endif()
+message(SIM_MODEL_LIB : ${SIM_MODEL_LIB})
 
 string(REGEX REPLACE ".*/([0-9]+).[0-9]-.*" "\\1" SIM_MAJOR_VER ${SIM_MODEL_LIB})
+
+message(SIM_MAJOR_VER : ${SIM_MAJOR_VER})
+message(SIMMETRIX : ${SIMMETRIX})
+message(SIMMETRIX_INCLUDE_DIR : ${SIMMETRIX_INCLUDE_DIR})
+message(SIMMETRIX_LIBRARIES : ${SIMMETRIX_LIBRARIES})
+
 find_package_handle_standard_args(SIMMETRIX DEFAULT_MSG
   SIMMETRIX_INCLUDE_DIR SIMMETRIX_LIBRARIES SIM_MAJOR_VER)
 
