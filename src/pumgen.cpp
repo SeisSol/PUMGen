@@ -28,8 +28,8 @@
 #include <apfMesh2.h>
 #include <apfNumbering.h>
 // #include <apfZoltan.h>
-#include <maMesh.h>
 #include "input/ApfNative.h"
+#include <maMesh.h>
 #ifdef USE_SIMMOD
 #include "input/SimModSuiteApf.h"
 #endif
@@ -48,7 +48,6 @@
 #include "input/SimModSuite.h"
 #endif // USE_SIMMOD
 #include "meshreader/GMSH4Parser.h"
-#include "meshreader/ParallelFidapReader.h"
 #include "meshreader/ParallelGMSHReader.h"
 #include "meshreader/ParallelGambitReader.h"
 #include "third_party/GMSH2Parser.h"
@@ -185,7 +184,7 @@ int main(int argc, char* argv[]) {
 
   // Parse command line arguments
   utils::Args args;
-  const char* source[] = {"gambit", "fidap", "msh2",        "msh4",
+  const char* source[] = {"gambit", "msh2",        "msh4",
                           "netcdf", "apf",   "simmodsuite", "simmodsuite-apf"};
   args.addEnumOption("source", source, 's', "Mesh source (default: gambit)", false);
 
@@ -299,18 +298,14 @@ int main(int argc, char* argv[]) {
     meshInput = new SerialMeshFile<puml::ParallelGambitReader>(inputFile);
     break;
   case 1:
-    logInfo(rank) << "Using Fidap mesh";
-    meshInput = new SerialMeshFile<ParallelFidapReader>(inputFile);
-    break;
-  case 2:
     logInfo(rank) << "Using GMSH mesh format 2 (msh2) mesh";
     meshInput = new SerialMeshFile<puml::ParallelGMSHReader<tndm::GMSH2Parser>>(inputFile);
     break;
-  case 3:
+  case 2:
     logInfo(rank) << "Using GMSH mesh format 4 (msh4) mesh";
     meshInput = new SerialMeshFile<puml::ParallelGMSHReader<puml::GMSH4Parser>>(inputFile);
     break;
-  case 4:
+  case 3:
 #ifdef USE_NETCDF
     logInfo(rank) << "Using netCDF mesh";
     meshInput = new NetCDFMesh(inputFile);
@@ -318,7 +313,7 @@ int main(int argc, char* argv[]) {
     logError() << "netCDF is not supported in this version";
 #endif // USE_NETCDF
     break;
-  case 5:
+  case 4:
     logInfo(rank) << "Using APF native format";
 #ifdef USE_SCOREC
     meshInput = ApfNative(inputFile, args.getArgument<const char*>("input", 0L)).generate();
@@ -327,7 +322,7 @@ int main(int argc, char* argv[]) {
                   "is not available.";
 #endif
     break;
-  case 6:
+  case 5:
 #ifdef USE_SIMMOD
     logInfo(rank) << "Using SimModSuite";
 
@@ -340,24 +335,28 @@ int main(int argc, char* argv[]) {
 #else  // USE_SIMMOD
     logError() << "SimModSuite is not supported in this version.";
 #endif // USE_SIMMOD
-  case 7:
+  case 6:
 #ifdef USE_SIMMOD
 #ifdef USE_SCOREC
-    meshInput = new SimModSuiteApf(
-        inputFile, args.getArgument<const char*>("cad", 0L),
-        args.getArgument<const char*>("license", 0L), args.getArgument<const char*>("mesh", "mesh"),
-        args.getArgument<const char*>("analysis", "analysis"),
-        args.getArgument<int>("enforce-size", 0), args.getArgument<const char*>("xml", 0L),
-        args.isSet("analyseAR"), args.getArgument<const char*>("sim_log", 0L)).generate();
+    meshInput =
+        new SimModSuiteApf(inputFile, args.getArgument<const char*>("cad", 0L),
+                           args.getArgument<const char*>("license", 0L),
+                           args.getArgument<const char*>("mesh", "mesh"),
+                           args.getArgument<const char*>("analysis", "analysis"),
+                           args.getArgument<int>("enforce-size", 0),
+                           args.getArgument<const char*>("xml", 0L), args.isSet("analyseAR"),
+                           args.getArgument<const char*>("sim_log", 0L))
+            .generate();
 #else
-    logError() << "This version of PUMgen has been compiled without SCOREC. Hence, this reader for the SimModSuite is not available here.";
+    logError() << "This version of PUMgen has been compiled without SCOREC. Hence, this reader for "
+                  "the SimModSuite is not available here.";
 #endif
 #else
     logError() << "SimModSuite is not supported in this version.";
 #endif
     break;
   default:
-    logError() << "Unknown source";
+    logError() << "Unknown source.";
   }
 
   logInfo(rank) << "Parsed mesh successfully, writing output...";
