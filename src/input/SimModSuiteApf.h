@@ -72,7 +72,7 @@ pAManager SModel_attManager(pModel model);
  *  of this class
  * @todo Maybe add MS_setMaxEntities to limit the number of elements
  */
-class SimModSuite : public MeshInput {
+class SimModSuite : public ApfMeshInput {
   private:
   EasiMeshSize easiMeshSize;
   pGModel m_model;

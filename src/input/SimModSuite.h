@@ -53,6 +53,7 @@
 
 #include <SimDisplay.h>
 #include <SimMeshTools.h>
+#include <cstddef>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -60,7 +61,6 @@
 #include <sstream>
 #include <string>
 #include <vector>
-#include <cstddef>
 
 // forward declare
 pAManager SModel_attManager(pModel model);

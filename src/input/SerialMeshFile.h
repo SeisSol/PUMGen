@@ -18,8 +18,8 @@
 #endif // PARALLEL
 
 #include "aux/Distributor.h"
-#include <vector>
 #include <cstddef>
+#include <vector>
 
 #include "MeshData.h"
 #include "utils/logger.h"

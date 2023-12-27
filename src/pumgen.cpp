@@ -10,8 +10,6 @@
  * @author Sebastian Rettenberger <sebastian.rettenberger@tum.de>
  */
 
-#include <H5Ppublic.h>
-#include <H5Zpublic.h>
 #include <mpi.h>
 
 #include <algorithm>
@@ -26,10 +24,16 @@
 
 #include <hdf5.h>
 
+#ifdef USE_SCOREC
 #include <apfMesh2.h>
 #include <apfNumbering.h>
 // #include <apfZoltan.h>
 #include <maMesh.h>
+#include "input/ApfNative.h"
+#ifdef USE_SIMMOD
+#include "input/SimModSuiteApf.h"
+#endif
+#endif
 #include <type_traits>
 
 #include "third_party/MPITraits.h"
@@ -40,7 +44,6 @@
 #ifdef USE_NETCDF
 #include "input/NetCDFMesh.h"
 #endif // USE_NETCDF
-#include "input/ApfNative.h"
 #ifdef USE_SIMMOD
 #include "input/SimModSuite.h"
 #endif // USE_SIMMOD
@@ -68,14 +71,6 @@ static int ilog(std::size_t value, int expbase = 1) {
     ++count;
   }
   return count;
-}
-
-template <typename F> static void iterate(apf::Mesh* mesh, int dim, F&& function) {
-  apf::MeshIterator* it = mesh->begin(dim);
-  while (apf::MeshEntity* element = mesh->iterate(it)) {
-    std::invoke(function, element);
-  }
-  mesh->end(it);
 }
 
 constexpr std::size_t NoSecondDim = 0;
@@ -184,15 +179,15 @@ int main(int argc, char* argv[]) {
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &processes);
 
+#ifdef USE_SCOREC
   PCU_Comm_Init();
+#endif
 
   // Parse command line arguments
   utils::Args args;
-  const char* source[] = {"gambit", "fidap", "msh2", "msh4", "netcdf", "apf", "simmodsuite"};
+  const char* source[] = {"gambit", "fidap", "msh2",        "msh4",
+                          "netcdf", "apf",   "simmodsuite", "simmodsuite-apf"};
   args.addEnumOption("source", source, 's', "Mesh source (default: gambit)", false);
-  args.addOption("dump", 'd', "Dump APF mesh before partitioning it", utils::Args::Required, false);
-  args.addOption("model", 0, "Dump/Load a specific model file", utils::Args::Required, false);
-  args.addOption("vtk", 0, "Dump mesh to VTK files", utils::Args::Required, false);
 
   const char* filters[] = {"none",     "scaleoffset", "deflate1", "deflate2",
                            "deflate3", "deflate4",    "deflate5", "deflate6",
@@ -325,7 +320,12 @@ int main(int argc, char* argv[]) {
     break;
   case 5:
     logInfo(rank) << "Using APF native format";
-    // meshInput = new ApfNative(inputFile, args.getArgument<const char*>("model", 0L));
+#ifdef USE_SCOREC
+    meshInput = ApfNative(inputFile, args.getArgument<const char*>("input", 0L)).generate();
+#else
+    logError() << "This version of PUMgen has been compiled without SCOREC. Hence, the APF format "
+                  "is not available.";
+#endif
     break;
   case 6:
 #ifdef USE_SIMMOD
@@ -338,8 +338,23 @@ int main(int argc, char* argv[]) {
         args.getArgument<int>("enforce-size", 0), args.getArgument<const char*>("xml", 0L),
         args.isSet("analyseAR"), args.getArgument<const char*>("sim_log", 0L));
 #else  // USE_SIMMOD
-    logError() << "SimModSuite is not supported in this version";
+    logError() << "SimModSuite is not supported in this version.";
 #endif // USE_SIMMOD
+  case 7:
+#ifdef USE_SIMMOD
+#ifdef USE_SCOREC
+    meshInput = new SimModSuiteApf(
+        inputFile, args.getArgument<const char*>("cad", 0L),
+        args.getArgument<const char*>("license", 0L), args.getArgument<const char*>("mesh", "mesh"),
+        args.getArgument<const char*>("analysis", "analysis"),
+        args.getArgument<int>("enforce-size", 0), args.getArgument<const char*>("xml", 0L),
+        args.isSet("analyseAR"), args.getArgument<const char*>("sim_log", 0L)).generate();
+#else
+    logError() << "This version of PUMgen has been compiled without SCOREC. Hence, this reader for the SimModSuite is not available here.";
+#endif
+#else
+    logError() << "SimModSuite is not supported in this version.";
+#endif
     break;
   default:
     logError() << "Unknown source";
@@ -348,8 +363,6 @@ int main(int argc, char* argv[]) {
   logInfo(rank) << "Parsed mesh successfully, writing output...";
 
   void* mesh = nullptr;
-
-  // TODO(David): replace by apf::countOwned again once extended
 
   // Get local/global size
   std::size_t localSize[2] = {meshInput->cellCount(), meshInput->vertexCount()};
@@ -473,7 +486,9 @@ int main(int argc, char* argv[]) {
 
   logInfo(rank) << "Finished successfully";
 
+#ifdef USE_SCOREC
   PCU_Comm_Free();
+#endif
 
   MPI_Finalize();
   return 0;
