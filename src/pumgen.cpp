@@ -173,8 +173,9 @@ static void writeH5Data(const F& handler, hid_t h5file, const std::string& name,
 int main(int argc, char* argv[]) {
   int rank = 0;
   int processes = 1;
+  int mpithreadstate = MPI_THREAD_SINGLE;
 
-  MPI_Init(&argc, &argv);
+  MPI_Init_thread(&argc, &argv, MPI_THREAD_MULTIPLE, &mpithreadstate);
 
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &processes);
