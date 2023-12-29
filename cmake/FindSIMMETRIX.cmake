@@ -1,17 +1,23 @@
 include(FindPackageHandleStandardArgs)
 
-find_path(GMI_SIM_INCLUDE_DIR gmi_sim.h)
-find_path(APF_SIM_INCLUDE_DIR apfSIM.h)
+if (SCOREC)
+  find_path(GMI_SIM_INCLUDE_DIR gmi_sim.h)
+  find_path(APF_SIM_INCLUDE_DIR apfSIM.h)
+
+  list(APPEND SIMMETRIX_INCLUDE_DIR
+    ${GMI_SIM_INCLUDE_DIR}
+    ${APF_SIM_INCLUDE_DIR}
+  )
+
+  find_library(GMI_SIM_LIB gmi_sim)
+  find_library(APF_SIM_LIB apf_sim)
+endif()
+
 find_path(MESH_SIM_INCLUDE_DIR MeshSim.h)
 
 list(APPEND SIMMETRIX_INCLUDE_DIR
-  ${GMI_SIM_INCLUDE_DIR}
-  ${APF_SIM_INCLUDE_DIR}
   ${MESH_SIM_INCLUDE_DIR}
 )
-
-find_library(GMI_SIM_LIB gmi_sim)
-find_library(APF_SIM_LIB apf_sim)
 
 set(SIM_LIB_HINT ${SIMMETRIX_ROOT}/lib/x64_rhel7_gcc48)
 
