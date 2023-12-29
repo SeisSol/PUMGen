@@ -21,7 +21,7 @@
 #include "MeshData.h"
 #include "utils/logger.h"
 
-#include "MeshInput.h"
+#include "MeshData.h"
 #include "NetCDFPartition.h"
 #include "ParallelVertexFilter.h"
 
@@ -85,7 +85,7 @@ class NetCDFMesh : public FullStorageMeshData {
       bool useGroups = true;
       if (nc_inq_varid(ncFile, "element_group", &ncVarElemGroup) != NC_NOERR) {
         useGroups = false;
-        logWarning() << "No group found, using group 0 for all elements";
+        logWarning(rank) << "No group found, using group 0 for all elements";
       } else {
         collectiveAccess(ncFile, ncVarElemGroup);
       }
