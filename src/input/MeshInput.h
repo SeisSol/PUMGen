@@ -87,28 +87,25 @@ class ApfMeshInput : public FullStorageMeshData {
     });
 
     // groups
+    apf::MeshTag* groupTag = m_mesh->findTag("group");
     iterate(m_mesh, 3, [&](auto index, auto* element) {
       int group;
-      mesh->getIntTag(element, groupTag, &group);
+      m_mesh->getIntTag(element, groupTag, &group);
       groupData[index] = group;
     });
 
     // boundary
+    apf::MeshTag* boundaryTag = m_mesh->findTag("boundary condition");
     iterate(m_mesh, 3, [&](auto index, auto* element) {
       apf::Downward faces;
-      mesh->getDownward(element, 2, faces);
+      m_mesh->getDownward(element, 2, faces);
 
       for (int i = 0; i < 4; i++) {
-        if (mesh->hasTag(faces[i], boundaryTag)) {
+        if (m_mesh->hasTag(faces[i], boundaryTag)) {
           int b;
-          mesh->getIntTag(faces[i], boundaryTag, &b);
+          m_mesh->getIntTag(faces[i], boundaryTag, &b);
 
-          if (b <= 0 || (b > i32limit && boundaryType == 0) ||
-              (b > i64limit && boundaryType == 1)) {
-            logError() << "Cannot handle boundary condition" << b;
-          }
-
-          setBoundary(inex, i, b);
+          setBoundary(index, i, b);
         }
       }
     });

@@ -10,8 +10,8 @@
  * @author Sebastian Rettenberger <sebastian.rettenberger@tum.de>
  */
 
-#ifndef SIM_MOD_SUITE_H
-#define SIM_MOD_SUITE_H
+#ifndef SIM_MOD_SUITE_APF_H
+#define SIM_MOD_SUITE_APF_H
 
 #include <mpi.h>
 
@@ -72,7 +72,7 @@ pAManager SModel_attManager(pModel model);
  *  of this class
  * @todo Maybe add MS_setMaxEntities to limit the number of elements
  */
-class SimModSuite : public ApfMeshInput {
+class SimModSuiteApf : public ApfMeshInput {
   private:
   EasiMeshSize easiMeshSize;
   pGModel m_model;
@@ -83,10 +83,10 @@ class SimModSuite : public ApfMeshInput {
   bool m_log;
 
   public:
-  SimModSuite(const char* modFile, const char* cadFile = 0L, const char* licenseFile = 0L,
-              const char* meshCaseName = "mesh", const char* analysisCaseName = "analysis",
-              int enforceSize = 0, const char* xmlFile = 0L, const bool analyseAR = false,
-              const char* logFile = 0L) {
+  SimModSuiteApf(const char* modFile, const char* cadFile = 0L, const char* licenseFile = 0L,
+                 const char* meshCaseName = "mesh", const char* analysisCaseName = "analysis",
+                 int enforceSize = 0, const char* xmlFile = 0L, const bool analyseAR = false,
+                 const char* logFile = 0L) {
     // Init SimModSuite
     SimModel_start();
     SimPartitionedMesh_start(0L, 0L);
@@ -227,7 +227,7 @@ class SimModSuite : public ApfMeshInput {
     MS_deleteMeshCase(analysisCase);
   }
 
-  virtual ~SimModSuite() {
+  virtual ~SimModSuiteApf() {
     M_release(m_simMesh);
     // We cannot delete the model here because it is still
     // connected to the mesh
@@ -685,4 +685,4 @@ class SimModSuite : public ApfMeshInput {
   }
 };
 
-#endif // SIM_MOD_SUITE_H
+#endif // SIM_MOD_SUITE_APF_H

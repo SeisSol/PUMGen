@@ -25,6 +25,7 @@
 #include <hdf5.h>
 
 #ifdef USE_SCOREC
+#include <PCU.h>
 #include <apfMesh2.h>
 #include <apfNumbering.h>
 // #include <apfZoltan.h>
@@ -316,7 +317,7 @@ int main(int argc, char* argv[]) {
   case 4:
     logInfo(rank) << "Using APF native format";
 #ifdef USE_SCOREC
-    meshInput = ApfNative(inputFile, args.getArgument<const char*>("input", 0L));
+    meshInput = new ApfNative(inputFile, args.getArgument<const char*>("input", 0L));
     (dynamic_cast<ApfMeshInput*>(meshInput))->generate();
 #else
     logError() << "This version of PUMgen has been compiled without SCOREC. Hence, the APF format "
