@@ -43,13 +43,13 @@ template <typename T> class SerialMeshFile : public FullStorageMeshData {
 
   public:
 #ifdef PARALLEL
-  SerialMeshFile(const char* meshFile, MPI_Comm comm = MPI_COMM_WORLD)
-      : m_comm(comm), m_meshReader(comm) {
+  SerialMeshFile(const char* meshFile, int boundarySize, MPI_Comm comm = MPI_COMM_WORLD)
+      : FullStorageMeshData(boundarySize), m_comm(comm), m_meshReader(comm) {
     init();
     open(meshFile);
   }
 #else  // PARALLEL
-  SerialMeshFile(const char* meshFile) {
+  SerialMeshFile(const char* meshFile, int boundarySize) : FullStorageMeshData(boundarySize) {
     init();
     open(meshFile);
   }

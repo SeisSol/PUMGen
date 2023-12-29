@@ -32,7 +32,8 @@ class NetCDFMesh : public FullStorageMeshData {
   public:
   virtual ~NetCDFMesh() = default;
 
-  NetCDFMesh(const char* meshFile, MPI_Comm comm = MPI_COMM_WORLD) {
+  NetCDFMesh(const char* meshFile, int boundarySize, MPI_Comm comm = MPI_COMM_WORLD)
+      : FullStorageMeshData(boundarySize) {
     int rank = 0;
     int nProcs = 1;
     MPI_Comm_rank(comm, &rank);

@@ -41,6 +41,8 @@ class FullStorageMeshData : public MeshData {
   virtual const std::vector<int64_t>& boundary() { return boundaryData; }
 
   protected:
+  FullStorageMeshData(int boundarySize) : bndShift(boundarySize) {}
+
   std::size_t cellCountValue = 0;
   std::size_t vertexCountValue = 0;
 

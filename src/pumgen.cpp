@@ -297,20 +297,22 @@ int main(int argc, char* argv[]) {
   switch (args.getArgument<int>("source", 0)) {
   case 0:
     logInfo(rank) << "Using Gambit mesh";
-    meshInput = new SerialMeshFile<puml::ParallelGambitReader>(inputFile);
+    meshInput = new SerialMeshFile<puml::ParallelGambitReader>(inputFile, faceOffset);
     break;
   case 1:
     logInfo(rank) << "Using GMSH mesh format 2 (msh2) mesh";
-    meshInput = new SerialMeshFile<puml::ParallelGMSHReader<tndm::GMSH2Parser>>(inputFile);
+    meshInput =
+        new SerialMeshFile<puml::ParallelGMSHReader<tndm::GMSH2Parser>>(inputFile, faceOffset);
     break;
   case 2:
     logInfo(rank) << "Using GMSH mesh format 4 (msh4) mesh";
-    meshInput = new SerialMeshFile<puml::ParallelGMSHReader<puml::GMSH4Parser>>(inputFile);
+    meshInput =
+        new SerialMeshFile<puml::ParallelGMSHReader<puml::GMSH4Parser>>(inputFile, faceOffset);
     break;
   case 3:
 #ifdef USE_NETCDF
     logInfo(rank) << "Using netCDF mesh";
-    meshInput = new NetCDFMesh(inputFile);
+    meshInput = new NetCDFMesh(inputFile, faceOffset);
 #else  // USE_NETCDF
     logError() << "netCDF is not supported in this version";
 #endif // USE_NETCDF
@@ -318,7 +320,7 @@ int main(int argc, char* argv[]) {
   case 4:
     logInfo(rank) << "Using APF native format";
 #ifdef USE_SCOREC
-    meshInput = new ApfNative(inputFile, args.getArgument<const char*>("input", 0L));
+    meshInput = new ApfNative(inputFile, faceOffset, args.getArgument<const char*>("input", 0L));
     (dynamic_cast<ApfMeshInput*>(meshInput))->generate();
 #else
     logError() << "This version of PUMgen has been compiled without SCOREC. Hence, the APF format "
@@ -330,7 +332,7 @@ int main(int argc, char* argv[]) {
     logInfo(rank) << "Using SimModSuite";
 
     meshInput = new SimModSuite(
-        inputFile, args.getArgument<const char*>("cad", 0L),
+        inputFile, faceOffset, args.getArgument<const char*>("cad", 0L),
         args.getArgument<const char*>("license", 0L), args.getArgument<const char*>("mesh", "mesh"),
         args.getArgument<const char*>("analysis", "analysis"),
         args.getArgument<int>("enforce-size", 0), args.getArgument<const char*>("xml", 0L),
@@ -345,7 +347,7 @@ int main(int argc, char* argv[]) {
     logInfo(rank) << "Using SimModSuite with APF (deprecated)";
 
     meshInput = new SimModSuiteApf(
-        inputFile, args.getArgument<const char*>("cad", 0L),
+        inputFile, faceOffset, args.getArgument<const char*>("cad", 0L),
         args.getArgument<const char*>("license", 0L), args.getArgument<const char*>("mesh", "mesh"),
         args.getArgument<const char*>("analysis", "analysis"),
         args.getArgument<int>("enforce-size", 0), args.getArgument<const char*>("xml", 0L),

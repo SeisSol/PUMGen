@@ -23,7 +23,8 @@
 
 class ApfNative : public ApfMeshInput {
   public:
-  ApfNative(const char* mesh, const char* model = 0L) {
+  ApfNative(const char* mesh, int boundarySize, const char* model = 0L)
+      : ApfMeshInput(boundarySize) {
     if (model)
       gmi_register_mesh();
     else {
