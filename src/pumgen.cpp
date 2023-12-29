@@ -316,7 +316,8 @@ int main(int argc, char* argv[]) {
   case 4:
     logInfo(rank) << "Using APF native format";
 #ifdef USE_SCOREC
-    meshInput = ApfNative(inputFile, args.getArgument<const char*>("input", 0L)).generate();
+    meshInput = ApfNative(inputFile, args.getArgument<const char*>("input", 0L));
+    (dynamic_cast<ApfMeshInput*>(meshInput))->generate();
 #else
     logError() << "This version of PUMgen has been compiled without SCOREC. Hence, the APF format "
                   "is not available.";
@@ -338,15 +339,13 @@ int main(int argc, char* argv[]) {
   case 6:
 #ifdef USE_SIMMOD
 #ifdef USE_SCOREC
-    meshInput =
-        new SimModSuiteApf(inputFile, args.getArgument<const char*>("cad", 0L),
-                           args.getArgument<const char*>("license", 0L),
-                           args.getArgument<const char*>("mesh", "mesh"),
-                           args.getArgument<const char*>("analysis", "analysis"),
-                           args.getArgument<int>("enforce-size", 0),
-                           args.getArgument<const char*>("xml", 0L), args.isSet("analyseAR"),
-                           args.getArgument<const char*>("sim_log", 0L))
-            .generate();
+    meshInput = new SimModSuiteApf(
+        inputFile, args.getArgument<const char*>("cad", 0L),
+        args.getArgument<const char*>("license", 0L), args.getArgument<const char*>("mesh", "mesh"),
+        args.getArgument<const char*>("analysis", "analysis"),
+        args.getArgument<int>("enforce-size", 0), args.getArgument<const char*>("xml", 0L),
+        args.isSet("analyseAR"), args.getArgument<const char*>("sim_log", 0L));
+    (dynamic_cast<ApfMeshInput*>(meshInput))->generate();
 #else
     logError() << "This version of PUMgen has been compiled without SCOREC. Hence, this reader for "
                   "the SimModSuite is not available here.";

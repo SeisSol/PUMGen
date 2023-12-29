@@ -193,7 +193,7 @@ class NetCDFMesh : public FullStorageMeshData {
 
       logInfo(rank) << "Converting local to global vertex identifier";
 #ifdef _OPENMP
-#pragma omp parallel for 
+#pragma omp parallel for
 #endif
       for (std::size_t i = 0; i < nElements * 4; i++) {
         connectivityData[i] = filter.globalIds()[elementsLocal[i]];
