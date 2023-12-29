@@ -3,7 +3,10 @@
 #define MESH_DATA_H
 
 #include <cstdint>
+#include <limits>
 #include <vector>
+
+#include "utils/logger.h"
 
 // TODO: to save space, the connectivity, geometry, group, and boundary arrays can also be
 // constructed on the fly (for that, change the MeshData data structure to work on an iterator
@@ -14,6 +17,8 @@
  */
 class MeshData {
   public:
+  virtual ~MeshData() = default;
+
   virtual std::size_t cellCount() = 0;
   virtual std::size_t vertexCount() = 0;
 
@@ -45,6 +50,12 @@ class FullStorageMeshData : public MeshData {
   int bndShift = 8;
 
   void setBoundary(std::size_t cell, int face, int value) {
+    constexpr auto i32limit = std::numeric_limits<unsigned char>::max();
+    constexpr auto i64limit = std::numeric_limits<unsigned short>::max();
+    if (value < 0 || (value > i32limit && bndShift == 8) || (value > i64limit && bndShift == 16)) {
+      logError() << "Cannot handle boundary condition" << value;
+    }
+
     boundaryData[cell] |= static_cast<int64_t>(value) << (face * bndShift);
   }
 
