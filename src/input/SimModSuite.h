@@ -189,14 +189,14 @@ class SimModSuite : public FullStorageMeshData {
       {
         size_t totalCount = 0;
         size_t ownedCount = 0;
-        VIter reg_it = M_vertexIter(PM_mesh(m_simMesh, i));
-        while (pVertex vertex = VIter_next(reg_it)) {
+        VIter vert_it = M_vertexIter(PM_mesh(m_simMesh, i));
+        while (pVertex vertex = VIter_next(vert_it)) {
           ++totalCount;
           if (EN_isOwnerProc((pEntity)vertex)) {
             ++ownedCount;
           }
         }
-        VIter_delete(reg_it);
+        VIter_delete(vert_it);
 
         vertexCount += ownedCount;
         vertexIDCount += totalCount;
@@ -238,7 +238,6 @@ class SimModSuite : public FullStorageMeshData {
           std::size_t indexID = vertexIDStart[i];
           VIter reg_it = M_vertexIter(PM_mesh(m_simMesh, i));
           while (pVertex vertex = VIter_next(reg_it)) {
-            // TODO: EN_isOwnerProc()
             EN_setID((pEntity)vertex, indexID);
             double xyz[3];
             V_coord(vertex, xyz);
@@ -254,7 +253,7 @@ class SimModSuite : public FullStorageMeshData {
     }
     vertexCount = vertexFilter.numLocalVertices();
 
-    logInfo(PMU_rank()) << "Local vertices (really, now):" << vertexCount;
+    logInfo(PMU_rank()) << "Local vertices (after filtering):" << vertexCount;
 
     setup(cellCount, vertexCount);
     std::copy(vertexFilter.localVertices().begin(), vertexFilter.localVertices().end(),
@@ -268,11 +267,12 @@ class SimModSuite : public FullStorageMeshData {
         pRegion reg;
         while ((reg = RIter_next(reg_it))) {
           if (EN_isOwnerProc((pEntity)reg)) {
+            EN_setID((pEntity)reg, index);
+
             pPList vertices = R_vertices(reg, 1);
             void* iter = nullptr;
             int j = 0;
             while (pVertex vertex = (pVertex)PList_next(vertices, &iter)) {
-              EN_setID((pEntity)reg, index);
               connectivityData[index * 4 + j] = vertexFilter.globalIds()[EN_id((pEntity)vertex)];
               ++j;
             }

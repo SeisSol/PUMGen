@@ -338,9 +338,12 @@ int main(int argc, char* argv[]) {
 #else  // USE_SIMMOD
     logError() << "SimModSuite is not supported in this version.";
 #endif // USE_SIMMOD
+    break;
   case 6:
 #ifdef USE_SIMMOD
 #ifdef USE_SCOREC
+    logInfo(rank) << "Using SimModSuite (with APF)";
+
     meshInput = new SimModSuiteApf(
         inputFile, args.getArgument<const char*>("cad", 0L),
         args.getArgument<const char*>("license", 0L), args.getArgument<const char*>("mesh", "mesh"),
