@@ -40,7 +40,7 @@ class ApfMeshInput : public FullStorageMeshData {
   public:
   apf::Mesh2* getMesh() { return m_mesh; }
 
-  ~ApfMeshInput() {
+  virtual ~ApfMeshInput() {
     delete m_mesh;
     m_mesh = nullptr;
   }

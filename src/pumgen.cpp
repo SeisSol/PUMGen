@@ -342,7 +342,7 @@ int main(int argc, char* argv[]) {
   case 6:
 #ifdef USE_SIMMOD
 #ifdef USE_SCOREC
-    logInfo(rank) << "Using SimModSuite (with APF)";
+    logInfo(rank) << "Using SimModSuite with APF (deprecated)";
 
     meshInput = new SimModSuiteApf(
         inputFile, args.getArgument<const char*>("cad", 0L),

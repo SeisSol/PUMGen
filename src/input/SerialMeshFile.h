@@ -28,6 +28,9 @@
  * Read a mesh from a serial file
  */
 template <typename T> class SerialMeshFile : public FullStorageMeshData {
+  public:
+  virtual ~SerialMeshFile() = default;
+
   private:
 #ifdef PARALLEL
   MPI_Comm m_comm;

@@ -30,6 +30,8 @@ class MeshData {
 
 class FullStorageMeshData : public MeshData {
   public:
+  virtual ~FullStorageMeshData() = default;
+
   virtual std::size_t cellCount() { return cellCountValue; }
   virtual std::size_t vertexCount() { return vertexCountValue; }
 
