@@ -88,7 +88,7 @@ static void writeH5Data(F&& handler, hid_t h5file, const std::string& name, apf:
   const std::size_t bufferSize = std::min(localSize, chunkSize);
   std::vector<T> data(SecondSize * bufferSize);
 
-  std::size_t rounds = (localSize + chunk - 1) / chunk;
+  std::size_t rounds = (localSize + chunkSize - 1) / chunkSize;
 
   MPI_Allreduce(MPI_IN_PLACE, &rounds, 1, tndm::mpi_type_t<decltype(rounds)>(), MPI_MAX,
                 MPI_COMM_WORLD);
