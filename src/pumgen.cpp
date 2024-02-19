@@ -86,7 +86,7 @@ static void writeH5Data(const F& handler, hid_t h5file, const std::string& name,
   const std::size_t bufferSize = std::min(localSize, chunkSize);
   std::vector<T> data(SecondSize * bufferSize);
 
-  std::size_t rounds = (localSize + chunk - 1) / chunk;
+  std::size_t rounds = (localSize + chunkSize - 1) / chunkSize;
 
   MPI_Allreduce(MPI_IN_PLACE, &rounds, 1, tndm::mpi_type_t<decltype(rounds)>(), MPI_MAX,
                 MPI_COMM_WORLD);
@@ -404,7 +404,7 @@ int main(int argc, char* argv[]) {
   checkH5Err(H5Pclose(h5falist));
 
   // Write cells
-  std::size_t connectSize = 8;
+  std::size_t connectBytesPerData = 8;
   logInfo(rank) << "Writing cells";
   writeH5Data<unsigned long, 4>(meshInput->connectivity(), h5file, "connect", mesh, 3,
                                 H5T_NATIVE_ULONG, H5T_STD_U64LE, chunksize, localSize[0],
@@ -418,8 +418,7 @@ int main(int argc, char* argv[]) {
 
   // Group information
 
-  std::size_t groupSize = 4;
-  if (true) {
+  std::size_t groupBytesPerData = 4;
     logInfo(rank) << "Writing group information";
     writeH5Data<int, NoSecondDim>(meshInput->group(), h5file, "group", mesh, 3, H5T_NATIVE_INT,
                                   H5T_STD_I32LE, chunksize, localSize[0], globalSize[0], reduceInts,
@@ -458,7 +457,7 @@ int main(int argc, char* argv[]) {
          << std::endl
          // This should be UInt but for some reason this does not work with
          // binary data
-         << "    <DataItem NumberType=\"Int\" Precision=\"" << connectSize
+         << "    <DataItem NumberType=\"Int\" Precision=\"" << connectBytesPerData
          << "\" Format=\"HDF\" "
             "Dimensions=\""
          << globalSize[0] << " 4\">" << basename << ":/connect</DataItem>" << std::endl
@@ -470,7 +469,7 @@ int main(int argc, char* argv[]) {
          << ":/geometry</DataItem>" << std::endl
          << "   </Geometry>" << std::endl
          << "   <Attribute Name=\"group\" Center=\"Cell\">" << std::endl
-         << "    <DataItem  NumberType=\"Int\" Precision=\"" << groupSize
+         << "    <DataItem  NumberType=\"Int\" Precision=\"" << groupBytesPerData
          << "\" Format=\"HDF\" "
             "Dimensions=\""
          << globalSize[0] << "\">" << basename << ":/group</DataItem>" << std::endl
