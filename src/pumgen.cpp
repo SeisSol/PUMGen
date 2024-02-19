@@ -419,13 +419,10 @@ int main(int argc, char* argv[]) {
   // Group information
 
   std::size_t groupBytesPerData = 4;
-    logInfo(rank) << "Writing group information";
-    writeH5Data<int, NoSecondDim>(meshInput->group(), h5file, "group", mesh, 3, H5T_NATIVE_INT,
-                                  H5T_STD_I32LE, chunksize, localSize[0], globalSize[0], reduceInts,
-                                  filterEnable, filterChunksize);
-  } else {
-    logInfo() << "No group information found in mesh";
-  }
+  logInfo(rank) << "Writing group information";
+  writeH5Data<int, NoSecondDim>(meshInput->group(), h5file, "group", mesh, 3, H5T_NATIVE_INT,
+                                H5T_STD_I32LE, chunksize, localSize[0], globalSize[0], reduceInts,
+                                filterEnable, filterChunksize);
 
   // Write boundary condition
   logInfo(rank) << "Writing boundary condition";
