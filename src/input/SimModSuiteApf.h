@@ -6,13 +6,12 @@
  *  notice in the file 'COPYING' at the root directory of this package
  *  and the copyright notice at https://github.com/SeisSol/PUMGen
  *
- * @copyright 2017,2023 Technical University of Munich
+ * @copyright 2017 Technical University of Munich
  * @author Sebastian Rettenberger <sebastian.rettenberger@tum.de>
- * @author David Schneller <david.schneller@tum.de>
  */
 
-#ifndef SIM_MOD_SUITE_H
-#define SIM_MOD_SUITE_H
+#ifndef SIM_MOD_SUITE_APF_H
+#define SIM_MOD_SUITE_APF_H
 
 #include <mpi.h>
 
@@ -20,6 +19,12 @@
 #include <cassert>
 #include <cstring>
 #include <unordered_map>
+
+#include <apf.h>
+#include <apfMDS.h>
+#include <apfMesh2.h>
+#include <apfSIM.h>
+#include <gmi_sim.h>
 
 #include <MeshSim.h>
 #include <SimDiscrete.h>
@@ -43,17 +48,14 @@
 #include "utils/path.h"
 #include "utils/progress.h"
 
-#include "MeshData.h"
+#include "MeshInput.h"
 
 #include "AnalysisAttributes.h"
 #include "EasiMeshSize.h"
 #include "MeshAttributes.h"
 
-#include "ParallelVertexFilter.h"
-
 #include <SimDisplay.h>
 #include <SimMeshTools.h>
-#include <cstddef>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
@@ -70,7 +72,7 @@ pAManager SModel_attManager(pModel model);
  *  of this class
  * @todo Maybe add MS_setMaxEntities to limit the number of elements
  */
-class SimModSuite : public FullStorageMeshData {
+class SimModSuiteApf : public ApfMeshInput {
   private:
   EasiMeshSize easiMeshSize;
   pGModel m_model;
@@ -81,11 +83,11 @@ class SimModSuite : public FullStorageMeshData {
   bool m_log;
 
   public:
-  SimModSuite(const char* modFile, int boundarySize, const char* cadFile = 0L,
-              const char* licenseFile = 0L, const char* meshCaseName = "mesh",
-              const char* analysisCaseName = "analysis", int enforceSize = 0,
-              const char* xmlFile = 0L, const bool analyseAR = false, const char* logFile = 0L)
-      : FullStorageMeshData(boundarySize) {
+  SimModSuiteApf(const char* modFile, int boundarySize, const char* cadFile = 0L,
+                 const char* licenseFile = 0L, const char* meshCaseName = "mesh",
+                 const char* analysisCaseName = "analysis", int enforceSize = 0,
+                 const char* xmlFile = 0L, const bool analyseAR = false, const char* logFile = 0L)
+      : ApfMeshInput(boundarySize) {
     // Init SimModSuite
     SimModel_start();
     SimPartitionedMesh_start(0L, 0L);
@@ -173,171 +175,51 @@ class SimModSuite : public FullStorageMeshData {
       analyse_mesh();
     }
 
-    logInfo(PMU_rank()) << "Iterating over mesh to get data...";
-    int parts = PM_numParts(m_simMesh);
-    std::size_t vertexCount = 0;
-    std::size_t vertexIDCount = 0;
-    std::size_t cellCount = 0;
+    // Convert to APF mesh
+    apf::Mesh* tmpMesh = apf::createMesh(m_simMesh);
+    gmi_register_sim();
+    gmi_model* model = gmi_import_sim(m_model);
 
-    std::vector<std::size_t> vertexStart(parts + 1);
-    std::vector<std::size_t> vertexIDStart(parts + 1);
-    std::vector<std::size_t> cellStart(parts + 1);
-    for (int i = 0; i < parts; i++) {
-      logInfo(PMU_rank()) << "Counting part" << i << "/" << parts;
-      vertexStart[i] = vertexCount;
-      vertexIDStart[i] = vertexIDCount;
-      cellStart[i] = cellCount;
-      {
-        size_t totalCount = 0;
-        size_t ownedCount = 0;
-        VIter vert_it = M_vertexIter(PM_mesh(m_simMesh, i));
-        while (pVertex vertex = VIter_next(vert_it)) {
-          ++totalCount;
-          if (EN_isOwnerProc((pEntity)vertex)) {
-            ++ownedCount;
-          }
-        }
-        VIter_delete(vert_it);
+    logInfo(PMU_rank()) << "Converting mesh to APF";
+    m_mesh = apf::createMdsMesh(model, tmpMesh);
+    apf::destroyMesh(tmpMesh);
 
-        vertexCount += ownedCount;
-        vertexIDCount += totalCount;
-      }
-      {
-        size_t totalCount = 0;
-        size_t ownedCount = 0;
-        RIter reg_it = M_regionIter(PM_mesh(m_simMesh, i));
-        while (pRegion reg = RIter_next(reg_it)) {
-          ++totalCount;
-          if (EN_isOwnerProc((pEntity)reg)) {
-            ++ownedCount;
-          }
-        }
-        RIter_delete(reg_it);
-
-        cellCount += ownedCount;
-        assert(totalCount == ownedCount);
-      }
-    }
-    vertexStart.back() = vertexCount;
-    cellStart.back() = cellCount;
-    vertexIDStart.back() = vertexIDCount;
-
-    logInfo(PMU_rank()) << "Local cells:" << cellCount;
-    logInfo(PMU_rank()) << "Local vertices:" << vertexCount;
-    logInfo(PMU_rank()) << "Local vertices (with duplicates):" << vertexIDCount;
-
+    // Set the boundary conditions from the geometric model
     AttCase_associate(analysisCase, 0L);
+    apf::MeshTag* boundaryTag = m_mesh->createIntTag("boundary condition", 1);
+    apf::MeshIterator* it = m_mesh->begin(2);
+    while (apf::MeshEntity* face = m_mesh->iterate(it)) {
+      apf::ModelEntity* modelFace = m_mesh->toModel(face);
+      if (m_mesh->getModelType(modelFace) != 2)
+        continue;
 
-    ParallelVertexFilter vertexFilter;
+      pGEntity simFace = reinterpret_cast<pGEntity>(modelFace);
 
-    {
-      std::vector<double> vertexData(vertexIDCount * 3);
-      for (int i = 0; i < parts; i++) {
-        logInfo(PMU_rank()) << "Processing part" << i << "/" << parts;
-        logInfo(PMU_rank()) << "Vertices:" << vertexStart[i] << "to" << vertexStart[i + 1];
-        {
-          std::size_t indexID = vertexIDStart[i];
-          VIter reg_it = M_vertexIter(PM_mesh(m_simMesh, i));
-          while (pVertex vertex = VIter_next(reg_it)) {
-            EN_setID((pEntity)vertex, indexID);
-            double xyz[3];
-            V_coord(vertex, xyz);
-            vertexData[indexID * 3 + 0] = xyz[0];
-            vertexData[indexID * 3 + 1] = xyz[1];
-            vertexData[indexID * 3 + 2] = xyz[2];
-            ++indexID;
-          }
-          VIter_delete(reg_it);
-        }
-      }
-      vertexFilter.filter(vertexIDCount, vertexData);
-    }
-    vertexCount = vertexFilter.numLocalVertices();
+      pAttribute attr = GEN_attrib(simFace, "boundaryCondition");
+      if (attr) {
+        char* image = Attribute_imageClass(attr);
+        int boundary = parseBoundary(image);
+        Sim_deleteString(image);
 
-    logInfo(PMU_rank()) << "Local vertices (after filtering):" << vertexCount;
-
-    setup(cellCount, vertexCount);
-    std::copy(vertexFilter.localVertices().begin(), vertexFilter.localVertices().end(),
-              geometryData.begin());
-    for (int i = 0; i < parts; i++) {
-      logInfo(PMU_rank()) << "Processing part" << i << "/" << parts;
-      logInfo(PMU_rank()) << "Connectivity:" << cellStart[i] << "to" << cellStart[i + 1];
-      {
-        std::size_t index = cellStart[i];
-        RIter reg_it = M_regionIter(PM_mesh(m_simMesh, i));
-        pRegion reg;
-        while ((reg = RIter_next(reg_it))) {
-          if (EN_isOwnerProc((pEntity)reg)) {
-            EN_setID((pEntity)reg, index);
-
-            pPList vertices = R_vertices(reg, 1);
-            void* iter = nullptr;
-            int j = 0;
-            while (pVertex vertex = (pVertex)PList_next(vertices, &iter)) {
-              connectivityData[index * 4 + j] = vertexFilter.globalIds()[EN_id((pEntity)vertex)];
-              ++j;
-            }
-            PList_delete(vertices);
-            ++index;
-          }
-        }
-        RIter_delete(reg_it);
-      }
-
-      logInfo(PMU_rank()) << "Groups";
-      {
-        int groupIdx = 0;
-        GRIter modelRegionIter = GM_regionIter(m_model);
-        while (pGRegion mreg = GRIter_next(modelRegionIter)) {
-          RIter reg_it = M_classifiedRegionIter(PM_mesh(m_simMesh, i), mreg);
-          while (pRegion reg = RIter_next(reg_it)) {
-            if (EN_isOwnerProc((pEntity)reg)) {
-              groupData[EN_id((pEntity)reg)] = groupIdx;
-            }
-          }
-          RIter_delete(reg_it);
-
-          ++groupIdx;
-        }
-        GRIter_delete(modelRegionIter);
-      }
-
-      logInfo(PMU_rank()) << "Boundaries";
-      {
-        GFIter modelFaceIter = GM_faceIter(m_model);
-        while (pGFace mface = GFIter_next(modelFaceIter)) {
-          pAttribute attr = GEN_attrib(mface, "boundaryCondition");
-          if (attr != nullptr) {
-            char* image = Attribute_imageClass(attr);
-            int boundary = parseBoundary(image);
-            FIter face_it = M_classifiedFaceIter(PM_mesh(m_simMesh, i), mface, 1);
-            while (pFace face = FIter_next(face_it)) {
-              pRegion r1 = F_region(face, 0);
-              pRegion r2 = F_region(face, 1);
-
-              // suboptimal: we go over all faces here...
-              if (r1 != nullptr && EN_isOwnerProc((pEntity)r1)) {
-                for (int k = 0; k < 4; ++k) {
-                  if (R_face(r1, k) == face) {
-                    setBoundary(EN_id((pEntity)r1), k, boundary);
-                  }
-                }
-              }
-              if (r2 != nullptr && EN_isOwnerProc((pEntity)r2)) {
-                for (int k = 0; k < 4; ++k) {
-                  if (R_face(r2, k) == face) {
-                    setBoundary(EN_id((pEntity)r2), k, boundary);
-                  }
-                }
-              }
-            }
-            FIter_delete(face_it);
-            Sim_deleteString(image);
-          }
-        }
-        GFIter_delete(modelFaceIter);
+        m_mesh->setIntTag(face, boundaryTag, &boundary);
       }
     }
+    m_mesh->end(it);
+
+    // Set groups
+    apf::MeshTag* groupTag = m_mesh->createIntTag("group", 1);
+    it = m_mesh->begin(3);
+    while (apf::MeshEntity* element = m_mesh->iterate(it)) {
+      apf::ModelEntity* modelRegion = m_mesh->toModel(element);
+
+      pGRegion simRegion = reinterpret_cast<pGRegion>(modelRegion);
+      std::unordered_map<pGRegion, int>::const_iterator i = groupMap.find(simRegion);
+      if (i == groupMap.end())
+        logError() << "Mesh element with unknown region found.";
+
+      m_mesh->setIntTag(element, groupTag, &i->second);
+    }
+    m_mesh->end(it);
 
     AttCase_unassociate(analysisCase);
 
@@ -346,7 +228,7 @@ class SimModSuite : public FullStorageMeshData {
     MS_deleteMeshCase(analysisCase);
   }
 
-  virtual ~SimModSuite() {
+  virtual ~SimModSuiteApf() {
     M_release(m_simMesh);
     // We cannot delete the model here because it is still
     // connected to the mesh
@@ -804,4 +686,4 @@ class SimModSuite : public FullStorageMeshData {
   }
 };
 
-#endif // SIM_MOD_SUITE_H
+#endif // SIM_MOD_SUITE_APF_H

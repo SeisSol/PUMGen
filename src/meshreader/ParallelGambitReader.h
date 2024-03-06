@@ -17,6 +17,7 @@
 
 #include "GambitReader.h"
 #include "ParallelMeshReader.h"
+#include "aux/Distributor.h"
 
 #include "third_party/MPITraits.h"
 
@@ -37,7 +38,7 @@ class ParallelGambitReader : public ParallelMeshReader<GambitReader> {
    * This is a collective operation.
    */
   void readGroups(int* groups) {
-    std::size_t chunkSize = (nElements() + m_nProcs - 1) / m_nProcs;
+    std::size_t chunkSize = getChunksize(nElements(), m_rank, m_nProcs);
 
     if (m_rank == 0) {
       std::size_t maxChunkSize = chunkSize;
@@ -50,9 +51,7 @@ class ParallelGambitReader : public ParallelMeshReader<GambitReader> {
       for (int i = 0; i < m_nProcs; i++) {
         logInfo() << "Reading group information part" << (i + 1) << "of" << m_nProcs;
 
-        if (i == m_nProcs - 1) {
-          chunkSize = nElements() - (m_nProcs - 1) * chunkSize;
-        }
+        chunkSize = getChunksize(nElements(), i, m_nProcs);
 
         m_serialReader.readGroups(i * maxChunkSize, chunkSize, map.data());
 
@@ -92,10 +91,6 @@ class ParallelGambitReader : public ParallelMeshReader<GambitReader> {
 
       MPI_Waitall((m_nProcs - 1) * 2, requests.data(), MPI_STATUSES_IGNORE);
     } else {
-      if (m_rank == m_nProcs - 1) {
-        chunkSize = nElements() - (m_nProcs - 1) * chunkSize;
-      }
-
       // Allocate enough memory
       std::vector<int> buf(chunkSize * 2);
 
@@ -126,7 +121,7 @@ class ParallelGambitReader : public ParallelMeshReader<GambitReader> {
    * @todo Only tetrahedral meshes are supported
    */
   void readBoundaries(int* boundaries) {
-    std::size_t chunkSize = (nElements() + m_nProcs - 1) / m_nProcs;
+    std::size_t chunkSize = getChunksize(nBoundaries(), m_rank, m_nProcs);
 
     if (m_rank == 0) {
       std::size_t maxChunkSize = chunkSize;
@@ -140,9 +135,7 @@ class ParallelGambitReader : public ParallelMeshReader<GambitReader> {
       for (std::size_t i = 0; i < nChunks; i++) {
         logInfo() << "Reading boundary conditions part" << (i + 1) << "of" << nChunks;
 
-        if (i == nChunks - 1) {
-          chunkSize = nBoundaries() - (nChunks - 1) * chunkSize;
-        }
+        chunkSize = getChunksize(nBoundaries(), i, m_nProcs);
 
         m_serialReader.readBoundaries(i * maxChunkSize, chunkSize, faces.data());
 
@@ -188,10 +181,6 @@ class ParallelGambitReader : public ParallelMeshReader<GambitReader> {
       }
       MPI_Waitall(m_nProcs - 1, requests.data(), MPI_STATUSES_IGNORE);
     } else {
-      if (m_rank == m_nProcs - 1) {
-        chunkSize = nElements() - (m_nProcs - 1) * chunkSize;
-      }
-
       // Allocate enough memory
       std::vector<int> buf(chunkSize * 2);
 

@@ -17,19 +17,20 @@
 #include <mpi.h>
 #endif // PARALLEL
 
-#include "ApfConvertWrapper.h"
-#include <PCU.h>
-#include <apfMDS.h>
-#include <apfMesh2.h>
-#include <gmi_null.h>
+#include "aux/Distributor.h"
+#include <cstddef>
 #include <vector>
 
-#include "MeshInput.h"
+#include "MeshData.h"
+#include "utils/logger.h"
 
 /**
  * Read a mesh from a serial file
  */
-template <typename T> class SerialMeshFile : public MeshInput {
+template <typename T> class SerialMeshFile : public FullStorageMeshData {
+  public:
+  virtual ~SerialMeshFile() = default;
+
   private:
 #ifdef PARALLEL
   MPI_Comm m_comm;
@@ -42,13 +43,13 @@ template <typename T> class SerialMeshFile : public MeshInput {
 
   public:
 #ifdef PARALLEL
-  SerialMeshFile(const char* meshFile, MPI_Comm comm = MPI_COMM_WORLD)
-      : m_comm(comm), m_meshReader(comm) {
+  SerialMeshFile(const char* meshFile, int boundarySize, MPI_Comm comm = MPI_COMM_WORLD)
+      : FullStorageMeshData(boundarySize), m_comm(comm), m_meshReader(comm) {
     init();
     open(meshFile);
   }
 #else  // PARALLEL
-  SerialMeshFile(const char* meshFile) {
+  SerialMeshFile(const char* meshFile, int boundarySize) : FullStorageMeshData(boundarySize) {
     init();
     open(meshFile);
   }
@@ -73,77 +74,27 @@ template <typename T> class SerialMeshFile : public MeshInput {
 
     const std::size_t nVertices = m_meshReader.nVertices();
     const std::size_t nElements = m_meshReader.nElements();
-    std::size_t nLocalVertices = (nVertices + m_nProcs - 1) / m_nProcs;
-    std::size_t nLocalElements = (nElements + m_nProcs - 1) / m_nProcs;
-    if (m_rank == m_nProcs - 1) {
-      nLocalVertices = nVertices - (m_nProcs - 1) * nLocalVertices;
-      nLocalElements = nElements - (m_nProcs - 1) * nLocalElements;
-    }
+    const std::size_t nLocalVertices = getChunksize(nVertices, m_rank, m_nProcs);
+    const std::size_t nLocalElements = getChunksize(nElements, m_rank, m_nProcs);
 
-    gmi_register_null();
-    gmi_model* model = gmi_load(".null");
-    m_mesh = apf::makeEmptyMdsMesh(model, 3, false);
+    setup(nLocalElements, nLocalVertices);
 
-    // Create elements
-    apf::GlobalToVert vertMap;
-    {
-      std::vector<ElementID> elements;
-      {
-        std::vector<std::size_t> elementsInt(nLocalElements * 4);
-        m_meshReader.readElements(elementsInt.data());
-        elements = std::vector<ElementID>(elementsInt.begin(), elementsInt.end());
+    logInfo(m_rank) << "Read vertex coordinates";
+    m_meshReader.readVertices(geometryData.data());
+
+    logInfo(m_rank) << "Read cell vertices";
+    m_meshReader.readElements(connectivityData.data());
+
+    logInfo(m_rank) << "Read cell groups";
+    m_meshReader.readGroups(groupData.data());
+
+    logInfo(m_rank) << "Read boundary conditions";
+    std::vector<int> preBoundaryData(nLocalElements * 4);
+    m_meshReader.readBoundaries(preBoundaryData.data());
+    for (std::size_t i = 0; i < nLocalElements; ++i) {
+      for (int j = 0; j < 4; ++j) {
+        setBoundary(i, j, preBoundaryData[4 * i + j]);
       }
-      logInfo(m_rank) << "Create APF connectivity";
-      apf::construct(m_mesh, elements.data(), nLocalElements, apf::Mesh::TET, vertMap);
-    }
-
-    apf::alignMdsRemotes(m_mesh);
-    apf::deriveMdsModel(m_mesh);
-
-    // Set vertices
-    {
-      std::vector<double> vertices(nLocalVertices * 3);
-      m_meshReader.readVertices(vertices.data());
-      logInfo(m_rank) << "Set coordinates in APF";
-      apf::setCoords(m_mesh, vertices.data(), nLocalVertices, vertMap);
-    }
-
-    // Set boundaries
-    apf::MeshTag* boundaryTag = m_mesh->createIntTag("boundary condition", 1);
-    {
-      std::vector<int> boundaries(nLocalElements * 4);
-      m_meshReader.readBoundaries(boundaries.data());
-      apf::MeshIterator* it = m_mesh->begin(3);
-      std::size_t i = 0;
-      while (apf::MeshEntity* element = m_mesh->iterate(it)) {
-        apf::Adjacent adjacent;
-        m_mesh->getAdjacent(element, 2, adjacent);
-
-        for (int j = 0; j < 4; j++) {
-          if (!boundaries[i * 4 + j]) {
-            continue;
-          }
-
-          m_mesh->setIntTag(adjacent[j], boundaryTag, &boundaries[i * 4 + j]);
-        }
-
-        i++;
-      }
-      m_mesh->end(it);
-    }
-
-    // Set groups
-    apf::MeshTag* groupTag = m_mesh->createIntTag("group", 1);
-    {
-      std::vector<int> groups(nLocalElements);
-      m_meshReader.readGroups(groups.data());
-      apf::MeshIterator* it = m_mesh->begin(3);
-      std::size_t i = 0;
-      while (apf::MeshEntity* element = m_mesh->iterate(it)) {
-        m_mesh->setIntTag(element, groupTag, &groups[i]);
-        i++;
-      }
-      m_mesh->end(it);
     }
   }
 };
