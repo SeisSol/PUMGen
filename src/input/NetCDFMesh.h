@@ -154,7 +154,7 @@ class NetCDFMesh : public FullStorageMeshData {
       std::size_t vertexOffset = 0;
       for (std::size_t i = 0; i < nLocalPart; i++) {
         std::copy_n(partitions[i].vertices(), partitions[i].nVertices() * 3,
-                    geometryData.begin() + vertexOffset * 3);
+                    verticesLocal.begin() + vertexOffset * 3);
         vertexOffset += partitions[i].nVertices();
       }
 
@@ -169,6 +169,7 @@ class NetCDFMesh : public FullStorageMeshData {
       std::copy_n(filter.localVertices().begin(), nVertices * 3, geometryData.begin());
 
       std::size_t elementOffset = 0;
+      vertexOffset = 0;
       for (std::size_t i = 0; i < nLocalPart; i++) {
 #ifdef _OPENMP
 #pragma omp parallel for schedule(static)
@@ -192,6 +193,7 @@ class NetCDFMesh : public FullStorageMeshData {
                     groupData.begin() + elementOffset);
 
         elementOffset += partitions[i].nElements();
+        vertexOffset += partitions[i].nVertices();
       }
 
       logInfo(rank) << "Converting local to global vertex identifier";
