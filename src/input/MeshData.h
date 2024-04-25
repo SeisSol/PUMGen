@@ -54,13 +54,18 @@ class FullStorageMeshData : public MeshData {
   int bndShift = 8;
 
   void setBoundary(std::size_t cell, int face, int value) {
-    constexpr auto i32limit = std::numeric_limits<unsigned char>::max();
-    constexpr auto i64limit = std::numeric_limits<unsigned short>::max();
-    if (value < 0 || (value > i32limit && bndShift == 8) || (value > i64limit && bndShift == 16)) {
-      logError() << "Cannot handle boundary condition" << value;
-    }
+    if (bndShift < 0) {
+      boundaryData[cell * 4 + face] = value;
+    } else {
+      constexpr auto i32limit = std::numeric_limits<unsigned char>::max();
+      constexpr auto i64limit = std::numeric_limits<unsigned short>::max();
+      if (value < 0 || (value > i32limit && bndShift == 8) ||
+          (value > i64limit && bndShift == 16)) {
+        logError() << "Cannot handle boundary condition" << value;
+      }
 
-    boundaryData[cell] |= static_cast<int64_t>(value) << (face * bndShift);
+      boundaryData[cell] |= static_cast<int64_t>(value) << (face * bndShift);
+    }
   }
 
   void setup(std::size_t cellCount, std::size_t vertexCount) {
@@ -70,7 +75,11 @@ class FullStorageMeshData : public MeshData {
     connectivityData.resize(cellCount * 4);
     geometryData.resize(vertexCount * 3);
     groupData.resize(cellCount);
-    boundaryData.resize(cellCount);
+    if (bndShift < 0) {
+      boundaryData.resize(cellCount * 4);
+    } else {
+      boundaryData.resize(cellCount);
+    }
 
     // TODO: reconsider the times 4 or 3
   }

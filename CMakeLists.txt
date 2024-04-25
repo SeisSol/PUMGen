@@ -25,7 +25,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
         "Debug" "Release" "RelWithDebInfo") # MinSizeRel is useless for us
 if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE Release)
+  set(CMAKE_BUILD_TYPE Release CACHE STRING "" FORCE)
   message(STATUS "Set build type to Release as none was supplied.")
 endif()
 set(CMAKE_CXX_FLAGS_RELEASE "-O2")

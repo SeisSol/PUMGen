@@ -75,27 +75,27 @@ static int ilog(std::size_t value, int expbase = 1) {
 
 constexpr std::size_t NoSecondDim = 0;
 
-template <typename T, std::size_t SecondDim, typename F>
+template <typename T, typename F>
 static void writeH5Data(const F& handler, hid_t h5file, const std::string& name, void* mesh,
                         int meshdim, hid_t h5memtype, hid_t h5outtype, std::size_t chunk,
                         std::size_t localSize, std::size_t globalSize, bool reduceInts,
-                        int filterEnable, std::size_t filterChunksize) {
-  constexpr std::size_t SecondSize = std::max(SecondDim, static_cast<std::size_t>(1));
-  constexpr std::size_t Dimensions = SecondDim == 0 ? 1 : 2;
-  const std::size_t chunkSize = chunk / SecondSize / sizeof(T);
+                        int filterEnable, std::size_t filterChunksize, std::size_t secondDim) {
+  const std::size_t secondSize = std::max(secondDim, static_cast<std::size_t>(1));
+  const std::size_t dimensions = secondDim == 0 ? 1 : 2;
+  const std::size_t chunkSize = chunk / secondSize / sizeof(T);
   const std::size_t bufferSize = std::min(localSize, chunkSize);
-  std::vector<T> data(SecondSize * bufferSize);
+  std::vector<T> data(secondSize * bufferSize);
 
   std::size_t rounds = (localSize + chunkSize - 1) / chunkSize;
 
   MPI_Allreduce(MPI_IN_PLACE, &rounds, 1, tndm::mpi_type_t<decltype(rounds)>(), MPI_MAX,
                 MPI_COMM_WORLD);
 
-  hsize_t globalSizes[2] = {globalSize, SecondDim};
-  hid_t h5space = H5Screate_simple(Dimensions, globalSizes, nullptr);
+  hsize_t globalSizes[2] = {globalSize, secondDim};
+  hid_t h5space = H5Screate_simple(dimensions, globalSizes, nullptr);
 
-  hsize_t sizes[2] = {bufferSize, SecondDim};
-  hid_t h5memspace = H5Screate_simple(Dimensions, sizes, nullptr);
+  hsize_t sizes[2] = {bufferSize, secondDim};
+  hid_t h5memspace = H5Screate_simple(dimensions, sizes, nullptr);
 
   std::size_t offset = localSize;
 
@@ -104,7 +104,7 @@ static void writeH5Data(const F& handler, hid_t h5file, const std::string& name,
   offset -= localSize;
 
   hsize_t start[2] = {offset, 0};
-  hsize_t count[2] = {bufferSize, SecondDim};
+  hsize_t count[2] = {bufferSize, secondDim};
 
   hid_t h5dxlist = H5Pcreate(H5P_DATASET_XFER);
   checkH5Err(h5dxlist);
@@ -124,7 +124,7 @@ static void writeH5Data(const F& handler, hid_t h5file, const std::string& name,
   hid_t h5filter = H5P_DEFAULT;
   if (filterEnable > 0) {
     h5filter = checkH5Err(H5Pcreate(H5P_DATASET_CREATE));
-    hsize_t chunk[2] = {std::min(filterChunksize, bufferSize), SecondDim};
+    hsize_t chunk[2] = {std::min(filterChunksize, bufferSize), secondDim};
     checkH5Err(H5Pset_chunk(h5filter, 2, chunk));
     if (filterEnable == 1 && std::is_integral_v<T>) {
       checkH5Err(H5Pset_scaleoffset(h5filter, H5Z_SO_INT, H5Z_SO_INT_MINBITS_DEFAULT));
@@ -147,7 +147,7 @@ static void writeH5Data(const F& handler, hid_t h5file, const std::string& name,
     start[0] = offset + written;
     count[0] = std::min(localSize - written, bufferSize);
 
-    std::copy_n(handler.begin() + written * SecondSize, count[0] * SecondSize, data.begin());
+    std::copy_n(handler.begin() + written * secondSize, count[0] * secondSize, data.begin());
 
     checkH5Err(H5Sselect_hyperslab(h5memspace, H5S_SELECT_SET, nullstart, nullptr, count, nullptr));
 
@@ -202,9 +202,9 @@ int main(int argc, char* argv[]) {
                  utils::Args::Required, false);
   args.addOption("chunksize", 0, "Chunksize for writing (default=1 GiB).", utils::Args::Required,
                  false);
-  const char* boundarytypes[] = {"int32", "int64"};
+  const char* boundarytypes[] = {"int32", "int64", "i32", "i64", "i32x4"};
   args.addEnumOption("boundarytype", boundarytypes, 0,
-                     "Type for writing out boundary data (default: int32).", false);
+                     "Type for writing out boundary data (default: i32).", false);
 
   args.addOption("license", 'l', "License file (only used by SimModSuite)", utils::Args::Required,
                  false);
@@ -272,14 +272,26 @@ int main(int argc, char* argv[]) {
   int boundaryType = args.getArgument("boundarytype", 0);
   hid_t boundaryDatatype;
   int faceOffset;
-  if (boundaryType == 0) {
+  int secondShape = NoSecondDim;
+  int boundaryFormatAttr = 0;
+  if (boundaryType == 0 || boundaryType == 2) {
     boundaryDatatype = H5T_STD_I32LE;
     faceOffset = 8;
-    logInfo(rank) << "Using 32-bit integer boundary type conditions.";
-  } else if (boundaryType == 1) {
+    secondShape = NoSecondDim;
+    boundaryFormatAttr = 1;
+    logInfo(rank) << "Using 32-bit integer boundary type conditions, or 8 bit per face (i32).";
+  } else if (boundaryType == 1 || boundaryType == 3) {
     boundaryDatatype = H5T_STD_I64LE;
     faceOffset = 16;
-    logInfo(rank) << "Using 64-bit integer boundary type conditions.";
+    secondShape = NoSecondDim;
+    boundaryFormatAttr = 2;
+    logInfo(rank) << "Using 64-bit integer boundary type conditions, or 16 bit per face (i64).";
+  } else if (boundaryType == 4) {
+    boundaryDatatype = H5T_STD_I32LE;
+    secondShape = 4;
+    faceOffset = -1;
+    boundaryFormatAttr = 0;
+    logInfo(rank) << "Using 32-bit integer per boundary face (i32x4).";
   }
 
   std::string xdmfFile = outputFile;
@@ -406,31 +418,38 @@ int main(int argc, char* argv[]) {
   // Write cells
   std::size_t connectBytesPerData = 8;
   logInfo(rank) << "Writing cells";
-  writeH5Data<unsigned long, 4>(meshInput->connectivity(), h5file, "connect", mesh, 3,
-                                H5T_NATIVE_ULONG, H5T_STD_U64LE, chunksize, localSize[0],
-                                globalSize[0], reduceInts, filterEnable, filterChunksize);
+  writeH5Data<unsigned long>(meshInput->connectivity(), h5file, "connect", mesh, 3,
+                             H5T_NATIVE_ULONG, H5T_STD_U64LE, chunksize, localSize[0],
+                             globalSize[0], reduceInts, filterEnable, filterChunksize, 4);
 
   // Vertices
   logInfo(rank) << "Writing vertices";
-  writeH5Data<double, 3>(meshInput->geometry(), h5file, "geometry", mesh, 0, H5T_IEEE_F64LE,
-                         H5T_IEEE_F64LE, chunksize, localSize[1], globalSize[1], reduceInts,
-                         filterEnable, filterChunksize);
+  writeH5Data<double>(meshInput->geometry(), h5file, "geometry", mesh, 0, H5T_IEEE_F64LE,
+                      H5T_IEEE_F64LE, chunksize, localSize[1], globalSize[1], reduceInts,
+                      filterEnable, filterChunksize, 3);
 
   // Group information
 
   std::size_t groupBytesPerData = 4;
   logInfo(rank) << "Writing group information";
-  writeH5Data<int, NoSecondDim>(meshInput->group(), h5file, "group", mesh, 3, H5T_NATIVE_INT,
-                                H5T_STD_I32LE, chunksize, localSize[0], globalSize[0], reduceInts,
-                                filterEnable, filterChunksize);
+  writeH5Data<int>(meshInput->group(), h5file, "group", mesh, 3, H5T_NATIVE_INT, H5T_STD_I32LE,
+                   chunksize, localSize[0], globalSize[0], reduceInts, filterEnable,
+                   filterChunksize, NoSecondDim);
 
   // Write boundary condition
   logInfo(rank) << "Writing boundary condition";
   auto i32limit = std::numeric_limits<unsigned char>::max();
   auto i64limit = std::numeric_limits<unsigned short>::max();
-  writeH5Data<long, NoSecondDim>(meshInput->boundary(), h5file, "boundary", mesh, 3,
-                                 H5T_NATIVE_LONG, boundaryDatatype, chunksize, localSize[0],
-                                 globalSize[0], reduceInts, filterEnable, filterChunksize);
+  writeH5Data<long>(meshInput->boundary(), h5file, "boundary", mesh, 3, H5T_NATIVE_LONG,
+                    boundaryDatatype, chunksize, localSize[0], globalSize[0], reduceInts,
+                    filterEnable, filterChunksize, secondShape);
+
+  hid_t attrSpace = checkH5Err(H5Screate(H5S_SCALAR));
+  hid_t attrBoundary = checkH5Err(
+      H5Acreate(h5file, "boundary-format", H5T_NATIVE_INT, attrSpace, H5P_DEFAULT, H5P_DEFAULT));
+  checkH5Err(H5Awrite(attrBoundary, H5T_NATIVE_INT, &boundaryFormatAttr));
+  checkH5Err(H5Aclose(attrBoundary));
+  checkH5Err(H5Sclose(attrSpace));
 
   // Writing XDMF file
   if (rank == 0) {

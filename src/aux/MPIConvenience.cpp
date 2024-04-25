@@ -3,6 +3,41 @@
 #include <mpi.h>
 #include <vector>
 
+namespace {
+constexpr std::size_t DataIncrement = std::numeric_limits<int>::max();
+constexpr int Tag = 1000;
+
+std::vector<MPI_Request> largeIsend(const void* sendbuf, std::size_t sendsize, std::size_t senddisp,
+                                    MPI_Datatype sendtype, int dest, int tag, MPI_Comm comm) {
+  int sendtypesizePre;
+  std::vector<MPI_Request> requests;
+  MPI_Type_size(sendtype, &sendtypesizePre);
+  std::size_t sendtypesize = sendtypesizePre;
+  for (std::size_t position = 0; position < sendsize; position += DataIncrement) {
+    int localSize = static_cast<int>(std::min(sendsize - position, DataIncrement));
+    requests.push_back(MPI_REQUEST_NULL);
+    MPI_Isend(reinterpret_cast<const char*>(sendbuf) + senddisp * sendtypesize + position,
+              localSize, sendtype, dest, tag, comm, &requests.back());
+  }
+  return requests;
+}
+
+std::vector<MPI_Request> largeIrecv(void* recvbuf, std::size_t recvsize, std::size_t recvdisp,
+                                    MPI_Datatype recvtype, int dest, int tag, MPI_Comm comm) {
+  int recvtypesizePre;
+  std::vector<MPI_Request> requests;
+  MPI_Type_size(recvtype, &recvtypesizePre);
+  std::size_t recvtypesize = recvtypesizePre;
+  for (std::size_t position = 0; position < recvsize; position += DataIncrement) {
+    int localSize = static_cast<int>(std::min(recvsize - position, DataIncrement));
+    requests.push_back(MPI_REQUEST_NULL);
+    MPI_Irecv(reinterpret_cast<char*>(recvbuf) + recvdisp * recvtypesize + position, localSize,
+              recvtype, dest, tag, comm, &requests.back());
+  }
+  return requests;
+}
+} // namespace
+
 void sparseAlltoallv(const void* sendbuf, const std::size_t* sendsize, const std::size_t* senddisp,
                      MPI_Datatype sendtype, void* recvbuf, const std::size_t* recvsize,
                      const std::size_t* recvdisp, MPI_Datatype recvtype, MPI_Comm comm) {
@@ -12,36 +47,19 @@ void sparseAlltoallv(const void* sendbuf, const std::size_t* sendsize, const std
   int recvtypesizePre;
   MPI_Comm_size(comm, &commsize);
   MPI_Comm_rank(comm, &commrank);
-  MPI_Type_size(sendtype, &sendtypesizePre);
-  MPI_Type_size(sendtype, &recvtypesizePre);
-
-  constexpr int Tag = 1000;
-
-  std::size_t sendtypesize = sendtypesizePre;
-  std::size_t recvtypesize = recvtypesizePre;
 
   std::vector<MPI_Request> requests;
   requests.reserve(commsize * 2);
 
   // (no special handling of self-to-self comm at the moment)
 
-  constexpr std::size_t DataIncrement = std::numeric_limits<int>::max();
-
   for (int i = 0; i < commsize; ++i) {
-    for (std::size_t position = 0; position < sendsize[i]; position += DataIncrement) {
-      int localSize = static_cast<int>(std::min(sendsize[i] - position, DataIncrement));
-      requests.push_back(MPI_REQUEST_NULL);
-      MPI_Isend(reinterpret_cast<const char*>(sendbuf) + senddisp[i] * sendtypesize + position,
-                localSize, sendtype, i, Tag, comm, &requests.back());
-    }
+    auto localRequests = largeIsend(sendbuf, sendsize[i], senddisp[i], sendtype, i, Tag, comm);
+    requests.insert(requests.end(), localRequests.begin(), localRequests.end());
   }
   for (int i = 0; i < commsize; ++i) {
-    for (std::size_t position = 0; position < recvsize[i]; position += DataIncrement) {
-      int localSize = static_cast<int>(std::min(recvsize[i] - position, DataIncrement));
-      requests.push_back(MPI_REQUEST_NULL);
-      MPI_Irecv(reinterpret_cast<char*>(recvbuf) + recvdisp[i] * recvtypesize + position, localSize,
-                recvtype, i, Tag, comm, &requests.back());
-    }
+    auto localRequests = largeIrecv(recvbuf, recvsize[i], recvdisp[i], recvtype, i, Tag, comm);
+    requests.insert(requests.end(), localRequests.begin(), localRequests.end());
   }
 
   MPI_Waitall(requests.size(), requests.data(), MPI_STATUSES_IGNORE);
@@ -67,4 +85,24 @@ void sparseAlltoallv(const void* sendbuf, const int* sendsize, const int* senddi
   std::vector<std::size_t> recvdispSize(recvdisp, recvdisp + commsize);
   sparseAlltoallv(sendbuf, sendsize, senddispSize.data(), sendtype, recvbuf, recvsize,
                   recvdispSize.data(), recvtype, comm);
+}
+
+void largeScatterv(const void* sendbuf, const std::size_t* sendsize, const std::size_t* senddisp,
+                   MPI_Datatype sendtype, void* recvbuf, std::size_t recvsize,
+                   MPI_Datatype recvtype, int root, MPI_Comm comm) {
+  std::vector<MPI_Request> requests;
+  int commrank;
+  int commsize;
+  MPI_Comm_size(comm, &commsize);
+  MPI_Comm_rank(comm, &commrank);
+  if (commrank == root) {
+    requests.reserve(commsize + 1);
+    for (int i = 0; i < commsize; ++i) {
+      auto sendRequests = largeIsend(sendbuf, sendsize[i], senddisp[i], sendtype, i, Tag, comm);
+      requests.insert(requests.end(), sendRequests.begin(), sendRequests.end());
+    }
+  }
+  auto recvRequests = largeIrecv(recvbuf, recvsize, 0, recvtype, root, Tag, comm);
+  requests.insert(requests.end(), recvRequests.begin(), recvRequests.end());
+  MPI_Waitall(requests.size(), requests.data(), MPI_STATUSES_IGNORE);
 }

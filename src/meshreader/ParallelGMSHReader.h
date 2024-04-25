@@ -142,8 +142,8 @@ template <typename P> class ParallelGMSHReader {
     MPI_Comm_rank(comm_, &rank);
     MPI_Comm_size(comm_, &procs);
 
-    auto sendcounts = std::vector<int>(procs);
-    auto displs = std::vector<int>(procs + 1);
+    auto sendcounts = std::vector<std::size_t>(procs);
+    auto displs = std::vector<std::size_t>(procs + 1);
     displs[0] = 0;
     for (int i = 0; i < procs; ++i) {
       sendcounts[i] = numPerElement * getChunksize(numElements, i, procs);
@@ -151,8 +151,8 @@ template <typename P> class ParallelGMSHReader {
     }
 
     auto recvcount = sendcounts[rank];
-    MPI_Scatterv(sendbuf, sendcounts.data(), displs.data(), tndm::mpi_type_t<T>(), recvbuf,
-                 recvcount, tndm::mpi_type_t<T>(), 0, comm_);
+    largeScatterv(sendbuf, sendcounts.data(), displs.data(), tndm::mpi_type_t<T>(), recvbuf,
+                  recvcount, tndm::mpi_type_t<T>(), 0, comm_);
   }
 
   MPI_Comm comm_;
