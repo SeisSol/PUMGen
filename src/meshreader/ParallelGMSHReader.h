@@ -12,6 +12,7 @@
 #include <vector>
 
 #include "aux/Distributor.h"
+#include "aux/MPIConvenience.h"
 
 namespace puml {
 
