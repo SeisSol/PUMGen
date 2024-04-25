@@ -16,7 +16,7 @@ std::vector<MPI_Request> largeIsend(const void* sendbuf, std::size_t sendsize, s
   for (std::size_t position = 0; position < sendsize; position += DataIncrement) {
     int localSize = static_cast<int>(std::min(sendsize - position, DataIncrement));
     requests.push_back(MPI_REQUEST_NULL);
-    MPI_Isend(reinterpret_cast<const char*>(sendbuf) + senddisp * sendtypesize + position,
+    MPI_Isend(reinterpret_cast<const char*>(sendbuf) + (senddisp + position) * sendtypesize,
               localSize, sendtype, dest, tag, comm, &requests.back());
   }
   return requests;
@@ -31,7 +31,7 @@ std::vector<MPI_Request> largeIrecv(void* recvbuf, std::size_t recvsize, std::si
   for (std::size_t position = 0; position < recvsize; position += DataIncrement) {
     int localSize = static_cast<int>(std::min(recvsize - position, DataIncrement));
     requests.push_back(MPI_REQUEST_NULL);
-    MPI_Irecv(reinterpret_cast<char*>(recvbuf) + recvdisp * recvtypesize + position, localSize,
+    MPI_Irecv(reinterpret_cast<char*>(recvbuf) + (recvdisp + position) * recvtypesize, localSize,
               recvtype, dest, tag, comm, &requests.back());
   }
   return requests;
