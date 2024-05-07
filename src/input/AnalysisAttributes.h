@@ -12,7 +12,7 @@
 using namespace tinyxml2;
 
 struct faceBoundary {
-  faceBoundary(int faceID, int bcType) : faceID(faceID), bcType(bcType){};
+  faceBoundary(int faceID, int bcType) : faceID(faceID), bcType(bcType) {};
   int faceID;
   int bcType;
 };

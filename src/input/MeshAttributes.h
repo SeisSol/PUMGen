@@ -33,7 +33,7 @@ struct VelocityRefinementCube {
   VelocityRefinementCube(SimpleCuboid cuboid, double targetedFrequency,
                          int bypassFindRegionAndUseGroup)
       : cuboid(cuboid), targetedFrequency(targetedFrequency),
-        bypassFindRegionAndUseGroup(bypassFindRegionAndUseGroup){};
+        bypassFindRegionAndUseGroup(bypassFindRegionAndUseGroup) {};
 
   SimpleCuboid cuboid;
   double targetedFrequency;

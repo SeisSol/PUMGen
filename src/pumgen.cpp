@@ -10,6 +10,7 @@
  * @author Sebastian Rettenberger <sebastian.rettenberger@tum.de>
  */
 
+#include <H5Tpublic.h>
 #include <mpi.h>
 
 #include <algorithm>
@@ -273,24 +274,30 @@ int main(int argc, char* argv[]) {
   hid_t boundaryDatatype;
   int faceOffset;
   int secondShape = NoSecondDim;
-  int boundaryFormatAttr = 0;
+  std::string boundaryFormatAttr = "";
+  int boundaryPrecision = 0;
+  std::string secondDimBoundary = "";
   if (boundaryType == 0 || boundaryType == 2) {
     boundaryDatatype = H5T_STD_I32LE;
     faceOffset = 8;
     secondShape = NoSecondDim;
-    boundaryFormatAttr = 1;
+    boundaryFormatAttr = "i32";
+    boundaryPrecision = 4;
     logInfo(rank) << "Using 32-bit integer boundary type conditions, or 8 bit per face (i32).";
   } else if (boundaryType == 1 || boundaryType == 3) {
     boundaryDatatype = H5T_STD_I64LE;
     faceOffset = 16;
     secondShape = NoSecondDim;
-    boundaryFormatAttr = 2;
+    boundaryFormatAttr = "i64";
+    boundaryPrecision = 8;
     logInfo(rank) << "Using 64-bit integer boundary type conditions, or 16 bit per face (i64).";
   } else if (boundaryType == 4) {
     boundaryDatatype = H5T_STD_I32LE;
     secondShape = 4;
     faceOffset = -1;
-    boundaryFormatAttr = 0;
+    boundaryFormatAttr = "i32x4";
+    boundaryPrecision = 4;
+    secondDimBoundary = " 4";
     logInfo(rank) << "Using 32-bit integer per boundary face (i32x4).";
   }
 
@@ -445,11 +452,14 @@ int main(int argc, char* argv[]) {
                     filterEnable, filterChunksize, secondShape);
 
   hid_t attrSpace = checkH5Err(H5Screate(H5S_SCALAR));
+  hid_t attrType = checkH5Err(H5Tcopy(H5T_C_S1));
+  checkH5Err(H5Tset_size(attrType, boundaryFormatAttr.size()));
   hid_t attrBoundary = checkH5Err(
-      H5Acreate(h5file, "boundary-format", H5T_NATIVE_INT, attrSpace, H5P_DEFAULT, H5P_DEFAULT));
-  checkH5Err(H5Awrite(attrBoundary, H5T_NATIVE_INT, &boundaryFormatAttr));
+      H5Acreate(h5file, "boundary-format", attrType, attrSpace, H5P_DEFAULT, H5P_DEFAULT));
+  checkH5Err(H5Awrite(attrBoundary, attrType, boundaryFormatAttr.data()));
   checkH5Err(H5Aclose(attrBoundary));
   checkH5Err(H5Sclose(attrSpace));
+  checkH5Err(H5Tclose(attrType));
 
   // Writing XDMF file
   if (rank == 0) {
@@ -491,9 +501,9 @@ int main(int argc, char* argv[]) {
          << globalSize[0] << "\">" << basename << ":/group</DataItem>" << std::endl
          << "   </Attribute>" << std::endl
          << "   <Attribute Name=\"boundary\" Center=\"Cell\">" << std::endl
-         << "    <DataItem NumberType=\"Int\" Precision=\"" << (boundaryType == 0 ? "4" : "8")
-         << "\" Format=\"HDF\" Dimensions=\"" << globalSize[0] << "\">" << basename
-         << ":/boundary</DataItem>" << std::endl
+         << "    <DataItem NumberType=\"Int\" Precision=\"" << boundaryPrecision
+         << "\" Format=\"HDF\" Dimensions=\"" << globalSize[0] << secondDimBoundary << "\">"
+         << basename << ":/boundary</DataItem>" << std::endl
          << "   </Attribute>" << std::endl
          << "  </Grid>" << std::endl
          << " </Domain>" << std::endl
