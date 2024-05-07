@@ -210,8 +210,9 @@ void MeshAttributes::set_velocity_aware_meshing() {
       logInfo(PMU_rank()) << "Adding velocity aware refinement region targeting"
                           << targetedFrequency << "Hz, centered at x =" << cuboid.center[0]
                           << "y=" << cuboid.center[1] << "z=" << cuboid.center[2]
-                          << "with half sizes" << "x =" << cuboid.halfSize[0]
-                          << "y =" << cuboid.halfSize[1] << "z =" << cuboid.halfSize[2];
+                          << "with half sizes"
+                          << "x =" << cuboid.halfSize[0] << "y =" << cuboid.halfSize[1]
+                          << "z =" << cuboid.halfSize[2];
       if (std::abs(cuboid.rotationZ) > 0.0) {
         logInfo(PMU_rank()) << "rotated around z axis by " << cuboid.rotationZ
                             << "degree(s) counterclockwise from x axis.";
