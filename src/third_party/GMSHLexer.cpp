@@ -23,8 +23,11 @@ GMSHToken GMSHLexer::getToken() {
         return GMSHToken::eof;
     }
 
-    while (isspace(lastChar)) {
+    while (isspace(lastChar) && in->good()) {
         advance();
+    }
+    if (!in->good()) {
+        return GMSHToken::eof;
     }
 
     if (lastChar == '$') {
