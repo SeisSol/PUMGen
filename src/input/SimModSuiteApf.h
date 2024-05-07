@@ -308,8 +308,7 @@ class SimModSuiteApf : public ApfMeshInput {
       switch (currentVal) {
       case -2:
         // task is started, do nothing
-        logInfo(PMU_rank()) << "Progress:" << what << ", 0"
-                            << "/" << endVal;
+        logInfo(PMU_rank()) << "Progress:" << what << ", 0" << "/" << endVal;
         break;
       case -1:
         // end of the task
