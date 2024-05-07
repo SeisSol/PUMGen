@@ -1,3 +1,0 @@
-jobs:
-    - template: azure-pipelines-clang-format-template.yml
-    - template: azure-pipelines-build-template.yml
