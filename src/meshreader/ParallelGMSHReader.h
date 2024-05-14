@@ -11,6 +11,9 @@
 #include <cstddef>
 #include <vector>
 
+#include "aux/Distributor.h"
+#include "aux/MPIConvenience.h"
+
 namespace puml {
 
 template <typename P> class ParallelGMSHReader {
@@ -40,7 +43,7 @@ template <typename P> class ParallelGMSHReader {
     }
 
     MPI_Bcast(&nVertices_, 1, tndm::mpi_type_t<decltype(nVertices_)>(), 0, comm_);
-    MPI_Bcast(&nElements_, 1, tndm::mpi_type_t<decltype(nVertices_)>(), 0, comm_);
+    MPI_Bcast(&nElements_, 1, tndm::mpi_type_t<decltype(nElements_)>(), 0, comm_);
   }
 
   [[nodiscard]] std::size_t nVertices() const { return nVertices_; }
@@ -140,19 +143,17 @@ template <typename P> class ParallelGMSHReader {
     MPI_Comm_rank(comm_, &rank);
     MPI_Comm_size(comm_, &procs);
 
-    const std::size_t chunkSize = (numElements + procs - 1) / procs;
-    auto sendcounts = std::vector<int>(procs);
-    auto displs = std::vector<int>(procs + 1);
-    std::fill(sendcounts.begin(), sendcounts.end(), numPerElement * chunkSize);
-    sendcounts.back() = numPerElement * (numElements - (procs - 1u) * chunkSize);
+    auto sendcounts = std::vector<std::size_t>(procs);
+    auto displs = std::vector<std::size_t>(procs + 1);
     displs[0] = 0;
     for (int i = 0; i < procs; ++i) {
+      sendcounts[i] = numPerElement * getChunksize(numElements, i, procs);
       displs[i + 1] = displs[i] + sendcounts[i];
     }
 
     auto recvcount = sendcounts[rank];
-    MPI_Scatterv(sendbuf, sendcounts.data(), displs.data(), tndm::mpi_type_t<T>(), recvbuf,
-                 recvcount, tndm::mpi_type_t<T>(), 0, comm_);
+    largeScatterv(sendbuf, sendcounts.data(), displs.data(), tndm::mpi_type_t<T>(), recvbuf,
+                  recvcount, tndm::mpi_type_t<T>(), 0, comm_);
   }
 
   MPI_Comm comm_;

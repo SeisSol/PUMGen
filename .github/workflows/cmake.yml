@@ -87,6 +87,7 @@ jobs:
       - name: clang-format
         run: |
           sudo apt-get update
-          sudo apt-get install -qq python3 clang-format
+          sudo apt-get install -qq python3 python3-pip
+          pip3 install clang-format==18.1.5
           git submodule update --init
           ./submodules/run-clang-format/run-clang-format.py --clang-format-executable clang-format --exclude src/third_party -r src

@@ -13,6 +13,7 @@ set(SIMMETRIX_ROOT "" CACHE STRING "Root directory of simmetrix dev files")
 set(SIM_MPI "mpich3" CACHE STRING "MPI version used by simmetrix")
 option(NETCDF "Use netcdf" OFF)
 option(PARASOLID "enable support for parasolid files" OFF)
+option(SCOREC "Use PUMI/APF" OFF)
 set(LOG_LEVEL "info" CACHE STRING "Log level for the code")
 set_property(CACHE LOG_LEVEL PROPERTY STRINGS "debug" "info" "warning" "error")
 
@@ -24,20 +25,21 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS
         "Debug" "Release" "RelWithDebInfo") # MinSizeRel is useless for us
 if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE Release)
+  set(CMAKE_BUILD_TYPE Release CACHE STRING "" FORCE)
   message(STATUS "Set build type to Release as none was supplied.")
 endif()
 set(CMAKE_CXX_FLAGS_RELEASE "-O2")
 
 add_executable(pumgen
   ${CMAKE_CURRENT_SOURCE_DIR}/src/pumgen.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/meshreader/FidapReader.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/meshreader/GambitReader.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/meshreader/GMSH4Parser.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/input/ParallelVertexFilter.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/third_party/GMSHLexer.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/third_party/GMSHParser.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/third_party/GMSH2Parser.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/aux/InsphereCalculator.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/aux/MPIConvenience.cpp
   )
 
 target_include_directories(pumgen PUBLIC src
@@ -74,9 +76,12 @@ target_link_libraries(pumgen PUBLIC MPI::MPI_CXX)
 
 target_compile_definitions(pumgen PUBLIC PARALLEL)
 
-find_package(APF REQUIRED)
-target_include_directories(pumgen PUBLIC ${APF_INCLUDE_DIR})
-target_link_libraries(pumgen PUBLIC ${APF_LIBRARIES})
+if (SCOREC)
+  find_package(APF REQUIRED)
+  target_include_directories(pumgen PUBLIC ${APF_INCLUDE_DIR})
+  target_link_libraries(pumgen PUBLIC ${APF_LIBRARIES})
+  target_compile_definitions(pumgen PUBLIC USE_SCOREC)
+endif()
 
 add_library(tinyxml2 submodules/tinyxml2/tinyxml2.cpp)
 target_link_libraries(pumgen PUBLIC tinyxml2)

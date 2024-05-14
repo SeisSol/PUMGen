@@ -30,6 +30,8 @@
 
 #include "third_party/MPITraits.h"
 
+#include "aux/MPIConvenience.h"
+
 /**
  * Filters duplicate vertices in parallel
  */
@@ -162,15 +164,16 @@ public:
     }
 
     // Determine the (local and total) bucket size
-    std::vector<int> bucketSize(m_numProcs);
+    std::vector<std::size_t> bucketSize(m_numProcs);
     for (std::size_t i = 0; i < numVertices; i++) {
       ++bucketSize[bucket[i]];
     }
 
     // Tell all processes what we are going to send them
-    std::vector<int> recvSize(m_numProcs);
+    std::vector<std::size_t> recvSize(m_numProcs);
 
-    MPI_Alltoall(bucketSize.data(), 1, MPI_INT, recvSize.data(), 1, MPI_INT, m_comm);
+    MPI_Alltoall(bucketSize.data(), 1, tndm::mpi_type_t<std::size_t>(), recvSize.data(), 1,
+                 tndm::mpi_type_t<std::size_t>(), m_comm);
 
     std::size_t numSortVertices = 0;
 #ifdef _OPENMP
@@ -192,16 +195,16 @@ public:
     // Allocate buffer for the vertices and exchange them
     std::vector<double> sortVertices(3 * numSortVertices);
 
-    std::vector<int> sDispls(m_numProcs);
-    std::vector<int> rDispls(m_numProcs);
+    std::vector<std::size_t> sDispls(m_numProcs);
+    std::vector<std::size_t> rDispls(m_numProcs);
     sDispls[0] = 0;
     rDispls[0] = 0;
     for (int i = 1; i < m_numProcs; i++) {
       sDispls[i] = sDispls[i - 1] + bucketSize[i - 1];
       rDispls[i] = rDispls[i - 1] + recvSize[i - 1];
     }
-    MPI_Alltoallv(sendVertices.data(), bucketSize.data(), sDispls.data(), vertexType,
-                  sortVertices.data(), recvSize.data(), rDispls.data(), vertexType, m_comm);
+    sparseAlltoallv(sendVertices.data(), bucketSize.data(), sDispls.data(), vertexType,
+                    sortVertices.data(), recvSize.data(), rDispls.data(), vertexType, m_comm);
 
     // Chop the last 4 bits to avoid numerical errors
     roundVertices.resize(numSortVertices * 3);
@@ -253,9 +256,9 @@ public:
 
     // Send result back
     std::vector<std::size_t> globalIds(numVertices);
-    MPI_Alltoallv(gids.data(), recvSize.data(), rDispls.data(), tndm::mpi_type_t<std::size_t>(),
-                  globalIds.data(), bucketSize.data(), sDispls.data(),
-                  tndm::mpi_type_t<std::size_t>(), m_comm);
+    sparseAlltoallv(gids.data(), recvSize.data(), rDispls.data(), tndm::mpi_type_t<std::size_t>(),
+                    globalIds.data(), bucketSize.data(), sDispls.data(),
+                    tndm::mpi_type_t<std::size_t>(), m_comm);
 
     // Assign the global ids to the correct vertices
     m_globalIds.resize(numVertices);
