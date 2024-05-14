@@ -38,6 +38,7 @@
 #include <SimMeshingInfoCodes.h>
 #endif
 #include <SimModel.h>
+#include <SimLicense.h>
 #include <SimModelerUtil.h>
 #ifdef PARASOLID
 #include <SimParasolidKrnl.h>
@@ -83,7 +84,7 @@ class SimModSuite : public MeshInput {
   bool m_log;
 
   public:
-  SimModSuite(const char* modFile, const char* cadFile = 0L, const char* licenseFile = 0L,
+  SimModSuite(const char* modFile, const char* cadFile = 0L, const char* licenseFile = 0L, const char* features = 0L,
               const char* meshCaseName = "mesh", const char* analysisCaseName = "analysis",
               int enforceSize = 0, const char* xmlFile = 0L, const bool analyseAR = false,
               const char* logFile = 0L) {
@@ -95,7 +96,7 @@ class SimModSuite : public MeshInput {
       Sim_logOn(logFile);
     } else
       m_log = false;
-    Sim_readLicenseFile(licenseFile);
+    SimLicense_start(features, licenseFile);
     MS_init();
     SimDiscrete_start(0);
 #ifdef PARASOLID
@@ -242,6 +243,7 @@ class SimModSuite : public MeshInput {
     Sim_unregisterAllKeys();
     if (m_log)
       Sim_logOff();
+    SimLicense_stop();
     SimPartitionedMesh_stop();
     SimModel_stop();
   }
