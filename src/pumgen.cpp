@@ -453,7 +453,7 @@ int main(int argc, char* argv[]) {
 
   hid_t attrSpace = checkH5Err(H5Screate(H5S_SCALAR));
   hid_t attrType = checkH5Err(H5Tcopy(H5T_C_S1));
-  checkH5Err(H5Tset_size(attrType, boundaryFormatAttr.size()));
+  checkH5Err(H5Tset_size(attrType, boundaryFormatAttr.size() + 1));
   hid_t attrBoundary = checkH5Err(
       H5Acreate(h5file, "boundary-format", attrType, attrSpace, H5P_DEFAULT, H5P_DEFAULT));
   checkH5Err(H5Awrite(attrBoundary, attrType, boundaryFormatAttr.data()));
