@@ -62,9 +62,6 @@
 #include <string>
 #include <vector>
 
-// forward declare
-pAManager SModel_attManager(pModel model);
-
 /**
  * @todo Currently it is not supported to create more than one instance
  *  of this class
@@ -159,7 +156,11 @@ class SimModSuite : public FullStorageMeshData {
     logInfo(PMU_rank()) << "Starting the volume mesher";
     pVolumeMesher volumeMesher = VolumeMesher_new(meshCase, m_simMesh);
     if (xmlFile != nullptr) {
+#ifdef BEFORE_SIM_2024
       VolumeMesher_setSmoothing(volumeMesher, MeshAtt.volumeSmoothingLevel);
+#else
+      VolumeMesher_setSmoothLevel(volumeMesher, MeshAtt.volumeSmoothingLevel);
+#endif
       VolumeMesher_setSmoothType(volumeMesher, static_cast<int>(MeshAtt.volumeSmoothingType));
       VolumeMesher_setOptimization(volumeMesher, MeshAtt.VolumeMesherOptimization);
     }
@@ -448,8 +449,11 @@ class SimModSuite : public FullStorageMeshData {
   void extractCases(pGModel m_model, pACase& meshCase, const char* meshCaseName,
                     pACase& analysisCase, const char* analysisCaseName) {
     logInfo(PMU_rank()) << "Extracting cases";
-    pAManager attMngr = SModel_attManager(m_model);
-
+#ifdef BEFORE_SIM_2024
+    pAManager attMngr = GM_attManager(m_model);
+#else
+    pAManager attMngr = GM_attManager(m_model, false);
+#endif
     MeshingOptions meshingOptions;
     meshCase = MS_newMeshCase(m_model);
 
