@@ -95,9 +95,10 @@ template <class R> class ParallelMeshReader {
       // Allocate second buffer so we can read and send in parallel
       std::vector<double> tempVertices(chunkSize * 3);
       double* vertices2 = tempVertices.data();
-      if (m_nProcs % 2 == 0)
+      if (m_nProcs % 2 == 0) {
         // swap once so we have the correct buffer at the end
         swap(vertices, vertices2);
+      }
 
       MPI_Request request = MPI_REQUEST_NULL;
       for (int i = 1; i < m_nProcs - 1; i++) {
@@ -146,9 +147,10 @@ template <class R> class ParallelMeshReader {
       // Allocate second buffer so we can read and send in parallel
       std::vector<std::size_t> tempElements(chunkSize * 4);
       std::size_t* elements2 = tempElements.data();
-      if (m_nProcs % 2 == 0)
+      if (m_nProcs % 2 == 0) {
         // swap once so we have the correct buffer at the end
         swap(elements, elements2);
+      }
 
       MPI_Request request = MPI_REQUEST_NULL;
 

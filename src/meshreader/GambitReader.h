@@ -13,6 +13,8 @@
 #ifndef GAMBIT_READER_H
 #define GAMBIT_READER_H
 
+#include <cctype>
+#include <cstddef>
 #include <fstream>
 #include <limits>
 #include <sstream>
@@ -161,15 +163,19 @@ class GambitReader : public MeshReader {
 
     getline(m_mesh, line);
     utils::StringUtils::rtrim(line); // remove \r
-    if (line != ENDSECTION)
+    if (line != ENDSECTION) {
       logError() << "Invalid Gambit format: End of elements expected, found" << line;
+    }
 
     // Groups
     m_groups.resize(nGroups);
     for (std::size_t i = 0; i < nGroups; i++) {
-      getline(m_mesh, line);
-      if (line.find(ELEMENT_GROUP) == std::string::npos)
+      do {
+        getline(m_mesh, line);
+      } while (line == ENDSECTION);
+      if (line.find(ELEMENT_GROUP) == std::string::npos) {
         logError() << "Invalid Gambit format: Group expected, found" << line;
+      }
       getline(m_mesh, line);
 
       // Group size and material
@@ -190,33 +196,39 @@ class GambitReader : public MeshReader {
       m_groups[i].lineSize = line.size() + 1;
 
       utils::StringUtils::rtrim(line);
-      if (line.length() % ELEMENTS_PER_LINE_GROUP != 0)
+      if (line.length() % ELEMENTS_PER_LINE_GROUP != 0) {
         logError() << "Invalid Gambit format: Mesh does not contain" << ELEMENTS_PER_LINE_GROUP
                    << "in one group line";
+      }
       m_groups[i].elementSize = line.length() / ELEMENTS_PER_LINE_GROUP;
 
       m_mesh.seekg(m_groups[i].seekPosition +
                    (m_groups[i].nLines / ELEMENTS_PER_LINE_GROUP) * m_groups[i].lineSize);
 
-      if (m_groups[i].nLines % ELEMENTS_PER_LINE_GROUP != 0)
+      if (m_groups[i].nLines % ELEMENTS_PER_LINE_GROUP != 0) {
         // Last line
         m_mesh.seekg(m_groups[i].lineSize -
                          (ELEMENTS_PER_LINE_GROUP - m_groups[i].nLines % ELEMENTS_PER_LINE_GROUP) *
                              m_groups[i].elementSize,
                      std::ifstream::cur);
+      }
 
       getline(m_mesh, line);
       utils::StringUtils::rtrim(line); // remove \r
-      if (line != ENDSECTION)
+      if (line != ENDSECTION) {
         logError() << "Invalid Gambit format: End of group expected, found" << line;
+      }
     }
 
     // Boundaries
     m_boundaries.resize(nBoundaries);
     for (std::size_t i = 0; i < nBoundaries; i++) {
-      getline(m_mesh, line);
-      if (line.find(BOUNDARY_CONDITIONS) == std::string::npos)
+      do {
+        getline(m_mesh, line);
+      } while (line == ENDSECTION);
+      if (line.find(BOUNDARY_CONDITIONS) == std::string::npos) {
         logError() << "Invalid Gambit format: Boundaries expected, found" << line;
+      }
       m_boundaries[i].variableLineLength = false;
 
       getline(m_mesh, line);
@@ -224,11 +236,29 @@ class GambitReader : public MeshReader {
 
       // Boundary type and size
       int x;
+      std::string preElementType;
       std::istringstream ss(line);
-      ss >> m_boundaries[i].type;
-      m_boundaries[i].type %= 100; // Fix boundary type TODO not sure where this should be placed
+      ss >> preElementType;
       ss >> x;
       ss >> m_boundaries[i].nLines;
+
+      // heuristic. Will work for Simmetrix and the default gmsh tags (which are actually strings)
+      int boundaryType = 0;
+      int multiplier = 1;
+      for (auto it = preElementType.rbegin(); it != preElementType.rend(); ++it) {
+        char c = *it;
+        if ('0' <= c && c <= '9') {
+          boundaryType += multiplier * (c - '0');
+          multiplier *= 10;
+        } else {
+          break;
+        }
+      }
+      // remove offset once
+      if (boundaryType >= 100) {
+        boundaryType -= 100;
+      }
+      m_boundaries[i].type = boundaryType;
 
       // Try boundary with fixed line length
       getline(m_mesh, line);
@@ -243,12 +273,13 @@ class GambitReader : public MeshReader {
       m_boundaries[i].elementTypeSize =
           static_cast<size_t>(ssE.tellg()) - m_boundaries[i].elementSize;
       ssE >> face;
-      if (ssE.tellg() == -1)
+      if (ssE.tellg() == -1) {
         m_boundaries[i].faceSize =
             line.length() - m_boundaries[i].elementSize - m_boundaries[i].elementTypeSize;
-      else
+      } else {
         m_boundaries[i].faceSize = static_cast<size_t>(ssE.tellg()) - m_boundaries[i].elementSize -
                                    m_boundaries[i].elementTypeSize;
+      }
 
       m_mesh.seekg(m_boundaries[i].seekPosition +
                    m_boundaries[i].nLines * m_boundaries[i].lineSize);
@@ -267,13 +298,15 @@ class GambitReader : public MeshReader {
                         // file
         m_mesh.seekg(m_boundaries[i].seekPosition);
 
-        for (size_t j = 0; j < m_boundaries[i].nLines; j++)
+        for (size_t j = 0; j < m_boundaries[i].nLines; j++) {
           m_mesh.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+        }
 
         getline(m_mesh, line);
         utils::StringUtils::rtrim(line); // remove \r
-        if (line != ENDSECTION)
+        if (line != ENDSECTION) {
           logError() << "Invalid Gambit format: End of boundaries expected, found" << line;
+        }
       }
     }
   }
@@ -417,8 +450,9 @@ class GambitReader : public MeshReader {
     // Get the boundary, were we should start reading
     std::vector<BoundarySection>::const_iterator section;
     for (section = m_boundaries.begin(); section != m_boundaries.end() && section->nLines < start;
-         section++)
+         section++) {
       start -= section->nLines;
+    }
 
     std::vector<char> buf;
 
@@ -472,8 +506,8 @@ class GambitReader : public MeshReader {
                      std::fstream::cur);
       }
 
-      boundaries[i].element--;
-      boundaries[i].face--;
+      boundaries[i].element -= 1;
+      boundaries[i].face -= 1;
       boundaries[i].type = section->type;
 
       ++start; // Line in the current section

@@ -139,12 +139,10 @@ static void writeH5Data(const F& handler, hid_t h5file, const std::string& name,
                            h5filter, H5P_DEFAULT);
 
   std::size_t written = 0;
-  std::size_t index = 0;
 
   hsize_t nullstart[2] = {0, 0};
 
   for (std::size_t i = 0; i < rounds; ++i) {
-    index = 0;
     start[0] = offset + written;
     count[0] = std::min(localSize - written, bufferSize);
 
@@ -253,7 +251,6 @@ int main(int argc, char* argv[]) {
   bool reduceInts = args.isSet("compactify-datatypes");
   int filterEnable = args.getArgument("filter-enable", 0);
   hsize_t filterChunksize = args.getArgument<hsize_t>("filter-chunksize", 4096);
-  bool applyFilters = filterEnable > 0;
   if (reduceInts) {
     logInfo(rank) << "Using compact integer types.";
   }
@@ -445,8 +442,6 @@ int main(int argc, char* argv[]) {
 
   // Write boundary condition
   logInfo(rank) << "Writing boundary condition";
-  auto i32limit = std::numeric_limits<unsigned char>::max();
-  auto i64limit = std::numeric_limits<unsigned short>::max();
   writeH5Data<long>(meshInput->boundary(), h5file, "boundary", mesh, 3, H5T_NATIVE_LONG,
                     boundaryDatatype, chunksize, localSize[0], globalSize[0], reduceInts,
                     filterEnable, filterChunksize, secondShape);
