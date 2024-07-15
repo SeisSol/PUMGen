@@ -64,9 +64,6 @@
 #include <string>
 #include <vector>
 
-// forward declare
-pAManager SModel_attManager(pModel model);
-
 /**
  * @todo Currently it is not supported to create more than one instance
  *  of this class
@@ -330,7 +327,12 @@ class SimModSuiteApf : public ApfMeshInput {
   void extractCases(pGModel m_model, pACase& meshCase, const char* meshCaseName,
                     pACase& analysisCase, const char* analysisCaseName) {
     logInfo(PMU_rank()) << "Extracting cases";
-    pAManager attMngr = SModel_attManager(m_model);
+
+#ifdef BEFORE_SIM_2024
+    pAManager attMngr = GM_attManager(m_model);
+#else
+    pAManager attMngr = GM_attManager(m_model, false);
+#endif
 
     MeshingOptions meshingOptions;
     meshCase = MS_newMeshCase(m_model);
