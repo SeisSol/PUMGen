@@ -633,7 +633,7 @@ class SimModSuiteApf : public ApfMeshInput {
         logInfo(PMU_rank()) << "centroids" << centroid[0] << centroid[1] << centroid[2] << "and "
                             << centroid2[0] << centroid2[1] << centroid2[2] << std::flush;
       }
-      logError() << PList_size(entities) / 2 << "Self-intersection(s) detected in CAD mesh";
+      logWarning() << PList_size(entities) / 2 << "Self-intersection(s) detected in CAD mesh";
     }
     PList_delete(entities);
     Progress_delete(prog);
