@@ -448,10 +448,11 @@ int main(int argc, char* argv[]) {
 
   hid_t attrSpace = checkH5Err(H5Screate(H5S_SCALAR));
   hid_t attrType = checkH5Err(H5Tcopy(H5T_C_S1));
-  checkH5Err(H5Tset_size(attrType, boundaryFormatAttr.size() + 1));
+  checkH5Err(H5Tset_size(attrType, H5T_VARIABLE));
   hid_t attrBoundary = checkH5Err(
       H5Acreate(h5file, "boundary-format", attrType, attrSpace, H5P_DEFAULT, H5P_DEFAULT));
-  checkH5Err(H5Awrite(attrBoundary, attrType, boundaryFormatAttr.data()));
+  void* stringData = boundaryFormatAttr.data();
+  checkH5Err(H5Awrite(attrBoundary, attrType, &stringData));
   checkH5Err(H5Aclose(attrBoundary));
   checkH5Err(H5Sclose(attrSpace));
   checkH5Err(H5Tclose(attrType));
