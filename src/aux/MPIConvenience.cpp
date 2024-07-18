@@ -43,8 +43,6 @@ void sparseAlltoallv(const void* sendbuf, const std::size_t* sendsize, const std
                      const std::size_t* recvdisp, MPI_Datatype recvtype, MPI_Comm comm) {
   int commsize;
   int commrank;
-  int sendtypesizePre;
-  int recvtypesizePre;
   MPI_Comm_size(comm, &commsize);
   MPI_Comm_rank(comm, &commrank);
 
