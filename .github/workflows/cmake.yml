@@ -63,7 +63,7 @@ jobs:
           sudo apt-get install -qq g++ openmpi-bin openmpi-common libopenmpi-dev hdf5-tools libhdf5-openmpi-103 libhdf5-openmpi-dev libnetcdf-dev
 
       - name: Download PUMI
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: pumi
           path: ${{ runner.workspace }}/opt
