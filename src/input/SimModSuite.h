@@ -461,6 +461,7 @@ class SimModSuite : public FullStorageMeshData {
     AttCase_associate(meshCaseFile, nullptr);
     MS_processSimModelerMeshingAtts(meshCaseFile, meshCase, &meshingOptions);
     AttCase_setModel(meshCase, m_model);
+    AttCase_unassociate(meshCaseFile);
 
     analysisCase = extractCase(attMngr, analysisCaseName);
     pPList children = AttNode_children(analysisCase);
