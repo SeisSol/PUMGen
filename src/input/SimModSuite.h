@@ -175,6 +175,11 @@ class SimModSuite : public FullStorageMeshData {
       analyse_mesh();
     }
 
+    if (xmlFile == nullptr) {
+      // unassociate case for attributes below
+      AttCase_unassociate(meshCase);
+    }
+
     logInfo(PMU_rank()) << "Iterating over mesh to get data...";
     int parts = PM_numParts(m_simMesh);
     std::size_t vertexCount = 0;
@@ -462,7 +467,6 @@ class SimModSuite : public FullStorageMeshData {
     AttCase_associate(meshCaseFile, nullptr);
     MS_processSimModelerMeshingAtts(meshCaseFile, meshCase, &meshingOptions);
     AttCase_setModel(meshCase, m_model);
-    AttCase_unassociate(meshCaseFile);
 
     analysisCase = extractCase(attMngr, analysisCaseName);
     pPList children = AttNode_children(analysisCase);

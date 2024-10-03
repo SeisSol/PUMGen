@@ -173,6 +173,11 @@ class SimModSuiteApf : public ApfMeshInput {
       analyse_mesh();
     }
 
+    if (xmlFile == nullptr) {
+      // unassociate case for attributes below
+      AttCase_unassociate(meshCase);
+    }
+
     // Convert to APF mesh
     apf::Mesh* tmpMesh = apf::createMesh(m_simMesh);
     gmi_register_sim();
@@ -342,7 +347,6 @@ class SimModSuiteApf : public ApfMeshInput {
     AttCase_associate(meshCaseFile, nullptr);
     MS_processSimModelerMeshingAtts(meshCaseFile, meshCase, &meshingOptions);
     AttCase_setModel(meshCase, m_model);
-    AttCase_unassociate(meshCaseFile);
 
     analysisCase = extractCase(attMngr, analysisCaseName);
     pPList children = AttNode_children(analysisCase);
