@@ -80,14 +80,15 @@ class SimModSuiteApf : public ApfMeshInput {
   bool m_log;
 
   public:
-  SimModSuiteApf(const char* modFile, int boundarySize, const char* cadFile = 0L,
-                 const char* licenseFile = 0L, const char* meshCaseName = "mesh",
+  SimModSuiteApf(const char* modFile, int boundarySize, const char* cadFile = nullptr,
+                 const char* licenseFile = nullptr, const char* meshCaseName = "mesh",
                  const char* analysisCaseName = "analysis", int enforceSize = 0,
-                 const char* xmlFile = 0L, const bool analyseAR = false, const char* logFile = 0L)
+                 const char* xmlFile = nullptr, const bool analyseAR = false,
+                 const char* logFile = nullptr)
       : ApfMeshInput(boundarySize) {
     // Init SimModSuite
     SimModel_start();
-    SimPartitionedMesh_start(0L, 0L);
+    SimPartitionedMesh_start(nullptr, nullptr);
     if (logFile) {
       m_log = true;
       Sim_logOn(logFile);
@@ -105,7 +106,7 @@ class SimModSuiteApf : public ApfMeshInput {
     logInfo(PMU_rank()) << "Loading model";
 
     std::string smodFile = modFile;
-    if (cadFile != 0L) {
+    if (cadFile != nullptr) {
       loadCAD(modFile, cadFile);
     } else if (smodFile.substr(smodFile.find_last_of(".") + 1) == "smd") {
       loadCAD(modFile, cadFile);
@@ -172,6 +173,11 @@ class SimModSuiteApf : public ApfMeshInput {
       analyse_mesh();
     }
 
+    if (xmlFile == nullptr) {
+      // unassociate case for attributes below
+      AttCase_unassociate(meshCase);
+    }
+
     // Convert to APF mesh
     apf::Mesh* tmpMesh = apf::createMesh(m_simMesh);
     gmi_register_sim();
@@ -182,7 +188,7 @@ class SimModSuiteApf : public ApfMeshInput {
     apf::destroyMesh(tmpMesh);
 
     // Set the boundary conditions from the geometric model
-    AttCase_associate(analysisCase, 0L);
+    AttCase_associate(analysisCase, nullptr);
     apf::MeshTag* boundaryTag = m_mesh->createIntTag("boundary condition", 1);
     apf::MeshIterator* it = m_mesh->begin(2);
     while (apf::MeshEntity* face = m_mesh->iterate(it)) {
@@ -344,7 +350,7 @@ class SimModSuiteApf : public ApfMeshInput {
 
     analysisCase = extractCase(attMngr, analysisCaseName);
     pPList children = AttNode_children(analysisCase);
-    void* iter = 0L;
+    void* iter = nullptr;
     while (pANode child = static_cast<pANode>(PList_next(children, &iter)))
       AttCase_setModel(static_cast<pACase>(child), m_model);
     PList_delete(children);
@@ -574,12 +580,12 @@ class SimModSuiteApf : public ApfMeshInput {
       sCadFile = modFile;
       utils::StringUtils::replaceLast(sCadFile, ".smd", "_nat.x_t");
     }
-    pNativeModel nativeModel = 0L;
+    pNativeModel nativeModel = nullptr;
 #ifdef PARASOLID
     if (utils::Path(sCadFile).exists())
       nativeModel = ParasolidNM_createFromFile(sCadFile.c_str(), 0);
 #endif
-    m_model = GM_load(modFile, nativeModel, 0L);
+    m_model = GM_load(modFile, nativeModel, nullptr);
     nativeModel = GM_nativeModel(m_model);
 
     if (nativeModel)
@@ -589,7 +595,7 @@ class SimModSuiteApf : public ApfMeshInput {
     // check for model errors
     pPList modelErrors = PList_new();
     if (!GM_isValid(m_model, 1, modelErrors)) {
-      void* iter = 0L;
+      void* iter = nullptr;
       while (pSimError err = static_cast<pSimError>(PList_next(modelErrors, &iter))) {
         logInfo(PMU_rank()) << "  Error code: " << SimError_code(err) << std::endl;
         logInfo(PMU_rank()) << "  Error string: " << SimError_toString(err) << std::endl;
@@ -601,7 +607,7 @@ class SimModSuiteApf : public ApfMeshInput {
     // check for model infos
     pPList modelInfos = PList_new();
     if (!GM_isValid(m_model, 1, modelInfos)) {
-      void* iter = 0L;
+      void* iter = nullptr;
       while (pSimInfo info = static_cast<pSimInfo>(PList_next(modelInfos, &iter))) {
         logInfo(PMU_rank()) << "  Info code: " << SimInfo_code(info) << std::endl;
         logInfo(PMU_rank()) << "  Info string: " << SimInfo_toString(info) << std::endl;
