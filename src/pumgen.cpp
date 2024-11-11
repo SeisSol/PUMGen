@@ -422,9 +422,9 @@ int main(int argc, char* argv[]) {
   // Write cells
   std::size_t connectBytesPerData = 8;
   logInfo(rank) << "Writing cells";
-  writeH5Data<unsigned long>(meshInput->connectivity(), h5file, "connect", mesh, 3,
-                             H5T_NATIVE_ULONG, H5T_STD_U64LE, chunksize, localSize[0],
-                             globalSize[0], reduceInts, filterEnable, filterChunksize, 4);
+  writeH5Data<uint64_t>(meshInput->connectivity(), h5file, "connect", mesh, 3, H5T_NATIVE_UINT64,
+                        H5T_STD_U64LE, chunksize, localSize[0], globalSize[0], reduceInts,
+                        filterEnable, filterChunksize, 4);
 
   // Vertices
   logInfo(rank) << "Writing vertices";
@@ -436,15 +436,21 @@ int main(int argc, char* argv[]) {
 
   std::size_t groupBytesPerData = 4;
   logInfo(rank) << "Writing group information";
-  writeH5Data<int>(meshInput->group(), h5file, "group", mesh, 3, H5T_NATIVE_INT, H5T_STD_I32LE,
-                   chunksize, localSize[0], globalSize[0], reduceInts, filterEnable,
-                   filterChunksize, NoSecondDim);
+  writeH5Data<int32_t>(meshInput->group(), h5file, "group", mesh, 3, H5T_NATIVE_INT32,
+                       H5T_STD_I32LE, chunksize, localSize[0], globalSize[0], reduceInts,
+                       filterEnable, filterChunksize, NoSecondDim);
 
   // Write boundary condition
   logInfo(rank) << "Writing boundary condition";
-  writeH5Data<long>(meshInput->boundary(), h5file, "boundary", mesh, 3, H5T_NATIVE_LONG,
-                    boundaryDatatype, chunksize, localSize[0], globalSize[0], reduceInts,
-                    filterEnable, filterChunksize, secondShape);
+  if (boundaryFormatAttr == "i32") {
+    writeH5Data<int32_t>(meshInput->boundary(), h5file, "boundary", mesh, 3, H5T_NATIVE_INT32,
+                         boundaryDatatype, chunksize, localSize[0], globalSize[0], reduceInts,
+                         filterEnable, filterChunksize, secondShape);
+  } else {
+    writeH5Data<int64_t>(meshInput->boundary(), h5file, "boundary", mesh, 3, H5T_NATIVE_INT64,
+                         boundaryDatatype, chunksize, localSize[0], globalSize[0], reduceInts,
+                         filterEnable, filterChunksize, secondShape);
+  }
 
   hid_t attrSpace = checkH5Err(H5Screate(H5S_SCALAR));
   hid_t attrType = checkH5Err(H5Tcopy(H5T_C_S1));
