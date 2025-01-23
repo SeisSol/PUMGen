@@ -20,13 +20,13 @@ class EasiMeshSize {
 
   easi::YAMLParser* parser;
   easi::Component* model; // Unique ptr to model leads to segfault
-  easi::Query query;
   pGModel simModel;
   std::unordered_map<pGRegion, int> groupMap;
 
-  int findGroup(std::array<double, 3> point);
+  int findGroup(const std::array<double, 3>& point);
 
-  std::tuple<const double, const int> getTargetedFrequencyAndRegion(std::array<double, 3> point);
+  std::tuple<const double, const int>
+  getTargetedFrequencyAndRegion(const std::array<double, 3>& point);
 
   public:
   EasiMeshSize();
@@ -34,7 +34,7 @@ class EasiMeshSize {
   EasiMeshSize(VelocityAwareRefinementSettings refinementSettings, pGModel simModel,
                std::unordered_map<pGRegion, int> groupMap);
 
-  double getMeshSize(std::array<double, 3> point);
+  double getMeshSize(const std::array<double, 3>& point);
 };
 
 #endif // PUMGEN_EASIMESHSIZE_H
