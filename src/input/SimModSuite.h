@@ -69,7 +69,7 @@
  */
 class SimModSuite : public FullStorageMeshData {
   private:
-  EasiMeshSize easiMeshSize;
+  std::shared_ptr<EasiMeshSize> easiMeshSize;
   pGModel m_model;
 
   pParMesh m_simMesh;
@@ -587,7 +587,8 @@ class SimModSuite : public FullStorageMeshData {
 
     if (MeshAtt.velocityAwareRefinementSettings.isVelocityAwareRefinementOn()) {
       logInfo(PMU_rank()) << "Enabling velocity aware meshing";
-      easiMeshSize = EasiMeshSize(MeshAtt.velocityAwareRefinementSettings, model, groupMap);
+      easiMeshSize =
+          std::make_shared<EasiMeshSize>(MeshAtt.velocityAwareRefinementSettings, model, groupMap);
       auto easiMeshSizeFunc = [](pSizeAttData sadata, void* userdata) {
         auto* easiMeshSize = static_cast<EasiMeshSize*>(userdata);
         std::array<double, 3> pt{};
@@ -598,7 +599,7 @@ class SimModSuite : public FullStorageMeshData {
         return easiMeshSize->getMeshSize(pt);
       };
       // set the user-defined function for isotropic size
-      MS_setSizeAttFunc(meshCase, "setCustomMeshSize", easiMeshSizeFunc, &easiMeshSize);
+      MS_setSizeAttFunc(meshCase, "setCustomMeshSize", easiMeshSizeFunc, easiMeshSize.get());
       // Relative anisotropic size is set for the entire model through the
       // function anisoSize
       MS_setMeshSize(meshCase, GM_domain(model), MS_userDefinedType | 1, 0, "setCustomMeshSize");
