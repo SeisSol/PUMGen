@@ -23,7 +23,7 @@ class EasiMeshSize {
   pGModel simModel;
   std::unordered_map<pGRegion, int> groupMap;
 
-  int findGroup(const std::array<double, 3>& point);
+  int findGroup(std::array<double, 3> point);
 
   std::tuple<const double, const int>
   getTargetedFrequencyAndRegion(const std::array<double, 3>& point);

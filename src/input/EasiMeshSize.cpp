@@ -14,7 +14,7 @@ EasiMeshSize::EasiMeshSize(VelocityAwareRefinementSettings refinementSettings, p
   model = parser->parse(refinementSettings.getEasiFileName());
 }
 
-int EasiMeshSize::findGroup(const std::array<double, 3>& point) {
+int EasiMeshSize::findGroup(std::array<double, 3> point) {
   // GR_containsPoint can be expensive for large geometry,
   // therefore we bypass it the simple case of one region
   if (groupMap.size() == 1) {
