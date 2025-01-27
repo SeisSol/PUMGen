@@ -21,6 +21,10 @@ list(APPEND SIMMETRIX_INCLUDE_DIR
 
 set(SIM_LIB_HINT ${SIMMETRIX_ROOT}/lib/x64_rhel7_gcc48)
 
+if (SIM_MPI STREQUAL "")
+  message(FATAL_ERROR "No MPI implementation for Simmodeler given. Build will fail.")
+endif()
+
 find_library(SIM_DISCRETE_LIB SimDiscrete ${SIM_LIB_HINT})
 find_library(SIM_MESHING_LIB SimMeshing ${SIM_LIB_HINT})
 find_library(SIM_MESH_TOOLS_LIB SimMeshTools ${SIM_LIB_HINT})
