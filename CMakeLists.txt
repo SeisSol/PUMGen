@@ -10,7 +10,7 @@ set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointe
 
 option(SIMMETRIX "Use simmetrix libraries" OFF)
 set(SIMMETRIX_ROOT "" CACHE STRING "Root directory of simmetrix dev files")
-set(SIM_MPI "mpich3" CACHE STRING "MPI version used by simmetrix")
+set(SIM_MPI "" CACHE STRING "MPI version used by simmetrix")
 option(NETCDF "Use netcdf" OFF)
 option(PARASOLID "enable support for parasolid files" OFF)
 option(SCOREC "Use PUMI/APF" OFF)
