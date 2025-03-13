@@ -31,6 +31,9 @@ template <typename T> class SerialMeshFile : public FullStorageMeshData {
   public:
   virtual ~SerialMeshFile() = default;
 
+  std::size_t vertexSize() const override { return T::Dim; }
+  std::size_t cellSize() const override { return puml::nodeCount(T::Dim, T::Order); }
+
   private:
 #ifdef PARALLEL
   MPI_Comm m_comm;
@@ -89,11 +92,11 @@ template <typename T> class SerialMeshFile : public FullStorageMeshData {
     m_meshReader.readGroups(groupData.data());
 
     logInfo(m_rank) << "Read boundary conditions";
-    std::vector<int> preBoundaryData(nLocalElements * 4);
+    std::vector<int> preBoundaryData(nLocalElements * (vertexSize() + 1));
     m_meshReader.readBoundaries(preBoundaryData.data());
     for (std::size_t i = 0; i < nLocalElements; ++i) {
-      for (int j = 0; j < 4; ++j) {
-        setBoundary(i, j, preBoundaryData[4 * i + j]);
+      for (int j = 0; j < (vertexSize() + 1); ++j) {
+        setBoundary(i, j, preBoundaryData[(vertexSize() + 1) * i + j]);
       }
     }
   }

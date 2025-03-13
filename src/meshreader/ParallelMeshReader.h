@@ -36,6 +36,8 @@ template <class R> class ParallelMeshReader {
   R m_serialReader;
 
   public:
+  constexpr static std::size_t Order = 1;
+  constexpr static std::size_t Dim = 3;
   ParallelMeshReader(MPI_Comm comm = MPI_COMM_WORLD)
       : m_nVertices(0), m_nElements(0), m_nBoundaries(0), m_comm(comm) {
     init();

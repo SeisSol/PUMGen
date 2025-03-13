@@ -10,6 +10,7 @@
  * @author Sebastian Rettenberger <sebastian.rettenberger@tum.de>
  */
 
+#include "meshreader/GMSHBuilder.h"
 #include <H5Tpublic.h>
 #include <mpi.h>
 
@@ -169,6 +170,11 @@ static void writeH5Data(const F& handler, hid_t h5file, const std::string& name,
   checkH5Err(H5Pclose(h5dxlist));
 }
 
+template <std::size_t Order>
+using SMF2 = SerialMeshFile<puml::ParallelGMSHReader<tndm::GMSH2Parser, Order>>;
+template <std::size_t Order>
+using SMF4 = SerialMeshFile<puml::ParallelGMSHReader<tndm::GMSH2Parser, Order>>;
+
 int main(int argc, char* argv[]) {
   int rank = 0;
   int processes = 1;
@@ -227,6 +233,7 @@ int main(int argc, char* argv[]) {
   args.addOption("sim_log", 0, "Create SimModSuite log", utils::Args::Required, false);
   args.addAdditionalOption("input", "Input file (mesh or model)");
   args.addAdditionalOption("output", "Output parallel unstructured mesh file", false);
+  args.addOption("order", 'o', "Mesh order", utils::Args::Optional, false);
 
   if (args.parse(argc, argv, rank == 0) != utils::Args::Success)
     return 1;
@@ -308,6 +315,8 @@ int main(int argc, char* argv[]) {
     xdmfFile.append(".xdmf");
   }
 
+  const auto meshOrder = args.getArgument<int>("order", 1);
+
   // Create/read the mesh
   MeshData* meshInput = nullptr;
   switch (args.getArgument<int>("source", 0)) {
@@ -317,13 +326,11 @@ int main(int argc, char* argv[]) {
     break;
   case 1:
     logInfo(rank) << "Using GMSH mesh format 2 (msh2) mesh";
-    meshInput =
-        new SerialMeshFile<puml::ParallelGMSHReader<tndm::GMSH2Parser>>(inputFile, faceOffset);
+    meshInput = puml::makePointer<MeshData, SMF2>(meshOrder, inputFile, faceOffset);
     break;
   case 2:
     logInfo(rank) << "Using GMSH mesh format 4 (msh4) mesh";
-    meshInput =
-        new SerialMeshFile<puml::ParallelGMSHReader<puml::GMSH4Parser>>(inputFile, faceOffset);
+    meshInput = puml::makePointer<MeshData, SMF4>(meshOrder, inputFile, faceOffset);
     break;
   case 3:
 #ifdef USE_NETCDF
@@ -391,6 +398,8 @@ int main(int argc, char* argv[]) {
   MPI_Allreduce(MPI_IN_PLACE, globalSize, 2, tndm::mpi_type_t<std::size_t>(), MPI_SUM,
                 MPI_COMM_WORLD);
 
+  logInfo(rank) << "Coordinates in vertex:" << meshInput->vertexSize();
+  logInfo(rank) << "Vertices in cell:" << meshInput->cellSize();
   logInfo(rank) << "Total cell count:" << globalSize[0];
   logInfo(rank) << "Total vertex count:" << globalSize[1];
 
@@ -424,13 +433,13 @@ int main(int argc, char* argv[]) {
   logInfo(rank) << "Writing cells";
   writeH5Data<uint64_t>(meshInput->connectivity(), h5file, "connect", mesh, 3, H5T_NATIVE_UINT64,
                         H5T_STD_U64LE, chunksize, localSize[0], globalSize[0], reduceInts,
-                        filterEnable, filterChunksize, 4);
+                        filterEnable, filterChunksize, meshInput->cellSize());
 
   // Vertices
   logInfo(rank) << "Writing vertices";
   writeH5Data<double>(meshInput->geometry(), h5file, "geometry", mesh, 0, H5T_IEEE_F64LE,
                       H5T_IEEE_F64LE, chunksize, localSize[1], globalSize[1], reduceInts,
-                      filterEnable, filterChunksize, 3);
+                      filterEnable, filterChunksize, meshInput->vertexSize());
 
   // Group information
 
@@ -442,6 +451,10 @@ int main(int argc, char* argv[]) {
 
   // Write boundary condition
   logInfo(rank) << "Writing boundary condition";
+  if (secondShape != NoSecondDim) {
+    // TODO: a bit ugly, but it works
+    secondShape = meshInput->vertexSize() + 1;
+  }
   if (boundaryFormatAttr == "i32") {
     writeH5Data<int32_t>(meshInput->boundary(), h5file, "boundary", mesh, 3, H5T_NATIVE_INT32,
                          boundaryDatatype, chunksize, localSize[0], globalSize[0], reduceInts,

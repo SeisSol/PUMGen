@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <iostream>
 #include <vector>
 
 #include "aux/Distributor.h"
@@ -16,8 +17,9 @@
 
 namespace puml {
 
-template <typename P> class ParallelGMSHReader {
+template <typename P, std::size_t OrderP> class ParallelGMSHReader {
   public:
+  constexpr static std::size_t Order = OrderP;
   constexpr static std::size_t Dim = 3;
   using bc_t = std::array<int, Dim + 1u>;
   constexpr static std::size_t Facet2Nodes[Dim + 1][Dim] = {
@@ -49,11 +51,12 @@ template <typename P> class ParallelGMSHReader {
   [[nodiscard]] std::size_t nVertices() const { return nVertices_; }
   [[nodiscard]] std::size_t nElements() const { return nElements_; }
   void readElements(std::size_t* elements) const {
-    static_assert(sizeof(GMSHBuilder<Dim>::element_t) == (Dim + 1) * sizeof(std::size_t));
-    scatter(builder_.elements.data()->data(), elements, nElements(), Dim + 1);
+    static_assert(sizeof(typename GMSHBuilder<Dim, Order>::element_t) ==
+                  nodeCount(Dim, Order) * sizeof(std::size_t));
+    scatter(builder_.elements.data()->data(), elements, nElements(), nodeCount(Dim, Order));
   }
   void readVertices(double* vertices) const {
-    static_assert(sizeof(GMSHBuilder<Dim>::vertex_t) == Dim * sizeof(double));
+    static_assert(sizeof(typename GMSHBuilder<Dim, Order>::vertex_t) == Dim * sizeof(double));
     scatter(builder_.vertices.data()->data(), vertices, nVertices(), Dim);
   }
   void readBoundaries(int* boundaries) const {
@@ -157,7 +160,7 @@ template <typename P> class ParallelGMSHReader {
   }
 
   MPI_Comm comm_;
-  GMSHBuilder<Dim> builder_;
+  GMSHBuilder<Dim, Order> builder_;
   std::vector<bc_t> bcs_;
   std::size_t nVertices_ = 0;
   std::size_t nElements_ = 0;
