@@ -23,14 +23,14 @@ constexpr std::size_t nodeCount(std::size_t D, std::size_t Order) {
 
 template <std::size_t P, typename BaseT, template <std::size_t> typename ParamT, typename... Args>
 BaseT* makePointerI(std::size_t param, Args&&... args) {
-  if constexpr (P < 6) {
+  if constexpr (P < 11) {
     if (param == P) {
       return new ParamT<P>(std::forward<Args>(args)...);
     } else {
       return makePointerI<P + 1, BaseT, ParamT>(param, std::forward<Args>(args)...);
     }
   } else {
-    // ERROR
+    logError() << "Order too high:" << param;
     return nullptr;
   }
 }
@@ -73,6 +73,21 @@ template <> struct GMSHSimplexType<1U, 4U> {
 template <> struct GMSHSimplexType<1U, 5U> {
   static constexpr long type = 28;
 };
+template <> struct GMSHSimplexType<1U, 6U> {
+  static constexpr long type = 62;
+};
+template <> struct GMSHSimplexType<1U, 7U> {
+  static constexpr long type = 63;
+};
+template <> struct GMSHSimplexType<1U, 8U> {
+  static constexpr long type = 64;
+};
+template <> struct GMSHSimplexType<1U, 9U> {
+  static constexpr long type = 65;
+};
+template <> struct GMSHSimplexType<1U, 10U> {
+  static constexpr long type = 66;
+};
 template <> struct GMSHSimplexType<2U, 3U> {
   static constexpr long type = 21;
 };
@@ -82,6 +97,21 @@ template <> struct GMSHSimplexType<2U, 4U> {
 template <> struct GMSHSimplexType<2U, 5U> {
   static constexpr long type = 25;
 };
+template <> struct GMSHSimplexType<2U, 6U> {
+  static constexpr long type = 42;
+};
+template <> struct GMSHSimplexType<2U, 7U> {
+  static constexpr long type = 43;
+};
+template <> struct GMSHSimplexType<2U, 8U> {
+  static constexpr long type = 44;
+};
+template <> struct GMSHSimplexType<2U, 9U> {
+  static constexpr long type = 45;
+};
+template <> struct GMSHSimplexType<2U, 10U> {
+  static constexpr long type = 46;
+};
 template <> struct GMSHSimplexType<3U, 3U> {
   static constexpr long type = 29;
 };
@@ -90,6 +120,21 @@ template <> struct GMSHSimplexType<3U, 4U> {
 };
 template <> struct GMSHSimplexType<3U, 5U> {
   static constexpr long type = 31;
+};
+template <> struct GMSHSimplexType<3U, 6U> {
+  static constexpr long type = 71;
+};
+template <> struct GMSHSimplexType<3U, 7U> {
+  static constexpr long type = 72;
+};
+template <> struct GMSHSimplexType<3U, 8U> {
+  static constexpr long type = 73;
+};
+template <> struct GMSHSimplexType<3U, 9U> {
+  static constexpr long type = 74;
+};
+template <> struct GMSHSimplexType<3U, 10U> {
+  static constexpr long type = 75;
 };
 
 template <std::size_t D, std::size_t Order> class GMSHBuilder : public tndm::GMSHMeshBuilder {
