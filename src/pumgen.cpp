@@ -173,7 +173,7 @@ static void writeH5Data(const F& handler, hid_t h5file, const std::string& name,
 template <std::size_t Order>
 using SMF2 = SerialMeshFile<puml::ParallelGMSHReader<tndm::GMSH2Parser, Order>>;
 template <std::size_t Order>
-using SMF4 = SerialMeshFile<puml::ParallelGMSHReader<tndm::GMSH2Parser, Order>>;
+using SMF4 = SerialMeshFile<puml::ParallelGMSHReader<puml::GMSH4Parser, Order>>;
 
 int main(int argc, char* argv[]) {
   int rank = 0;
