@@ -304,9 +304,9 @@ bool GMSH4Parser::parsePeriodic(bool variableAffine) {
 
     for (std::size_t i = 0; i < identifySize; ++i) {
       getNextToken();
-      const std::size_t nodeId = expectNonNegativeInt();
+      const std::size_t nodeId = expectNonNegativeInt() - 1;
       getNextToken();
-      const std::size_t nodeIdentifyId = expectNonNegativeInt();
+      const std::size_t nodeIdentifyId = expectNonNegativeInt() - 1;
       builder->addVertexLink(nodeId, nodeIdentifyId);
     }
   }

@@ -411,6 +411,7 @@ int main(int argc, char* argv[]) {
   logInfo() << "Vertices in cell:" << meshInput->cellSize();
   logInfo() << "Total cell count:" << globalSize[0];
   logInfo() << "Total vertex count:" << globalSize[1];
+  logInfo() << "Vertex identification:" << meshInput->hasIdentify();
 
   auto inspheres =
       calculateInsphere(meshInput->connectivity(), meshInput->geometry(), MPI_COMM_WORLD);
@@ -531,7 +532,7 @@ int main(int argc, char* argv[]) {
          << basename << ":/boundary</DataItem>" << std::endl
          << "   </Attribute>" << std::endl;
     if (meshInput->hasIdentify()) {
-      xdmf << "   <Attribute Name=\"boundary\" Center=\"Node\">" << std::endl
+      xdmf << "   <Attribute Name=\"identify\" Center=\"Node\">" << std::endl
            << "    <DataItem NumberType=\"Int\" Precision=\"8\" Format=\"HDF\" Dimensions=\""
            << globalSize[1] << "\">" << basename << ":/identify</DataItem>" << std::endl
            << "   </Attribute>" << std::endl;

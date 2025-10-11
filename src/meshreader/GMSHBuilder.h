@@ -9,6 +9,7 @@
 #include <array>
 #include <cassert>
 #include <numeric>
+#include <set>
 #include <vector>
 
 #include "utils/logger.h"
@@ -163,10 +164,8 @@ template <std::size_t D, std::size_t Order> class GMSHBuilder : public tndm::GMS
     }
   }
 
-  void setNumVertices(std::size_t numVertices) {
-    vertices.resize(numVertices);
-    resizeIdentifyIfNeeded(numVertices);
-  }
+  void setNumVertices(std::size_t numVertices) { vertices.resize(numVertices); }
+
   void setVertex(long id, std::array<double, D> const& x) {
     for (std::size_t i = 0; i < D; ++i) {
       vertices[id][i] = x[i];
@@ -201,6 +200,35 @@ template <std::size_t D, std::size_t Order> class GMSHBuilder : public tndm::GMS
     // needed in case we parse periodic before we parse the vertex/node section
     resizeIdentifyIfNeeded(vertex + 1);
     identify[vertex] = linkVertex;
+  }
+
+  void postprocess() {
+    // GMSH does not pick the same node to identify for all
+    // thus, stratify (i.e. "path compress" in "union find" terms)
+
+    if (!identify.empty()) {
+      // only resize if we have an identification array
+      resizeIdentifyIfNeeded(vertices.size());
+      for (std::size_t i = 0; i < identify.size(); ++i) {
+        if (identify[i] != i) {
+
+          // find until we loop
+          std::size_t curr = i;
+          std::set<std::size_t> equivalent;
+          equivalent.insert(curr);
+          while (equivalent.find(identify[curr]) == equivalent.end()) {
+            curr = identify[curr];
+            equivalent.insert(curr);
+          }
+
+          // then set everything to one value
+          const auto identifyEquiv = *equivalent.begin();
+          for (const auto& index : equivalent) {
+            identify[index] = identifyEquiv;
+          }
+        }
+      }
+    }
   }
 };
 

@@ -42,6 +42,7 @@ template <typename P, std::size_t OrderP> class ParallelGMSHReader {
       if (!ok) {
         logError() << meshFile << std::endl << parser.getErrorMessage();
       }
+      builder_.postprocess();
       convertBoundaryConditions();
 
       nVertices_ = builder_.vertices.size();
