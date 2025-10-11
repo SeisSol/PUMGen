@@ -93,7 +93,7 @@ if (SIMMETRIX)
     find_package(easi 1.0.0 REQUIRED)
     target_link_libraries(pumgen PUBLIC easi::easi)
 
-    target_sources(pumgen PUBLIC 
+    target_sources(pumgen PUBLIC
       ${CMAKE_CURRENT_SOURCE_DIR}/src/input/AnalysisAttributes.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/src/input/EasiMeshSize.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/src/input/MeshAttributes.cpp

@@ -36,7 +36,7 @@ find_library(SIM_PARTITIONED_MESH_LIB SimPartitionedMesh ${SIM_LIB_HINT})
 find_library(SIM_PARTITIONED_MESH_MPI_LIB SimPartitionedMesh-mpi ${SIM_LIB_HINT})
 find_library(SIM_PARTITIONED_WRAPPER_LIB SimPartitionWrapper-${SIM_MPI} ${SIM_LIB_HINT})
 find_library(SIM_PS_KRNL_LIB pskernel ${SIM_LIB_HINT}/psKrnl)
-  
+
 get_filename_component(SIM_PS_KRNL_LIB_DIR ${SIM_PS_KRNL_LIB} DIRECTORY)
 
 list(APPEND SIMMETRIX_LIBRARIES

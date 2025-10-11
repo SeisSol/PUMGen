@@ -2,7 +2,7 @@
 <dynamicRupture>2</dynamicRupture>
 <absorbing>3,4</absorbing>
 <!-- see https://seissol.readthedocs.io/en/latest/fault-tagging.html for SeisSol convention regarding boundaryCondition -->
-<boundaryCondition tag="65">7</boundaryCondition> 
+<boundaryCondition tag="65">7</boundaryCondition>
 <boundaryCondition tag="67">7</boundaryCondition>
 <boundaryCondition tag="68">8,9</boundaryCondition>
 <globalMSize value="100e3"/>
@@ -27,8 +27,8 @@
 <surfaceNoMesh>1,2</surfaceNoMesh>
 <regionNoMesh>1,4</regionNoMesh>
 
-<!-- For complex geometry, finding the region in which a point lies is expensive and will 
-slow down the mesh generation significantly when using VelocityAwareMeshing. 
+<!-- For complex geometry, finding the region in which a point lies is expensive and will
+slow down the mesh generation significantly when using VelocityAwareMeshing.
 To avoid such an expensive call to the findGroup function, we can specify the group to use
 in the easi query using the (optional) argument bypassFindRegionAndUseGroup -->
 
@@ -36,6 +36,6 @@ in the easi query using the (optional) argument bypassFindRegionAndUseGroup -->
     <VelocityRefinementCuboid frequency="2" centerX="200" centerY="200" centerZ="-100"
                               halfSizeX="100" halfSizeY="100" halfSizeZ="100" rotationZAnticlockwiseFromX="30."/>
     <VelocityRefinementCuboid frequency="10" centerX="0" centerY="0" centerZ="0"
-                              halfSizeX="100" halfSizeY="100" halfSizeZ="100" 
+                              halfSizeX="100" halfSizeY="100" halfSizeZ="100"
                               bypassFindRegionAndUseGroup="1"/>
 </VelocityAwareMeshing>

@@ -18,21 +18,21 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -qq g++ openmpi-bin openmpi-common libopenmpi-dev hdf5-tools libhdf5-openmpi-dev libnetcdf-dev
-  
+
       - name: Configure PUMGen
         working-directory: ${{ github.workspace }}
         run: |
           git submodule update --init --recursive
           mkdir build_${{ matrix.build_type}} && cd build_${{ matrix.build_type}}
           cmake .. -DCMAKE_PREFIX_PATH=${{ runner.workspace }}/opt -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
-  
+
       - name: Build
         working-directory: ${{ github.workspace }}/build_${{ matrix.build_type }}
         run: cmake --build .
-  
+
   clang-format:
     runs-on: ubuntu-latest
-    steps: 
+    steps:
       - uses: actions/checkout@v5
 
       - name: clang-format
