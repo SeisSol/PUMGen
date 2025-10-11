@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2025 SeisSol Group
+//
+// SPDX-License-Identifier: BSD-3-Clause
 #include "MPIConvenience.h"
 #include <limits>
 #include <mpi.h>

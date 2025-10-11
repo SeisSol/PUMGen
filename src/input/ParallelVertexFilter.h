@@ -1,20 +1,11 @@
-/**
- * @file
- *  This file is part of PUMGen
- *
- *  For conditions of distribution and use, please see the copyright
- *  notice in the file 'COPYING' at the root directory of this package
- *  and the copyright notice at https://github.com/SeisSol/PUMGen
- *
- * @copyright 2017 Technical University of Munich
- * @author Sebastian Rettenberger <sebastian.rettenberger@tum.de>
- *
- * @remark This class is taken from XdmfWriter
- * (https://github.com/TUM-I5/XdmfWriter)
- */
+// SPDX-FileCopyrightText: 2017 SeisSol Group
+// SPDX-FileCopyrightText: 2017 Technical University of Munich
+//
+// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-FileContributor: Sebastian Rettenberger <sebastian.rettenberger@tum.de>
 
-#ifndef PARALLEL_VERTEX_FILTER_H
-#define PARALLEL_VERTEX_FILTER_H
+#ifndef PUMGEN_SRC_INPUT_PARALLELVERTEXFILTER_H_
+#define PUMGEN_SRC_INPUT_PARALLELVERTEXFILTER_H_
 
 #include <mpi.h>
 
@@ -30,7 +21,7 @@
 
 #include "third_party/MPITraits.h"
 
-#include "aux/MPIConvenience.h"
+#include "helper/MPIConvenience.h"
 
 /**
  * Filters duplicate vertices in parallel
@@ -363,4 +354,4 @@ public:
   constexpr static int BUCKETS_PER_RANK = 8;
 };
 
-#endif // PARALLEL_VERTEX_FILTER_H
+#endif // PUMGEN_SRC_INPUT_PARALLELVERTEXFILTER_H_

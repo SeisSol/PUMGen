@@ -1,17 +1,11 @@
-/**
- * @file
- *  This file is part of PUMGen
- *
- *  For conditions of distribution and use, please see the copyright
- *  notice in the file 'COPYING' at the root directory of this package
- *  and the copyright notice at https://github.com/SeisSol/PUMGen
- *
- * @copyright 2017 Technical University of Munich
- * @author Sebastian Rettenberger <sebastian.rettenberger@tum.de>
- */
+// SPDX-FileCopyrightText: 2017 SeisSol Group
+// SPDX-FileCopyrightText: 2017 Technical University of Munich
+//
+// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-FileContributor: Sebastian Rettenberger <sebastian.rettenberger@tum.de>
 
-#ifndef GAMBIT_READER_H
-#define GAMBIT_READER_H
+#ifndef PUMGEN_SRC_MESHREADER_GAMBITREADER_H_
+#define PUMGEN_SRC_MESHREADER_GAMBITREADER_H_
 
 #include <cctype>
 #include <cstddef>
@@ -50,6 +44,19 @@ struct GambitBoundaryFace {
 };
 
 class GambitReader : public MeshReader {
+  private:
+  /** Number of character required to store a coordinate */
+  static constexpr size_t COORDINATE_SIZE = 20ul;
+  /** Number of elements stored in one group line */
+  static constexpr size_t ELEMENTS_PER_LINE_GROUP = 10ul;
+
+  static const char* GAMBIT_FILE_ID;
+  static const char* ENDSECTION;
+  static const char* NODAL_COORDINATES;
+  static const char* ELEMENT_CELLS;
+  static const char* ELEMENT_GROUP;
+  static const char* BOUNDARY_CONDITIONS;
+
   private:
   struct ElementSection : FileSection {
     /** Start of vertices in an element */
@@ -534,21 +541,8 @@ class GambitReader : public MeshReader {
       boundaries[faces[i].element * 4 + faces[i].face] = faces[i].type;
     }
   }
-
-  private:
-  /** Number of character required to store a coordinate */
-  static const size_t COORDINATE_SIZE = 20ul;
-  /** Number of elements stored in one group line */
-  static const size_t ELEMENTS_PER_LINE_GROUP = 10ul;
-
-  static const char* GAMBIT_FILE_ID;
-  static const char* ENDSECTION;
-  static const char* NODAL_COORDINATES;
-  static const char* ELEMENT_CELLS;
-  static const char* ELEMENT_GROUP;
-  static const char* BOUNDARY_CONDITIONS;
 };
 
 } // namespace puml
 
-#endif // GAMBIT_READER_H
+#endif // PUMGEN_SRC_MESHREADER_GAMBITREADER_H_

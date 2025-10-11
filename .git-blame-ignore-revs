@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2020 SeisSol Group
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
 # Apply LLVM stlye for the first time
 b864952a14025d953acc5fad1198e5ba119e25d3
 # Apply mneme style

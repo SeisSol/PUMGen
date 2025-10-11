@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2020 SeisSol Group
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
 cmake_minimum_required(VERSION 3.9)
 
 cmake_policy(SET CMP0074 NEW)
@@ -38,8 +42,8 @@ add_executable(pumgen
   ${CMAKE_CURRENT_SOURCE_DIR}/src/third_party/GMSHLexer.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/third_party/GMSHParser.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/third_party/GMSH2Parser.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/aux/InsphereCalculator.cpp
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/aux/MPIConvenience.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/helper/InsphereCalculator.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/helper/MPIConvenience.cpp
   )
 
 target_include_directories(pumgen PUBLIC src
@@ -93,7 +97,7 @@ if (SIMMETRIX)
     find_package(easi 1.0.0 REQUIRED)
     target_link_libraries(pumgen PUBLIC easi::easi)
 
-    target_sources(pumgen PUBLIC 
+    target_sources(pumgen PUBLIC
       ${CMAKE_CURRENT_SOURCE_DIR}/src/input/AnalysisAttributes.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/src/input/EasiMeshSize.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/src/input/MeshAttributes.cpp

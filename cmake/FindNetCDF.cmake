@@ -11,6 +11,7 @@ Provides the following variables:
 # Stolen from VTK with some small modifications
 # https://github.com/Kitware/VTK/blob/master/CMake/FindNetCDF.cmake
 # (BSD 3-Clause License)
+# SPDX-License-Identifier: BSD-3-Clause
 
 #[[=========================================================================
 

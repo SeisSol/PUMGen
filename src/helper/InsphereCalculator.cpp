@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2025 SeisSol Group
+//
+// SPDX-License-Identifier: BSD-3-Clause
 #include "InsphereCalculator.h"
 #include "third_party/MPITraits.h"
 #include <algorithm>

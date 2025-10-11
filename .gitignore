@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2017 SeisSol Group
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
 # KDevelop4
 *.kdev4
 *.kdev4/
