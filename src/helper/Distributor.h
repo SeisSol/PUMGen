@@ -1,5 +1,8 @@
-#ifndef PUMGEN_AUX_DISTRIBUTOR_H_
-#define PUMGEN_AUX_DISTRIBUTOR_H_
+// SPDX-FileCopyrightText: 2025 SeisSol Group
+//
+// SPDX-License-Identifier: BSD-3-Clause
+#ifndef PUMGEN_SRC_HELPER_DISTRIBUTOR_H_
+#define PUMGEN_SRC_HELPER_DISTRIBUTOR_H_
 
 #include <cmath>
 #include <cstdlib>
@@ -17,4 +20,4 @@ constexpr std::size_t getChunksum(std::size_t total, int until, int size) {
   return base + addon;
 }
 
-#endif // PUMGEN_AUX_DISTRIBUTOR_H_
+#endif // PUMGEN_SRC_HELPER_DISTRIBUTOR_H_

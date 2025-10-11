@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: BSD-3-Clause
 
-#ifndef MESH_DATA_H
-#define MESH_DATA_H
+#ifndef PUMGEN_SRC_INPUT_MESHDATA_H_
+#define PUMGEN_SRC_INPUT_MESHDATA_H_
 
 #include <cstdint>
 #include <limits>
@@ -102,4 +102,4 @@ class FullStorageMeshData : public MeshData {
   }
 };
 
-#endif // MESH_INPUT_H
+#endif // PUMGEN_SRC_INPUT_MESHDATA_H_

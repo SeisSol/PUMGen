@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2020 SeisSol Group
+//
+// SPDX-License-Identifier: BSD-3-Clause
 #include "MeshAttributes.h"
 
 VelocityAwareRefinementSettings::VelocityAwareRefinementSettings(double elementsPerWaveLength,
