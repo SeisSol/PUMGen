@@ -1,5 +1,9 @@
-#ifndef HASH_20200627_H
-#define HASH_20200627_H
+// SPDX-FileCopyrightText: 2025 SeisSol Group
+// SPDX-FileCopyrightText: 2020 Ludwig-Maximilians-Universität München
+//
+// SPDX-License-Identifier: BSD-3-Clause
+#ifndef PUMGEN_SRC_THIRD_PARTY_HASH_H_
+#define PUMGEN_SRC_THIRD_PARTY_HASH_H_
 
 #include <cstdint>
 #include <string>
@@ -17,4 +21,4 @@ constexpr uint64_t operator""_fnv1a(char const* s, std::size_t len) { return tnd
 
 } // namespace tndm
 
-#endif // HASH_20200627_H
+#endif // PUMGEN_SRC_THIRD_PARTY_HASH_H_

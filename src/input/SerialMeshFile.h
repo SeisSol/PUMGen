@@ -1,10 +1,11 @@
+// SPDX-FileCopyrightText: 2017 SeisSol Group
 // SPDX-FileCopyrightText: 2017 Technical University of Munich
 //
 // SPDX-License-Identifier: BSD-3-Clause
 // SPDX-FileContributor: Sebastian Rettenberger <sebastian.rettenberger@tum.de>
 
-#ifndef SERIAL_MESH_FILE_H
-#define SERIAL_MESH_FILE_H
+#ifndef PUMGEN_SRC_INPUT_SERIALMESHFILE_H_
+#define PUMGEN_SRC_INPUT_SERIALMESHFILE_H_
 
 #ifdef PARALLEL
 #include <mpi.h>
@@ -106,4 +107,4 @@ template <typename T> class SerialMeshFile : public FullStorageMeshData {
   }
 };
 
-#endif // SERIAL_MESH_FILE_H
+#endif // PUMGEN_SRC_INPUT_SERIALMESHFILE_H_

@@ -1,10 +1,11 @@
+// SPDX-FileCopyrightText: 2023 SeisSol Group
 // SPDX-FileCopyrightText: 2017 Technical University of Munich
 //
 // SPDX-License-Identifier: BSD-3-Clause
 // SPDX-FileContributor: Sebastian Rettenberger <sebastian.rettenberger@tum.de>
 
-#ifndef SIM_MOD_SUITE_APF_H
-#define SIM_MOD_SUITE_APF_H
+#ifndef PUMGEN_SRC_INPUT_SIMMODSUITEAPF_H_
+#define PUMGEN_SRC_INPUT_SIMMODSUITEAPF_H_
 
 #include <mpi.h>
 
@@ -687,4 +688,4 @@ class SimModSuiteApf : public ApfMeshInput {
   }
 };
 
-#endif // SIM_MOD_SUITE_APF_H
+#endif // PUMGEN_SRC_INPUT_SIMMODSUITEAPF_H_

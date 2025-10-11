@@ -1,11 +1,12 @@
+// SPDX-FileCopyrightText: 2017 SeisSol Group
 // SPDX-FileCopyrightText: 2017 Technical University of Munich
 //
 // SPDX-License-Identifier: BSD-3-Clause
 // SPDX-FileContributor: Sebastian Rettenberger <sebastian.rettenberger@tum.de>
 // SPDX-FileContributor: David Schneller <david.schneller@tum.de>
 
-#ifndef SIM_MOD_SUITE_H
-#define SIM_MOD_SUITE_H
+#ifndef PUMGEN_SRC_INPUT_SIMMODSUITE_H_
+#define PUMGEN_SRC_INPUT_SIMMODSUITE_H_
 
 #include <mpi.h>
 
@@ -808,4 +809,4 @@ class SimModSuite : public FullStorageMeshData {
   }
 };
 
-#endif // SIM_MOD_SUITE_H
+#endif // PUMGEN_SRC_INPUT_SIMMODSUITE_H_

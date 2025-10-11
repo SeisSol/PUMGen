@@ -1,10 +1,11 @@
+// SPDX-FileCopyrightText: 2017 SeisSol Group
 // SPDX-FileCopyrightText: 2017 Technical University of Munich
 //
 // SPDX-License-Identifier: BSD-3-Clause
 // SPDX-FileContributor: Sebastian Rettenberger <sebastian.rettenberger@tum.de>
 
-#ifndef MESH_READER_H
-#define MESH_READER_H
+#ifndef PUMGEN_SRC_MESHREADER_MESHREADER_H_
+#define PUMGEN_SRC_MESHREADER_MESHREADER_H_
 
 #include <fstream>
 
@@ -86,4 +87,4 @@ class MeshReader {
   }
 };
 
-#endif // MESH_READER_H
+#endif // PUMGEN_SRC_MESHREADER_MESHREADER_H_

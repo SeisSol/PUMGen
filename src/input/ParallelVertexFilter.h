@@ -1,10 +1,11 @@
+// SPDX-FileCopyrightText: 2017 SeisSol Group
 // SPDX-FileCopyrightText: 2017 Technical University of Munich
 //
 // SPDX-License-Identifier: BSD-3-Clause
 // SPDX-FileContributor: Sebastian Rettenberger <sebastian.rettenberger@tum.de>
 
-#ifndef PARALLEL_VERTEX_FILTER_H
-#define PARALLEL_VERTEX_FILTER_H
+#ifndef PUMGEN_SRC_INPUT_PARALLELVERTEXFILTER_H_
+#define PUMGEN_SRC_INPUT_PARALLELVERTEXFILTER_H_
 
 #include <mpi.h>
 
@@ -353,4 +354,4 @@ public:
   constexpr static int BUCKETS_PER_RANK = 8;
 };
 
-#endif // PARALLEL_VERTEX_FILTER_H
+#endif // PUMGEN_SRC_INPUT_PARALLELVERTEXFILTER_H_

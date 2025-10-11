@@ -1,10 +1,11 @@
+// SPDX-FileCopyrightText: 2017 SeisSol Group
 // SPDX-FileCopyrightText: 2017 Technical University of Munich
 //
 // SPDX-License-Identifier: BSD-3-Clause
 // SPDX-FileContributor: Sebastian Rettenberger <sebastian.rettenberger@tum.de>
 
-#ifndef NETCDF_MESH_H
-#define NETCDF_MESH_H
+#ifndef PUMGEN_SRC_INPUT_NETCDFMESH_H_
+#define PUMGEN_SRC_INPUT_NETCDFMESH_H_
 
 #include <mpi.h>
 
@@ -213,4 +214,4 @@ class NetCDFMesh : public FullStorageMeshData {
   }
 };
 
-#endif // NETCDF_MESH_H
+#endif // PUMGEN_SRC_INPUT_NETCDFMESH_H_

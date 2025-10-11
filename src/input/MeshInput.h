@@ -1,9 +1,11 @@
+// SPDX-FileCopyrightText: 2017 SeisSol Group
 // SPDX-FileCopyrightText: 2017 Technical University of Munich
 //
 // SPDX-License-Identifier: BSD-3-Clause
 // SPDX-FileContributor: Sebastian Rettenberger <sebastian.rettenberger@tum.de>
 
-#include "MeshData.h"
+#ifndef PUMGEN_SRC_INPUT_MESHINPUT_H_
+#define PUMGEN_SRC_INPUT_MESHINPUT_H_
 #include "utils/logger.h"
 #include <apfMesh2.h>
 #include <apfNumbering.h>
@@ -109,4 +111,4 @@ class ApfMeshInput : public FullStorageMeshData {
   }
 };
 
-#endif // MESH_INPUT_H
+#endif // PUMGEN_SRC_INPUT_MESHINPUT_H_

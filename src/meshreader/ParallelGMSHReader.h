@@ -1,5 +1,9 @@
-#ifndef PARALLELGMSHREADER_20201014_H
-#define PARALLELGMSHREADER_20201014_H
+// SPDX-FileCopyrightText: 2020 SeisSol Group
+// SPDX-FileCopyrightText: 2020 Ludwig-Maximilians-Universität München
+//
+// SPDX-License-Identifier: BSD-3-Clause
+#ifndef PUMGEN_SRC_MESHREADER_PARALLELGMSHREADER_H_
+#define PUMGEN_SRC_MESHREADER_PARALLELGMSHREADER_H_
 
 #include "GMSHBuilder.h"
 #include "third_party/MPITraits.h"
@@ -174,4 +178,4 @@ template <typename P, std::size_t OrderP> class ParallelGMSHReader {
 
 } // namespace puml
 
-#endif // PARALLELGMSHREADER_20201014_H
+#endif // PUMGEN_SRC_MESHREADER_PARALLELGMSHREADER_H_

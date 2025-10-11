@@ -1,10 +1,11 @@
+// SPDX-FileCopyrightText: 2017 SeisSol Group
 // SPDX-FileCopyrightText: 2017 Technical University of Munich
 //
 // SPDX-License-Identifier: BSD-3-Clause
 // SPDX-FileContributor: Sebastian Rettenberger <sebastian.rettenberger@tum.de>
 
-#ifndef PARALLEL_MESH_READER_H
-#define PARALLEL_MESH_READER_H
+#ifndef PUMGEN_SRC_MESHREADER_PARALLELMESHREADER_H_
+#define PUMGEN_SRC_MESHREADER_PARALLELMESHREADER_H_
 
 #include <mpi.h>
 
@@ -202,4 +203,4 @@ template <class R> class ParallelMeshReader {
   }
 };
 
-#endif // PARALLEL_MESH_READER_H
+#endif // PUMGEN_SRC_MESHREADER_PARALLELMESHREADER_H_

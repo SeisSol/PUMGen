@@ -1,5 +1,8 @@
-#ifndef GMSHMESHBUILDER_20200901_H
-#define GMSHMESHBUILDER_20200901_H
+// SPDX-FileCopyrightText: 2022 SeisSol Group
+//
+// SPDX-License-Identifier: BSD-3-Clause
+#ifndef PUMGEN_SRC_THIRD_PARTY_GMSHMESHBUILDER_H_
+#define PUMGEN_SRC_THIRD_PARTY_GMSHMESHBUILDER_H_
 
 #include <array>
 
@@ -17,4 +20,4 @@ class GMSHMeshBuilder {
 
 } // namespace tndm
 
-#endif // GMSHMESHBUILDER_20200901_H
+#endif // PUMGEN_SRC_THIRD_PARTY_GMSHMESHBUILDER_H_

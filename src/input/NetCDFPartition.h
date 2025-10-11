@@ -1,10 +1,11 @@
+// SPDX-FileCopyrightText: 2017 SeisSol Group
 // SPDX-FileCopyrightText: 2017 Technical University of Munich
 //
 // SPDX-License-Identifier: BSD-3-Clause
 // SPDX-FileContributor: Sebastian Rettenberger <sebastian.rettenberger@tum.de>
 
-#ifndef PARTITION_H
-#define PARTITION_H
+#ifndef PUMGEN_SRC_INPUT_NETCDFPARTITION_H_
+#define PUMGEN_SRC_INPUT_NETCDFPARTITION_H_
 
 #include <cstring>
 
@@ -81,4 +82,4 @@ class Partition {
   const static int INTERNAL2EX_ORDER[4];
 };
 
-#endif // PARTITION_H
+#endif // PUMGEN_SRC_INPUT_NETCDFPARTITION_H_

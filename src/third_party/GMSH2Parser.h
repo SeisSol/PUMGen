@@ -1,5 +1,9 @@
-#ifndef GMSH2PARSER_20200901_H
-#define GMSH2PARSER_20200901_H
+// SPDX-FileCopyrightText: 2022 SeisSol Group
+// SPDX-FileCopyrightText: 2020 Ludwig-Maximilians-Universität München
+//
+// SPDX-License-Identifier: BSD-3-Clause
+#ifndef PUMGEN_SRC_THIRD_PARTY_GMSH2PARSER_H_
+#define PUMGEN_SRC_THIRD_PARTY_GMSH2PARSER_H_
 
 #include "GMSHLexer.h"
 #include "GMSHMeshBuilder.h"
@@ -41,4 +45,4 @@ class GMSH2Parser : public GMSHParser {
 
 }; // namespace tndm
 
-#endif // GMSH2PARSER_20200901_H
+#endif // PUMGEN_SRC_THIRD_PARTY_GMSH2PARSER_H_

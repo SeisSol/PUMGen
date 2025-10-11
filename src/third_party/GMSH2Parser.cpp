@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2022 SeisSol Group
+// SPDX-FileCopyrightText: 2020 Ludwig-Maximilians-Universität München
+//
+// SPDX-License-Identifier: BSD-3-Clause
 #include "GMSH2Parser.h"
 #include "GMSHLexer.h"
 

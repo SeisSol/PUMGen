@@ -1,10 +1,11 @@
+// SPDX-FileCopyrightText: 2017 SeisSol Group
 // SPDX-FileCopyrightText: 2017 Technical University of Munich
 //
 // SPDX-License-Identifier: BSD-3-Clause
 // SPDX-FileContributor: Sebastian Rettenberger <sebastian.rettenberger@tum.de>
 
-#ifndef PARALLEL_GAMBIT_READER
-#define PARALLEL_GAMBIT_READER
+#ifndef PUMGEN_SRC_MESHREADER_PARALLELGAMBITREADER_H_
+#define PUMGEN_SRC_MESHREADER_PARALLELGAMBITREADER_H_
 
 #include <mpi.h>
 
@@ -203,4 +204,4 @@ class ParallelGambitReader : public ParallelMeshReader<GambitReader> {
 
 } // namespace puml
 
-#endif // PARALLEL_GAMBIT_READER
+#endif // PUMGEN_SRC_MESHREADER_PARALLELGAMBITREADER_H_

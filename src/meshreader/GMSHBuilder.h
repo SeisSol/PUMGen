@@ -1,5 +1,9 @@
-#ifndef GMSHBUILDER_20201014_H
-#define GMSHBUILDER_20201014_H
+// SPDX-FileCopyrightText: 2020 SeisSol Group
+// SPDX-FileCopyrightText: 2020 Ludwig-Maximilians-Universität München
+//
+// SPDX-License-Identifier: BSD-3-Clause
+#ifndef PUMGEN_SRC_MESHREADER_GMSHBUILDER_H_
+#define PUMGEN_SRC_MESHREADER_GMSHBUILDER_H_
 
 #include <algorithm>
 #include <array>
@@ -202,4 +206,4 @@ template <std::size_t D, std::size_t Order> class GMSHBuilder : public tndm::GMS
 
 } // namespace puml
 
-#endif // GMSHBUILDER_20201014_H
+#endif // PUMGEN_SRC_MESHREADER_GMSHBUILDER_H_

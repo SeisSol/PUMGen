@@ -1,5 +1,9 @@
-#ifndef MPITRAITS_H
-#define MPITRAITS_H
+// SPDX-FileCopyrightText: 2025 SeisSol Group
+// SPDX-FileCopyrightText: 2020 Ludwig-Maximilians-Universität München
+//
+// SPDX-License-Identifier: BSD-3-Clause
+#ifndef PUMGEN_SRC_THIRD_PARTY_MPITRAITS_H_
+#define PUMGEN_SRC_THIRD_PARTY_MPITRAITS_H_
 
 #include <mpi.h>
 
@@ -53,4 +57,4 @@ template <typename T> class mpi_array_type {
 
 } // namespace tndm
 
-#endif // MPITRAITS_H
+#endif // PUMGEN_SRC_THIRD_PARTY_MPITRAITS_H_
