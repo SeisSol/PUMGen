@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2023 SeisSol Group
+//
+// SPDX-License-Identifier: BSD-3-Clause
 
 #ifndef MESH_DATA_H
 #define MESH_DATA_H
