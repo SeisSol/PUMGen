@@ -80,7 +80,12 @@ template <typename T> class SerialMeshFile : public FullStorageMeshData {
     const std::size_t nLocalVertices = getChunksize(nVertices, m_rank, m_nProcs);
     const std::size_t nLocalElements = getChunksize(nElements, m_rank, m_nProcs);
 
-    setup(nLocalElements, nLocalVertices);
+    bool identify = false;
+    if constexpr (T::SupportsIdentify) {
+      identify = m_meshReader.hasIdentify();
+    }
+
+    setup(nLocalElements, nLocalVertices, identify);
 
     logInfo(m_rank) << "Read vertex coordinates";
     m_meshReader.readVertices(geometryData.data());
@@ -97,6 +102,12 @@ template <typename T> class SerialMeshFile : public FullStorageMeshData {
     for (std::size_t i = 0; i < nLocalElements; ++i) {
       for (int j = 0; j < (vertexSize() + 1); ++j) {
         setBoundary(i, j, preBoundaryData[(vertexSize() + 1) * i + j]);
+      }
+    }
+
+    if constexpr (T::SupportsIdentify) {
+      if (identify) {
+        m_meshReader.readIdentify(identifyData.data());
       }
     }
   }

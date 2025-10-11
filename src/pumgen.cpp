@@ -170,6 +170,19 @@ static void writeH5Data(const F& handler, hid_t h5file, const std::string& name,
   checkH5Err(H5Pclose(h5dxlist));
 }
 
+void addAttribute(hid_t h5file, const std::string& name, const std::string& value) {
+  hid_t attrSpace = checkH5Err(H5Screate(H5S_SCALAR));
+  hid_t attrType = checkH5Err(H5Tcopy(H5T_C_S1));
+  checkH5Err(H5Tset_size(attrType, H5T_VARIABLE));
+  hid_t attrBoundary =
+      checkH5Err(H5Acreate(h5file, name.data(), attrType, attrSpace, H5P_DEFAULT, H5P_DEFAULT));
+  const void* stringData = value.data();
+  checkH5Err(H5Awrite(attrBoundary, attrType, &stringData));
+  checkH5Err(H5Aclose(attrBoundary));
+  checkH5Err(H5Sclose(attrSpace));
+  checkH5Err(H5Tclose(attrType));
+}
+
 template <std::size_t Order>
 using SMF2 = SerialMeshFile<puml::ParallelGMSHReader<tndm::GMSH2Parser, Order>>;
 template <std::size_t Order>
@@ -465,16 +478,17 @@ int main(int argc, char* argv[]) {
                          filterEnable, filterChunksize, secondShape);
   }
 
-  hid_t attrSpace = checkH5Err(H5Screate(H5S_SCALAR));
-  hid_t attrType = checkH5Err(H5Tcopy(H5T_C_S1));
-  checkH5Err(H5Tset_size(attrType, H5T_VARIABLE));
-  hid_t attrBoundary = checkH5Err(
-      H5Acreate(h5file, "boundary-format", attrType, attrSpace, H5P_DEFAULT, H5P_DEFAULT));
-  void* stringData = boundaryFormatAttr.data();
-  checkH5Err(H5Awrite(attrBoundary, attrType, &stringData));
-  checkH5Err(H5Aclose(attrBoundary));
-  checkH5Err(H5Sclose(attrSpace));
-  checkH5Err(H5Tclose(attrType));
+  addAttribute(h5file, "boundary-format", boundaryFormatAttr);
+
+  if (meshInput->hasIdentify()) {
+    logInfo(rank) << "Writing vertex topology identification";
+    writeH5Data<uint64_t>(meshInput->identify(), h5file, "identify", mesh, 0, H5T_NATIVE_UINT64,
+                          H5T_STD_U64LE, chunksize, localSize[1], globalSize[1], reduceInts,
+                          filterEnable, filterChunksize, NoSecondDim);
+    addAttribute(h5file, "topology-format", "identify-vertex");
+  } else {
+    addAttribute(h5file, "topology-format", "geometric");
+  }
 
   // Writing XDMF file
   if (rank == 0) {
@@ -519,10 +533,14 @@ int main(int argc, char* argv[]) {
          << "    <DataItem NumberType=\"Int\" Precision=\"" << boundaryPrecision
          << "\" Format=\"HDF\" Dimensions=\"" << globalSize[0] << secondDimBoundary << "\">"
          << basename << ":/boundary</DataItem>" << std::endl
-         << "   </Attribute>" << std::endl
-         << "  </Grid>" << std::endl
-         << " </Domain>" << std::endl
-         << "</Xdmf>" << std::endl;
+         << "   </Attribute>" << std::endl;
+    if (meshInput->hasIdentify()) {
+      xdmf << "   <Attribute Name=\"boundary\" Center=\"Node\">" << std::endl
+           << "    <DataItem NumberType=\"Int\" Precision=\"8\" Format=\"HDF\" Dimensions=\""
+           << globalSize[1] << "\">" << basename << ":/identify</DataItem>" << std::endl
+           << "   </Attribute>" << std::endl;
+    }
+    xdmf << "  </Grid>" << std::endl << " </Domain>" << std::endl << "</Xdmf>" << std::endl;
   }
 
   checkH5Err(H5Fclose(h5file));

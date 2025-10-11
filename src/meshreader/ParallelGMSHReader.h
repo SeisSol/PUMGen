@@ -65,6 +65,12 @@ template <typename P, std::size_t OrderP> class ParallelGMSHReader {
   }
   void readGroups(int* groups) const { scatter(builder_.groups.data(), groups, nElements(), 1); }
 
+  constexpr static bool SupportsIdentify = true;
+  bool hasIdentify() const { return !builder_.identify.empty(); }
+  void readIdentify(std::size_t* vertices) const {
+    scatter(builder_.identify.data(), vertices, nVertices(), 1);
+  }
+
   private:
   /**
    * GMSH stores boundary conditions on a surface mesh whereas SeisSol expects

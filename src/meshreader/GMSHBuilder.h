@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <numeric>
 #include <vector>
 
 #include "utils/logger.h"
@@ -144,12 +145,24 @@ template <std::size_t D, std::size_t Order> class GMSHBuilder : public tndm::GMS
   using facet_t = std::array<int, nodeCount(D - 1u, Order)>;
 
   std::vector<vertex_t> vertices;
+  std::vector<std::size_t> identify;
   std::vector<element_t> elements;
   std::vector<int> groups;
   std::vector<facet_t> facets;
   std::vector<int> bcs;
 
-  void setNumVertices(std::size_t numVertices) { vertices.resize(numVertices); }
+  void resizeIdentifyIfNeeded(std::size_t newSize) {
+    const auto oldSize = identify.size();
+    if (newSize > oldSize) {
+      identify.resize(newSize);
+      std::iota(identify.begin() + oldSize, identify.end(), oldSize);
+    }
+  }
+
+  void setNumVertices(std::size_t numVertices) {
+    vertices.resize(numVertices);
+    resizeIdentifyIfNeeded(numVertices);
+  }
   void setVertex(long id, std::array<double, D> const& x) {
     for (std::size_t i = 0; i < D; ++i) {
       vertices[id][i] = x[i];
@@ -179,6 +192,11 @@ template <std::size_t D, std::size_t Order> class GMSHBuilder : public tndm::GMS
       facets.emplace_back(elem);
       bcs.emplace_back(static_cast<int>(tag));
     }
+  }
+  void addVertexLink(std::size_t vertex, std::size_t linkVertex) {
+    // needed in case we parse periodic before we parse the vertex/node section
+    resizeIdentifyIfNeeded(vertex + 1);
+    identify[vertex] = linkVertex;
   }
 };
 
