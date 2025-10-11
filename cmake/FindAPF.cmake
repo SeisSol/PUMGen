@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2021 SeisSol Group
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
 include(FindPackageHandleStandardArgs)
 
 # simmetrixLibs = [('gmi_sim', 'gmi_sim.h'), ('apf_sim', 'apfSIM.h')]

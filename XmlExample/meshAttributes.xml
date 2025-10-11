@@ -1,3 +1,9 @@
+<!--
+    SPDX-FileCopyrightText: 2020 SeisSol Group
+
+    SPDX-License-Identifier: BSD-3-Clause
+-->
+
 <freeSurface>1</freeSurface>
 <dynamicRupture>2</dynamicRupture>
 <absorbing>3,4</absorbing>

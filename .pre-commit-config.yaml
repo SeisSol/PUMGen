@@ -36,11 +36,11 @@ repos:
     -   id: markdownlint-cli2
         name: '[MARKDOWN] lint'
 
-#-   repo: https://github.com/fsfe/reuse-tool
-#    rev: v5.1.1
-#    hooks:
-#    -   id: reuse
-#        name: '[GENERIC] REUSE compatibiltiy'
+-   repo: https://github.com/fsfe/reuse-tool
+    rev: v5.1.1
+    hooks:
+    -   id: reuse
+        name: '[GENERIC] REUSE compatibiltiy'
 
 -   repo: https://github.com/sphinx-contrib/sphinx-lint
     rev: 'v1.0.0'

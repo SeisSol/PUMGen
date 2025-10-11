@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2017 SeisSol Group
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
 [submodule "submodules/utils"]
 	path = submodules/utils
 	url = ../../TUM-I5/utils.git

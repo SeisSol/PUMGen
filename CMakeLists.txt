@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2020 SeisSol Group
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
 cmake_minimum_required(VERSION 3.9)
 
 cmake_policy(SET CMP0074 NEW)
