@@ -192,19 +192,21 @@ int main(int argc, char* argv[]) {
   MPI_Comm_rank(MPI_COMM_WORLD, &rank);
   MPI_Comm_size(MPI_COMM_WORLD, &processes);
 
+  utils::Logger::setRank(rank);
+
 #ifdef USE_SCOREC
   PCU_Comm_Init();
 #endif
 
   // Parse command line arguments
-  utils::Args args;
-  const char* source[] = {"gambit", "msh2",        "msh4",           "netcdf",
-                          "apf",    "simmodsuite", "simmodsuite-apf"};
+  utils::Args args("A mesh converter to the PUML format, as used in SeisSol.");
+  const auto source = std::vector<std::string>{"gambit", "msh2",        "msh4",           "netcdf",
+                                               "apf",    "simmodsuite", "simmodsuite-apf"};
   args.addEnumOption("source", source, 's', "Mesh source (default: gambit)", false);
 
-  const char* filters[] = {"none",     "scaleoffset", "deflate1", "deflate2",
-                           "deflate3", "deflate4",    "deflate5", "deflate6",
-                           "deflate7", "deflate8",    "deflate9"};
+  const auto filters = std::vector<std::string>{"none",     "scaleoffset", "deflate1", "deflate2",
+                                                "deflate3", "deflate4",    "deflate5", "deflate6",
+                                                "deflate7", "deflate8",    "deflate9"};
   args.addOption("compactify-datatypes", 0,
                  "Compress index and group data types to minimum byte size (no HDF5 filters)",
                  utils::Args::Required, false);
@@ -214,7 +216,7 @@ int main(int argc, char* argv[]) {
                  utils::Args::Required, false);
   args.addOption("chunksize", 0, "Chunksize for writing (default=1 GiB).", utils::Args::Required,
                  false);
-  const char* boundarytypes[] = {"int32", "int64", "i32", "i64", "i32x4"};
+  const auto boundarytypes = std::vector<std::string>{"int32", "int64", "i32", "i64", "i32x4"};
   args.addEnumOption("boundarytype", boundarytypes, 0,
                      "Type for writing out boundary data (default: i32).", false);
 
@@ -234,7 +236,7 @@ int main(int argc, char* argv[]) {
                  "used by SimModSuite)",
                  utils::Args::Required, false);
   args.addOption("analyseAR", 0, "produce an histogram of AR", utils::Args::No, false);
-  const char* forces[] = {"0", "1", "2"};
+  const auto forces = std::vector<std::string>{"0", "1", "2"};
   args.addEnumOption("enforce-size", forces, 0,
                      "Enforce mesh size (only used by SimModSuite, default: 0)", false);
   args.addOption("sim_log", 0, "Create SimModSuite log", utils::Args::Required, false);
@@ -266,18 +268,18 @@ int main(int argc, char* argv[]) {
   int filterEnable = args.getArgument("filter-enable", 0);
   hsize_t filterChunksize = args.getArgument<hsize_t>("filter-chunksize", 4096);
   if (reduceInts) {
-    logInfo(rank) << "Using compact integer types.";
+    logInfo() << "Using compact integer types.";
   }
   if (filterEnable == 0) {
-    logInfo(rank) << "No filtering enabled (contiguous storage)";
+    logInfo() << "No filtering enabled (contiguous storage)";
   } else {
-    logInfo(rank) << "Using filtering. Chunksize:" << filterChunksize;
+    logInfo() << "Using filtering. Chunksize:" << filterChunksize;
     if (filterEnable == 1) {
-      logInfo(rank) << "Compression: scale-offset compression for integers (disabled for floats)";
+      logInfo() << "Compression: scale-offset compression for integers (disabled for floats)";
     } else if (filterEnable < 11) {
-      logInfo(rank) << "Compression: deflate, strength" << filterEnable - 1
-                    << "(note: this requires HDF5 to be compiled with GZIP support; this applies "
-                       "to SeisSol as well)";
+      logInfo() << "Compression: deflate, strength" << filterEnable - 1
+                << "(note: this requires HDF5 to be compiled with GZIP support; this applies "
+                   "to SeisSol as well)";
     }
   }
 
@@ -294,14 +296,14 @@ int main(int argc, char* argv[]) {
     secondShape = NoSecondDim;
     boundaryFormatAttr = "i32";
     boundaryPrecision = 4;
-    logInfo(rank) << "Using 32-bit integer boundary type conditions, or 8 bit per face (i32).";
+    logInfo() << "Using 32-bit integer boundary type conditions, or 8 bit per face (i32).";
   } else if (boundaryType == 1 || boundaryType == 3) {
     boundaryDatatype = H5T_STD_I64LE;
     faceOffset = 16;
     secondShape = NoSecondDim;
     boundaryFormatAttr = "i64";
     boundaryPrecision = 8;
-    logInfo(rank) << "Using 64-bit integer boundary type conditions, or 16 bit per face (i64).";
+    logInfo() << "Using 64-bit integer boundary type conditions, or 16 bit per face (i64).";
   } else if (boundaryType == 4) {
     boundaryDatatype = H5T_STD_I32LE;
     secondShape = 4;
@@ -309,7 +311,7 @@ int main(int argc, char* argv[]) {
     boundaryFormatAttr = "i32x4";
     boundaryPrecision = 4;
     secondDimBoundary = " 4";
-    logInfo(rank) << "Using 32-bit integer per boundary face (i32x4).";
+    logInfo() << "Using 32-bit integer per boundary face (i32x4).";
   }
 
   std::string xdmfFile = outputFile;
@@ -328,27 +330,27 @@ int main(int argc, char* argv[]) {
   MeshData* meshInput = nullptr;
   switch (args.getArgument<int>("source", 0)) {
   case 0:
-    logInfo(rank) << "Using Gambit mesh";
+    logInfo() << "Using Gambit mesh";
     meshInput = new SerialMeshFile<puml::ParallelGambitReader>(inputFile, faceOffset);
     break;
   case 1:
-    logInfo(rank) << "Using GMSH mesh format 2 (msh2) mesh";
+    logInfo() << "Using GMSH mesh format 2 (msh2) mesh";
     meshInput = puml::makePointer<MeshData, SMF2>(meshOrder, inputFile, faceOffset);
     break;
   case 2:
-    logInfo(rank) << "Using GMSH mesh format 4 (msh4) mesh";
+    logInfo() << "Using GMSH mesh format 4 (msh4) mesh";
     meshInput = puml::makePointer<MeshData, SMF4>(meshOrder, inputFile, faceOffset);
     break;
   case 3:
 #ifdef USE_NETCDF
-    logInfo(rank) << "Using netCDF mesh";
+    logInfo() << "Using netCDF mesh";
     meshInput = new NetCDFMesh(inputFile, faceOffset);
 #else  // USE_NETCDF
     logError() << "netCDF is not supported in this version";
 #endif // USE_NETCDF
     break;
   case 4:
-    logInfo(rank) << "Using APF native format";
+    logInfo() << "Using APF native format";
 #ifdef USE_SCOREC
     meshInput = new ApfNative(inputFile, faceOffset, args.getArgument<const char*>("input", 0L));
     (dynamic_cast<ApfMeshInput*>(meshInput))->generate();
@@ -359,7 +361,7 @@ int main(int argc, char* argv[]) {
     break;
   case 5:
 #ifdef USE_SIMMOD
-    logInfo(rank) << "Using SimModSuite";
+    logInfo() << "Using SimModSuite";
 
     meshInput = new SimModSuite(
         inputFile, faceOffset, args.getArgument<const char*>("cad", 0L),
@@ -374,7 +376,7 @@ int main(int argc, char* argv[]) {
   case 6:
 #ifdef USE_SIMMOD
 #ifdef USE_SCOREC
-    logInfo(rank) << "Using SimModSuite with APF (deprecated)";
+    logInfo() << "Using SimModSuite with APF (deprecated)";
 
     meshInput = new SimModSuiteApf(
         inputFile, faceOffset, args.getArgument<const char*>("cad", 0L),
@@ -395,7 +397,7 @@ int main(int argc, char* argv[]) {
     logError() << "Unknown source.";
   }
 
-  logInfo(rank) << "Parsed mesh successfully, writing output...";
+  logInfo() << "Parsed mesh successfully, writing output...";
 
   void* mesh = nullptr;
 
@@ -405,16 +407,16 @@ int main(int argc, char* argv[]) {
   MPI_Allreduce(MPI_IN_PLACE, globalSize, 2, tndm::mpi_type_t<std::size_t>(), MPI_SUM,
                 MPI_COMM_WORLD);
 
-  logInfo(rank) << "Coordinates in vertex:" << meshInput->vertexSize();
-  logInfo(rank) << "Vertices in cell:" << meshInput->cellSize();
-  logInfo(rank) << "Total cell count:" << globalSize[0];
-  logInfo(rank) << "Total vertex count:" << globalSize[1];
+  logInfo() << "Coordinates in vertex:" << meshInput->vertexSize();
+  logInfo() << "Vertices in cell:" << meshInput->cellSize();
+  logInfo() << "Total cell count:" << globalSize[0];
+  logInfo() << "Total vertex count:" << globalSize[1];
 
   auto inspheres =
       calculateInsphere(meshInput->connectivity(), meshInput->geometry(), MPI_COMM_WORLD);
   double min = *std::min_element(inspheres.begin(), inspheres.end());
   MPI_Reduce((rank == 0 ? MPI_IN_PLACE : &min), &min, 1, MPI_DOUBLE, MPI_MIN, 0, MPI_COMM_WORLD);
-  logInfo(rank) << "Minimum insphere found:" << min;
+  logInfo() << "Minimum insphere found:" << min;
 
   // Get offsets
   std::size_t offsets[2] = {localSize[0], localSize[1]};
@@ -437,13 +439,13 @@ int main(int argc, char* argv[]) {
 
   // Write cells
   std::size_t connectBytesPerData = 8;
-  logInfo(rank) << "Writing cells";
+  logInfo() << "Writing cells";
   writeH5Data<uint64_t>(meshInput->connectivity(), h5file, "connect", mesh, 3, H5T_NATIVE_UINT64,
                         H5T_STD_U64LE, chunksize, localSize[0], globalSize[0], reduceInts,
                         filterEnable, filterChunksize, meshInput->cellSize());
 
   // Vertices
-  logInfo(rank) << "Writing vertices";
+  logInfo() << "Writing vertices";
   writeH5Data<double>(meshInput->geometry(), h5file, "geometry", mesh, 0, H5T_IEEE_F64LE,
                       H5T_IEEE_F64LE, chunksize, localSize[1], globalSize[1], reduceInts,
                       filterEnable, filterChunksize, meshInput->vertexSize());
@@ -451,13 +453,13 @@ int main(int argc, char* argv[]) {
   // Group information
 
   std::size_t groupBytesPerData = 4;
-  logInfo(rank) << "Writing group information";
+  logInfo() << "Writing group information";
   writeH5Data<int32_t>(meshInput->group(), h5file, "group", mesh, 3, H5T_NATIVE_INT32,
                        H5T_STD_I32LE, chunksize, localSize[0], globalSize[0], reduceInts,
                        filterEnable, filterChunksize, NoSecondDim);
 
   // Write boundary condition
-  logInfo(rank) << "Writing boundary condition";
+  logInfo() << "Writing boundary condition";
   if (secondShape != NoSecondDim) {
     // TODO: a bit ugly, but it works
     secondShape = meshInput->vertexSize() + 1;
@@ -475,7 +477,7 @@ int main(int argc, char* argv[]) {
   addAttribute(h5file, "boundary-format", boundaryFormatAttr);
 
   if (meshInput->hasIdentify()) {
-    logInfo(rank) << "Writing vertex topology identification";
+    logInfo() << "Writing vertex topology identification";
     writeH5Data<uint64_t>(meshInput->identify(), h5file, "identify", mesh, 0, H5T_NATIVE_UINT64,
                           H5T_STD_U64LE, chunksize, localSize[1], globalSize[1], reduceInts,
                           filterEnable, filterChunksize, NoSecondDim);
@@ -541,7 +543,7 @@ int main(int argc, char* argv[]) {
 
   delete meshInput;
 
-  logInfo(rank) << "Finished successfully";
+  logInfo() << "Finished successfully";
 
 #ifdef USE_SCOREC
   PCU_Comm_Free();

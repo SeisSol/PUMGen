@@ -82,7 +82,7 @@ class NetCDFMesh : public FullStorageMeshData {
       bool useGroups = true;
       if (nc_inq_varid(ncFile, "element_group", &ncVarElemGroup) != NC_NOERR) {
         useGroups = false;
-        logWarning(rank) << "No group found, using group 0 for all elements";
+        logWarning() << "No group found, using group 0 for all elements";
       } else {
         collectiveAccess(ncFile, ncVarElemGroup);
       }
@@ -96,7 +96,7 @@ class NetCDFMesh : public FullStorageMeshData {
       collectiveAccess(ncFile, ncVarVrtxCoords);
 
       // Read elements
-      logInfo(rank) << "Reading netCDF file";
+      logInfo() << "Reading netCDF file";
       for (std::size_t i = 0; i < nMaxLocalPart; i++) {
         std::size_t j = i % nLocalPart;
 
@@ -152,7 +152,7 @@ class NetCDFMesh : public FullStorageMeshData {
         vertexOffset += partitions[i].nVertices();
       }
 
-      logInfo(rank) << "Running vertex filter";
+      logInfo() << "Running vertex filter";
       ParallelVertexFilter filter(commIO);
       filter.filter(nVertices, verticesLocal);
 
@@ -190,7 +190,7 @@ class NetCDFMesh : public FullStorageMeshData {
         vertexOffset += partitions[i].nVertices();
       }
 
-      logInfo(rank) << "Converting local to global vertex identifier";
+      logInfo() << "Converting local to global vertex identifier";
 #ifdef _OPENMP
 #pragma omp parallel for
 #endif

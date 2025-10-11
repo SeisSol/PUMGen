@@ -85,10 +85,10 @@ void MeshAttributes::set_SurfaceMeshingAttributes() {
     } else {
       logError() << "Unrecognised surfaceSmoothingType (Laplacian or Gradient)" << sSmoothingType;
     }
-    logInfo(PMU_rank()) << "surface smoothing option: surfaceSmoothingLevel "
-                           "surfaceSmoothingType surfaceFaceRotationLimit Snap"
-                        << surfaceSmoothingLevel << " " << static_cast<int>(surfaceSmoothingType)
-                        << " " << surfaceFaceRotationLimit << " " << surfaceSnap;
+    logInfo() << "surface smoothing option: surfaceSmoothingLevel "
+                 "surfaceSmoothingType surfaceFaceRotationLimit Snap"
+              << surfaceSmoothingLevel << " " << static_cast<int>(surfaceSmoothingType) << " "
+              << surfaceFaceRotationLimit << " " << surfaceSnap;
   }
 }
 
@@ -104,8 +104,8 @@ void MeshAttributes::set_VolumeMeshingAttributes() {
     } else {
       logError() << "Unrecognised volumeSmoothingType (Laplacian or Gradient)" << sSmoothingType;
     }
-    logInfo(PMU_rank()) << "volume smoothing option: volumeSmoothingLevel volumeSmoothingType"
-                        << volumeSmoothingLevel << " " << static_cast<int>(volumeSmoothingType);
+    logInfo() << "volume smoothing option: volumeSmoothingLevel volumeSmoothingType"
+              << volumeSmoothingLevel << " " << static_cast<int>(volumeSmoothingType);
   }
 }
 
@@ -178,8 +178,8 @@ void MeshAttributes::set_velocity_aware_meshing() {
     velocityAwareRefinementSettings =
         VelocityAwareRefinementSettings(elementsPerWaveLength, easiFileName);
     constexpr auto cuboidName = "VelocityRefinementCuboid";
-    logInfo(PMU_rank()) << "Activating velocity aware meshing, using" << elementsPerWaveLength
-                        << "elements per wavelength and easi file" << easiFileName;
+    logInfo() << "Activating velocity aware meshing, using" << elementsPerWaveLength
+              << "elements per wavelength and easi file" << easiFileName;
     for (auto child = velocityAwareMeshingElement->FirstChildElement(cuboidName); child;
          child = child->NextSiblingElement(cuboidName)) {
 
@@ -210,23 +210,21 @@ void MeshAttributes::set_velocity_aware_meshing() {
 
       velocityAwareRefinementSettings.addRefinementRegion(cuboid, targetedFrequency,
                                                           bypassFindRegionAndUseGroup);
-      logInfo(PMU_rank()) << "Adding velocity aware refinement region targeting"
-                          << targetedFrequency << "Hz, centered at x =" << cuboid.center[0]
-                          << "y=" << cuboid.center[1] << "z=" << cuboid.center[2]
-                          << "with half sizes"
-                          << "x =" << cuboid.halfSize[0] << "y =" << cuboid.halfSize[1]
-                          << "z =" << cuboid.halfSize[2];
+      logInfo() << "Adding velocity aware refinement region targeting" << targetedFrequency
+                << "Hz, centered at x =" << cuboid.center[0] << "y=" << cuboid.center[1]
+                << "z=" << cuboid.center[2] << "with half sizes"
+                << "x =" << cuboid.halfSize[0] << "y =" << cuboid.halfSize[1]
+                << "z =" << cuboid.halfSize[2];
       if (std::abs(cuboid.rotationZ) > 0.0) {
-        logInfo(PMU_rank()) << "rotated around z axis by " << cuboid.rotationZ
-                            << "degree(s) counterclockwise from x axis.";
+        logInfo() << "rotated around z axis by " << cuboid.rotationZ
+                  << "degree(s) counterclockwise from x axis.";
       }
       if (bypassFindRegionAndUseGroup) {
-        logInfo(PMU_rank()) << "bypass findRegion and use group =" << bypassFindRegionAndUseGroup;
+        logInfo() << "bypass findRegion and use group =" << bypassFindRegionAndUseGroup;
       }
     }
     if (!velocityAwareRefinementSettings.isVelocityAwareRefinementOn()) {
-      logWarning(PMU_rank())
-          << "Activated velocity aware meshing but did not specify any refinement region!";
+      logWarning() << "Activated velocity aware meshing but did not specify any refinement region!";
     }
     ++numChilds;
   }

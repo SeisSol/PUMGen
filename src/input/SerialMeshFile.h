@@ -81,16 +81,16 @@ template <typename T> class SerialMeshFile : public FullStorageMeshData {
 
     setup(nLocalElements, nLocalVertices, identify);
 
-    logInfo(m_rank) << "Read vertex coordinates";
+    logInfo() << "Read vertex coordinates";
     m_meshReader.readVertices(geometryData.data());
 
-    logInfo(m_rank) << "Read cell vertices";
+    logInfo() << "Read cell vertices";
     m_meshReader.readElements(connectivityData.data());
 
-    logInfo(m_rank) << "Read cell groups";
+    logInfo() << "Read cell groups";
     m_meshReader.readGroups(groupData.data());
 
-    logInfo(m_rank) << "Read boundary conditions";
+    logInfo() << "Read boundary conditions";
     std::vector<int> preBoundaryData(nLocalElements * (vertexSize() + 1));
     m_meshReader.readBoundaries(preBoundaryData.data());
     for (std::size_t i = 0; i < nLocalElements; ++i) {
