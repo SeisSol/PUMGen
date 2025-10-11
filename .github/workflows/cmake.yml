@@ -34,11 +34,14 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          submodules: recursive
 
-      - name: clang-format
+      - name: apt-get
         run: |
           sudo apt-get update
-          sudo apt-get install -qq python3 python3-pip
-          pip3 install clang-format==19.1.0
-          git submodule update --init
-          ./submodules/run-clang-format/run-clang-format.py --clang-format-executable clang-format --exclude src/third_party -r src
+          sudo add-apt-repository ppa:deadsnakes/ppa
+          sudo apt-get update
+          sudo apt-get -y install python3.13
+
+      - uses: pre-commit/action@v3.0.1
