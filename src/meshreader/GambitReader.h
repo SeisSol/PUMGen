@@ -45,6 +45,19 @@ struct GambitBoundaryFace {
 
 class GambitReader : public MeshReader {
   private:
+  /** Number of character required to store a coordinate */
+  static constexpr size_t COORDINATE_SIZE = 20ul;
+  /** Number of elements stored in one group line */
+  static constexpr size_t ELEMENTS_PER_LINE_GROUP = 10ul;
+
+  static const char* GAMBIT_FILE_ID;
+  static const char* ENDSECTION;
+  static const char* NODAL_COORDINATES;
+  static const char* ELEMENT_CELLS;
+  static const char* ELEMENT_GROUP;
+  static const char* BOUNDARY_CONDITIONS;
+
+  private:
   struct ElementSection : FileSection {
     /** Start of vertices in an element */
     size_t vertexStart;
@@ -528,19 +541,6 @@ class GambitReader : public MeshReader {
       boundaries[faces[i].element * 4 + faces[i].face] = faces[i].type;
     }
   }
-
-  private:
-  /** Number of character required to store a coordinate */
-  static const size_t COORDINATE_SIZE = 20ul;
-  /** Number of elements stored in one group line */
-  static const size_t ELEMENTS_PER_LINE_GROUP = 10ul;
-
-  static const char* GAMBIT_FILE_ID;
-  static const char* ENDSECTION;
-  static const char* NODAL_COORDINATES;
-  static const char* ELEMENT_CELLS;
-  static const char* ELEMENT_GROUP;
-  static const char* BOUNDARY_CONDITIONS;
 };
 
 } // namespace puml

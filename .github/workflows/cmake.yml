@@ -12,6 +12,7 @@ jobs:
     runs-on: ubuntu-latest
 
     strategy:
+      fail-fast: false
       matrix:
         build_type: ["Release", "Debug"]
 
@@ -34,7 +35,7 @@ jobs:
         working-directory: ${{ github.workspace }}/build_${{ matrix.build_type }}
         run: cmake --build .
 
-  clang-format:
+  pre-commit-check:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
