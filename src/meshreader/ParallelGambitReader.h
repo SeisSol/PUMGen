@@ -17,7 +17,7 @@
 
 #include "GambitReader.h"
 #include "ParallelMeshReader.h"
-#include "aux/Distributor.h"
+#include "helper/Distributor.h"
 
 #include "third_party/MPITraits.h"
 

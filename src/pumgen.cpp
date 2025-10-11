@@ -55,7 +55,7 @@
 #include "meshreader/ParallelGambitReader.h"
 #include "third_party/GMSH2Parser.h"
 
-#include "aux/InsphereCalculator.h"
+#include "helper/InsphereCalculator.h"
 
 template <typename TT> static TT _checkH5Err(TT&& status, const char* file, int line) {
   if (status < 0) {

@@ -23,8 +23,8 @@ repos:
         name: '[GENERIC] detect OS file naming case conflicts'
     -   id: check-executables-have-shebangs
         name: '[GENERIC] check for shebangs in executable files'
-    #-   id: check-illegal-windows-names
-    #    name: '[GENERIC] detect illegal Windows file names'
+    -   id: check-illegal-windows-names
+        name: '[GENERIC] detect illegal Windows file names'
     -   id: check-json
         name: '[JSON] check'
     #-   id: check-xml

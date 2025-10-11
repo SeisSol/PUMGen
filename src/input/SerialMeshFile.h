@@ -17,7 +17,7 @@
 #include <mpi.h>
 #endif // PARALLEL
 
-#include "aux/Distributor.h"
+#include "helper/Distributor.h"
 #include <cstddef>
 #include <vector>
 

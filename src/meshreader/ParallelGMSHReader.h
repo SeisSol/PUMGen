@@ -12,8 +12,8 @@
 #include <iostream>
 #include <vector>
 
-#include "aux/Distributor.h"
-#include "aux/MPIConvenience.h"
+#include "helper/Distributor.h"
+#include "helper/MPIConvenience.h"
 
 namespace puml {
 

@@ -30,7 +30,7 @@
 
 #include "third_party/MPITraits.h"
 
-#include "aux/MPIConvenience.h"
+#include "helper/MPIConvenience.h"
 
 /**
  * Filters duplicate vertices in parallel
