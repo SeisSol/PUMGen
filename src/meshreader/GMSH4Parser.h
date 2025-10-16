@@ -1,5 +1,8 @@
-#ifndef PUMGEN_GMSH4PARSER_H
-#define PUMGEN_GMSH4PARSER_H
+// SPDX-FileCopyrightText: 2022 SeisSol Group
+//
+// SPDX-License-Identifier: BSD-3-Clause
+#ifndef PUMGEN_SRC_MESHREADER_GMSH4PARSER_H_
+#define PUMGEN_SRC_MESHREADER_GMSH4PARSER_H_
 
 #include <map>
 #include <string>
@@ -37,9 +40,10 @@ class GMSH4Parser : public tndm::GMSHParser {
   bool parseEntities();
   bool parseNodes();
   bool parseElements();
+  bool parsePeriodic(bool variableAffine);
   virtual bool parse_() override;
 };
 
 } // namespace puml
 
-#endif // PUMGEN_GMSH4PARSER_H
+#endif // PUMGEN_SRC_MESHREADER_GMSH4PARSER_H_

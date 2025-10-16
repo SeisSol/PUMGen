@@ -1,5 +1,9 @@
-#ifndef PARALLELGMSHREADER_20201014_H
-#define PARALLELGMSHREADER_20201014_H
+// SPDX-FileCopyrightText: 2020 SeisSol Group
+// SPDX-FileCopyrightText: 2020 Ludwig-Maximilians-Universität München
+//
+// SPDX-License-Identifier: BSD-3-Clause
+#ifndef PUMGEN_SRC_MESHREADER_PARALLELGMSHREADER_H_
+#define PUMGEN_SRC_MESHREADER_PARALLELGMSHREADER_H_
 
 #include "GMSHBuilder.h"
 #include "third_party/MPITraits.h"
@@ -12,8 +16,8 @@
 #include <iostream>
 #include <vector>
 
-#include "aux/Distributor.h"
-#include "aux/MPIConvenience.h"
+#include "helper/Distributor.h"
+#include "helper/MPIConvenience.h"
 
 namespace puml {
 
@@ -38,6 +42,7 @@ template <typename P, std::size_t OrderP> class ParallelGMSHReader {
       if (!ok) {
         logError() << meshFile << std::endl << parser.getErrorMessage();
       }
+      builder_.postprocess();
       convertBoundaryConditions();
 
       nVertices_ = builder_.vertices.size();
@@ -64,6 +69,12 @@ template <typename P, std::size_t OrderP> class ParallelGMSHReader {
     scatter(bcs_.data()->data(), boundaries, nElements(), Dim + 1);
   }
   void readGroups(int* groups) const { scatter(builder_.groups.data(), groups, nElements(), 1); }
+
+  constexpr static bool SupportsIdentify = true;
+  bool hasIdentify() const { return !builder_.identify.empty(); }
+  void readIdentify(std::size_t* vertices) const {
+    scatter(builder_.identify.data(), vertices, nVertices(), 1);
+  }
 
   private:
   /**
@@ -168,4 +179,4 @@ template <typename P, std::size_t OrderP> class ParallelGMSHReader {
 
 } // namespace puml
 
-#endif // PARALLELGMSHREADER_20201014_H
+#endif // PUMGEN_SRC_MESHREADER_PARALLELGMSHREADER_H_

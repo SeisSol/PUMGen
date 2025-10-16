@@ -1,17 +1,11 @@
-/**
- * @file
- *  This file is part of PUMGen
- *
- *  For conditions of distribution and use, please see the copyright
- *  notice in the file 'COPYING' at the root directory of this package
- *  and the copyright notice at https://github.com/SeisSol/PUMGen
- *
- * @copyright 2017 Technical University of Munich
- * @author Sebastian Rettenberger <sebastian.rettenberger@tum.de>
- */
+// SPDX-FileCopyrightText: 2023 SeisSol Group
+// SPDX-FileCopyrightText: 2017 Technical University of Munich
+//
+// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-FileContributor: Sebastian Rettenberger <sebastian.rettenberger@tum.de>
 
-#ifndef SIM_MOD_SUITE_APF_H
-#define SIM_MOD_SUITE_APF_H
+#ifndef PUMGEN_SRC_INPUT_SIMMODSUITEAPF_H_
+#define PUMGEN_SRC_INPUT_SIMMODSUITEAPF_H_
 
 #include <mpi.h>
 
@@ -103,7 +97,7 @@ class SimModSuiteApf : public ApfMeshInput {
     Sim_setMessageHandler(messageHandler);
 
     // Load CAD
-    logInfo(PMU_rank()) << "Loading model";
+    logInfo() << "Loading model";
 
     std::string smodFile = modFile;
     if (cadFile != nullptr) {
@@ -122,7 +116,7 @@ class SimModSuiteApf : public ApfMeshInput {
     }
 
     // Extract cases
-    logInfo(PMU_rank()) << "Extracting cases";
+    logInfo() << "Extracting cases";
     pACase meshCase, analysisCase;
     MeshAttributes MeshAtt;
 
@@ -143,7 +137,7 @@ class SimModSuiteApf : public ApfMeshInput {
     Progress_setCallback(prog, progressHandler);
 
     // create the mesh
-    logInfo(PMU_rank()) << "Starting the surface mesher";
+    logInfo() << "Starting the surface mesher";
     pSurfaceMesher surfaceMesher = SurfaceMesher_new(meshCase, m_simMesh);
     if (xmlFile != nullptr) {
       SurfaceMesher_setSmoothing(surfaceMesher, MeshAtt.surfaceSmoothingLevel);
@@ -156,7 +150,7 @@ class SimModSuiteApf : public ApfMeshInput {
 
     PM_setTotalNumParts(m_simMesh, PMU_size());
 
-    logInfo(PMU_rank()) << "Starting the volume mesher";
+    logInfo() << "Starting the volume mesher";
     pVolumeMesher volumeMesher = VolumeMesher_new(meshCase, m_simMesh);
     if (xmlFile != nullptr) {
       VolumeMesher_setSmoothing(volumeMesher, MeshAtt.volumeSmoothingLevel);
@@ -183,7 +177,7 @@ class SimModSuiteApf : public ApfMeshInput {
     gmi_register_sim();
     gmi_model* model = gmi_import_sim(m_model);
 
-    logInfo(PMU_rank()) << "Converting mesh to APF";
+    logInfo() << "Converting mesh to APF";
     m_mesh = apf::createMdsMesh(model, tmpMesh);
     apf::destroyMesh(tmpMesh);
 
@@ -288,13 +282,13 @@ class SimModSuiteApf : public ApfMeshInput {
     switch (type) {
     case Sim_InfoMsg:
       // Show sim info messages as debug messages
-      logDebug(PMU_rank()) << "SimModeler:" << msg;
+      logDebug() << "SimModeler:" << msg;
       break;
     case Sim_DebugMsg:
       // Ignore sim debug messages
       break;
     case Sim_WarningMsg:
-      logWarning(PMU_rank()) << "SimModeler:" << msg;
+      logWarning() << "SimModeler:" << msg;
       break;
     case Sim_ErrorMsg:
       // Use warning because error will abort the program
@@ -311,20 +305,20 @@ class SimModSuiteApf : public ApfMeshInput {
       switch (currentVal) {
       case -2:
         // task is started, do nothing
-        logInfo(PMU_rank()) << "Progress:" << what << ", 0"
-                            << "/" << endVal;
+        logInfo() << "Progress:" << what << ", 0"
+                  << "/" << endVal;
         break;
       case -1:
         // end of the task
-        logInfo(PMU_rank()) << "Progress:" << what << ", done";
+        logInfo() << "Progress:" << what << ", done";
         break;
       default:
-        logInfo(PMU_rank()) << "Progress:" << what << "," << currentVal << "/" << endVal;
+        logInfo() << "Progress:" << what << "," << currentVal << "/" << endVal;
         break;
       }
     } else {
       if (currentVal == -2)
-        logInfo(PMU_rank()) << "Progress:" << what;
+        logInfo() << "Progress:" << what;
     }
     logDebug() << what << level << startVal << endVal << currentVal;
   }
@@ -332,7 +326,7 @@ class SimModSuiteApf : public ApfMeshInput {
   private:
   void extractCases(pGModel m_model, pACase& meshCase, const char* meshCaseName,
                     pACase& analysisCase, const char* analysisCaseName) {
-    logInfo(PMU_rank()) << "Extracting cases";
+    logInfo() << "Extracting cases";
 
 #ifdef BEFORE_SIM_2024
     pAManager attMngr = GM_attManager(m_model);
@@ -376,8 +370,8 @@ class SimModSuiteApf : public ApfMeshInput {
                        << "not found in model.";
           } else {
             MS_setMeshSize(meshCase, entity, 1, MSize, nullptr);
-            logInfo(PMU_rank()) << element_name[element_type_id] << "id:" << element_id
-                                << ", MSize =" << MSize;
+            logInfo() << element_name[element_type_id] << "id:" << element_id
+                      << ", MSize =" << MSize;
           }
         }
       }
@@ -387,7 +381,7 @@ class SimModSuiteApf : public ApfMeshInput {
   void setCases(pGModel model, pACase& meshCase, pACase& analysisCase, MeshAttributes& MeshAtt,
                 AnalysisAttributes& AnalysisAtt, std::unordered_map<pGRegion, int> groupMap) {
 
-    logInfo(PMU_rank()) << "Setting cases";
+    logInfo() << "Setting cases";
     // ------------------------------ Set boundary conditions
     // ------------------------------
 
@@ -442,7 +436,7 @@ class SimModSuiteApf : public ApfMeshInput {
         // the creation of the AttributeVoid on the face as soon as the
         // association process is started
         if (fb.bcType != 0) {
-          logInfo(PMU_rank()) << "faceBound[" << fb.faceID + 1 << "] =" << fb.bcType;
+          logInfo() << "faceBound[" << fb.faceID + 1 << "] =" << fb.bcType;
           AMA_addGEntity(aBC[fb.bcType], face);
         }
       }
@@ -456,7 +450,7 @@ class SimModSuiteApf : public ApfMeshInput {
     // Set global mesh size
     pModelItem modelDomain = GM_domain(model);
     if (MeshAtt.globalMSize > 0) {
-      logInfo(PMU_rank()) << "globalMSize =" << MeshAtt.globalMSize;
+      logInfo() << "globalMSize =" << MeshAtt.globalMSize;
       // ( <meshing case>, <entity>, <1=absolute, 2=relative>, <size>, <size
       // expression> )
       MS_setMeshSize(meshCase, modelDomain, 1, MeshAtt.globalMSize, nullptr);
@@ -466,7 +460,7 @@ class SimModSuiteApf : public ApfMeshInput {
     setMeshSize(model, meshCase, MeshAtt);
 
     if (MeshAtt.velocityAwareRefinementSettings.isVelocityAwareRefinementOn()) {
-      logInfo(PMU_rank()) << "Enabling velocity aware meshing";
+      logInfo() << "Enabling velocity aware meshing";
       easiMeshSize = EasiMeshSize(MeshAtt.velocityAwareRefinementSettings, model, groupMap);
       auto easiMeshSizeFunc = [](pSizeAttData sadata, void* userdata) {
         auto* easiMeshSize = static_cast<EasiMeshSize*>(userdata);
@@ -486,18 +480,18 @@ class SimModSuiteApf : public ApfMeshInput {
 
     if (MeshAtt.gradation > 0) {
       // Set gradation relative
-      logInfo(PMU_rank()) << "Gradation rate =" << MeshAtt.gradation;
+      logInfo() << "Gradation rate =" << MeshAtt.gradation;
       MS_setGlobalSizeGradationRate(meshCase, MeshAtt.gradation);
     }
     if (MeshAtt.vol_AspectRatio > 0) {
       // Set target equivolume AspectRatio
-      logInfo(PMU_rank()) << "Target equivolume AspectRatio =" << MeshAtt.vol_AspectRatio;
+      logInfo() << "Target equivolume AspectRatio =" << MeshAtt.vol_AspectRatio;
       MS_setVolumeShapeMetric(meshCase, modelDomain, ShapeMetricType_AspectRatio,
                               MeshAtt.vol_AspectRatio);
     }
     if (MeshAtt.area_AspectRatio > 0) {
       // Set target equiarea AspectRatio
-      logInfo(PMU_rank()) << "Target equiarea AspectRatio =" << MeshAtt.area_AspectRatio;
+      logInfo() << "Target equiarea AspectRatio =" << MeshAtt.area_AspectRatio;
 #ifdef BEFORE_SIM_11
       MS_setSurfaceShapeMetric(meshCase, modelDomain, ShapeMetricType_AspectRatio,
                                MeshAtt.area_AspectRatio);
@@ -507,15 +501,15 @@ class SimModSuiteApf : public ApfMeshInput {
 #endif
     }
     for (auto& mycube : MeshAtt.lCube) {
-      logInfo(PMU_rank()) << "Cube mesh refinement: " << mycube.CubeMSize;
-      logInfo(PMU_rank()) << "Center" << mycube.CubeCenter[0] << " " << mycube.CubeCenter[1] << " "
-                          << mycube.CubeCenter[2];
-      logInfo(PMU_rank()) << "Width" << mycube.CubeWidth[0] << " " << mycube.CubeWidth[1] << " "
-                          << mycube.CubeWidth[2];
-      logInfo(PMU_rank()) << "Height" << mycube.CubeHeight[0] << " " << mycube.CubeHeight[1] << " "
-                          << mycube.CubeHeight[2];
-      logInfo(PMU_rank()) << "Depth" << mycube.CubeDepth[0] << " " << mycube.CubeDepth[1] << " "
-                          << mycube.CubeDepth[2];
+      logInfo() << "Cube mesh refinement: " << mycube.CubeMSize;
+      logInfo() << "Center" << mycube.CubeCenter[0] << " " << mycube.CubeCenter[1] << " "
+                << mycube.CubeCenter[2];
+      logInfo() << "Width" << mycube.CubeWidth[0] << " " << mycube.CubeWidth[1] << " "
+                << mycube.CubeWidth[2];
+      logInfo() << "Height" << mycube.CubeHeight[0] << " " << mycube.CubeHeight[1] << " "
+                << mycube.CubeHeight[2];
+      logInfo() << "Depth" << mycube.CubeDepth[0] << " " << mycube.CubeDepth[1] << " "
+                << mycube.CubeDepth[2];
       MS_addCubeRefinement(meshCase, mycube.CubeMSize, &mycube.CubeCenter[0], &mycube.CubeWidth[0],
                            &mycube.CubeHeight[0], &mycube.CubeDepth[0]);
     }
@@ -526,9 +520,9 @@ class SimModSuiteApf : public ApfMeshInput {
         if (face == nullptr) {
           logError() << "MeshSizeProp faceid:" << iElem << "not found in model.";
         } else {
-          logInfo(PMU_rank()) << "MeshSizeProp faceid:" << iElem
-                              << ", distance =" << MeshAtt.MeshSizePropagationDistance
-                              << ", scaling factor =" << MeshAtt.MeshSizePropagationScalingFactor;
+          logInfo() << "MeshSizeProp faceid:" << iElem
+                    << ", distance =" << MeshAtt.MeshSizePropagationDistance
+                    << ", scaling factor =" << MeshAtt.MeshSizePropagationScalingFactor;
 #ifdef BEFORE_SIM_15
           MS_setMeshSizePropagation(meshCase, face, 1, MeshAtt.MeshSizePropagationDistance,
                                     MeshAtt.MeshSizePropagationScalingFactor);
@@ -544,8 +538,8 @@ class SimModSuiteApf : public ApfMeshInput {
       if (face == nullptr) {
         logError() << "UseDiscreteMesh; faceid:" << iElem << "not found in model.";
       } else {
-        logInfo(PMU_rank()) << "UseDiscreteMesh; faceid, noModification:" << iElem
-                            << MeshAtt.UseDiscreteMesh_noModification;
+        logInfo() << "UseDiscreteMesh; faceid, noModification:" << iElem
+                  << MeshAtt.UseDiscreteMesh_noModification;
         MS_useDiscreteGeometryMesh(meshCase, face, MeshAtt.UseDiscreteMesh_noModification);
         // MS_limitSurfaceMeshModification(meshCase,face,UseDiscreteMesh_noModification);
       }
@@ -555,7 +549,7 @@ class SimModSuiteApf : public ApfMeshInput {
       if (face == nullptr) {
         logError() << "No Mesh; faceid:" << iElem << "not found in model.";
       } else {
-        logInfo(PMU_rank()) << "No Mesh; faceid:" << iElem;
+        logInfo() << "No Mesh; faceid:" << iElem;
         MS_setNoMesh(meshCase, face, 1);
       }
     }
@@ -564,7 +558,7 @@ class SimModSuiteApf : public ApfMeshInput {
       if (region == nullptr) {
         logError() << "No Mesh; regionid:" << iElem << "not found in model.";
       } else {
-        logInfo(PMU_rank()) << "No Mesh; regionid:" << iElem;
+        logInfo() << "No Mesh; regionid:" << iElem;
         MS_setNoMesh(meshCase, region, 1);
       }
     }
@@ -597,8 +591,8 @@ class SimModSuiteApf : public ApfMeshInput {
     if (!GM_isValid(m_model, 1, modelErrors)) {
       void* iter = nullptr;
       while (pSimError err = static_cast<pSimError>(PList_next(modelErrors, &iter))) {
-        logInfo(PMU_rank()) << "  Error code: " << SimError_code(err) << std::endl;
-        logInfo(PMU_rank()) << "  Error string: " << SimError_toString(err) << std::endl;
+        logInfo() << "  Error code: " << SimError_code(err) << std::endl;
+        logInfo() << "  Error string: " << SimError_toString(err) << std::endl;
       }
       logError() << "Input model is not valid";
     }
@@ -609,8 +603,8 @@ class SimModSuiteApf : public ApfMeshInput {
     if (!GM_isValid(m_model, 1, modelInfos)) {
       void* iter = nullptr;
       while (pSimInfo info = static_cast<pSimInfo>(PList_next(modelInfos, &iter))) {
-        logInfo(PMU_rank()) << "  Info code: " << SimInfo_code(info) << std::endl;
-        logInfo(PMU_rank()) << "  Info string: " << SimInfo_toString(info) << std::endl;
+        logInfo() << "  Info code: " << SimInfo_code(info) << std::endl;
+        logInfo() << "  Info string: " << SimInfo_toString(info) << std::endl;
       }
       logError() << "Input model is not valid";
     }
@@ -629,15 +623,14 @@ class SimModSuiteApf : public ApfMeshInput {
       for (int i = 0; i < PList_size(entities); i += 2) {
         pEntity firstEnt = (pEntity)PList_item(entities, i);
         pEntity secondEnt = (pEntity)PList_item(entities, i + 1);
-        logInfo(PMU_rank()) << "Self-intersection between" << element_name[EN_whatInType(firstEnt)]
-                            << GEN_tag(EN_whatIn(firstEnt)) << "and"
-                            << element_name[EN_whatInType(secondEnt)]
-                            << GEN_tag(EN_whatIn(secondEnt));
+        logInfo() << "Self-intersection between" << element_name[EN_whatInType(firstEnt)]
+                  << GEN_tag(EN_whatIn(firstEnt)) << "and" << element_name[EN_whatInType(secondEnt)]
+                  << GEN_tag(EN_whatIn(secondEnt));
         double centroid[3], centroid2[3];
         EN_centroid(firstEnt, &centroid[0]);
         EN_centroid(secondEnt, &centroid2[0]);
-        logInfo(PMU_rank()) << "centroids" << centroid[0] << centroid[1] << centroid[2] << "and "
-                            << centroid2[0] << centroid2[1] << centroid2[2] << std::flush;
+        logInfo() << "centroids" << centroid[0] << centroid[1] << centroid[2] << "and "
+                  << centroid2[0] << centroid2[1] << centroid2[2] << std::flush;
       }
       logError() << PList_size(entities) / 2 << "Self-intersection(s) detected in CAD mesh";
     }
@@ -678,20 +671,20 @@ class SimModSuiteApf : public ApfMeshInput {
     RIter_delete(reg_it);
 
     // Print the statistics
-    logInfo(PMU_rank()) << "AR statistics:";
+    logInfo() << "AR statistics:";
     MPI_Allreduce(&maxAR, &AR_global, 1, MPI_DOUBLE, MPI_MAX, MPI_COMM_WORLD);
-    logInfo(PMU_rank()) << "AR max:" << AR_global;
-    logInfo(PMU_rank()) << "AR (target: < ~10):";
+    logInfo() << "AR max:" << AR_global;
+    logInfo() << "AR (target: < ~10):";
     long int bin_global;
     for (int i = 0; i < num_bins - 1; i++) {
       MPI_Allreduce(&AR_vol_bins[i], &bin_global, 1, MPI_LONG, MPI_SUM, MPI_COMM_WORLD);
-      logInfo(PMU_rank()) << std::fixed << std::setprecision(2) << "[" << AR[i] << "," << AR[i + 1]
-                          << "):" << bin_global;
+      logInfo() << std::fixed << std::setprecision(2) << "[" << AR[i] << "," << AR[i + 1]
+                << "):" << bin_global;
     }
     MPI_Allreduce(&AR_vol_bins[num_bins - 1], &bin_global, 1, MPI_LONG, MPI_SUM, MPI_COMM_WORLD);
-    logInfo(PMU_rank()) << std::fixed << std::setprecision(2) << "[" << AR[num_bins - 1]
-                        << ",inf):" << bin_global;
+    logInfo() << std::fixed << std::setprecision(2) << "[" << AR[num_bins - 1]
+              << ",inf):" << bin_global;
   }
 };
 
-#endif // SIM_MOD_SUITE_APF_H
+#endif // PUMGEN_SRC_INPUT_SIMMODSUITEAPF_H_

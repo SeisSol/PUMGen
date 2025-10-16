@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2022 SeisSol Group
+//
+// SPDX-License-Identifier: BSD-3-Clause
 #include "GMSH4Parser.h"
 
 #include <cassert>
@@ -10,7 +13,7 @@ bool GMSH4Parser::parse_() {
   errorMsg.clear();
   getNextToken();
 
-  double version = parseMeshFormat();
+  const double version = parseMeshFormat();
   if (version < 4.0 || version >= 5.0) {
     char buf[128];
     sprintf(buf, "Unsupported MSH version %.1lf", version);
@@ -20,6 +23,7 @@ bool GMSH4Parser::parse_() {
   bool hasEntities = false;
   bool hasNodes = false;
   bool hasElements = false;
+  bool hasPeriodic = false;
 
   while (curTok != tndm::GMSHToken::eof) {
     switch (curTok) {
@@ -31,6 +35,9 @@ bool GMSH4Parser::parse_() {
       break;
     case tndm::GMSHToken::elements:
       hasElements = parseElements();
+      break;
+    case tndm::GMSHToken::periodic:
+      hasPeriodic = parsePeriodic(version >= 4.1);
       break;
     default:
       getNextToken();
@@ -156,7 +163,9 @@ bool GMSH4Parser::parseEntities() {
       getNextToken();
       tags.push_back(expectNonNegativeInt());
     }
-    physicalVolumeIds.insert_or_assign(id, tags.at(0));
+    if (!tags.empty()) {
+      physicalVolumeIds.insert_or_assign(id, tags.at(0));
+    }
     getNextToken();
     const std::size_t numBoundaryTags = expectNonNegativeInt();
     // ignore boundary
@@ -256,6 +265,55 @@ bool GMSH4Parser::parseElements() {
   getNextToken();
   if (curTok != tndm::GMSHToken::end_elements) {
     return logErrorAnnotated<bool>("Expected $EndElements");
+  }
+  getNextToken();
+
+  return true;
+}
+
+bool GMSH4Parser::parsePeriodic(bool variableAffine) {
+  getNextToken();
+  const auto numPeriodic = expectNonNegativeInt();
+
+  // ignore everything but the node identification
+
+  for (std::size_t blockIdx = 0; blockIdx < numPeriodic; blockIdx++) {
+    getNextToken();
+    [[maybe_unused]] const std::size_t entityDim = expectNonNegativeInt();
+    getNextToken();
+    [[maybe_unused]] const std::size_t entityId = expectNonNegativeInt();
+    getNextToken();
+    [[maybe_unused]] const std::size_t entityIdentifyId = expectNonNegativeInt();
+
+    // for MSH4.1 vs MSH4.0
+    const auto affineSize = [&]() -> std::size_t {
+      if (variableAffine) {
+        getNextToken();
+        return expectNonNegativeInt();
+      } else {
+        return 16;
+      }
+    }();
+    for (std::size_t i = 0; i < affineSize; ++i) {
+      getNextToken();
+      [[maybe_unused]] const double affineValue = expectNumber();
+    }
+
+    getNextToken();
+    const std::size_t identifySize = expectNonNegativeInt();
+
+    for (std::size_t i = 0; i < identifySize; ++i) {
+      getNextToken();
+      const std::size_t nodeId = expectNonNegativeInt() - 1;
+      getNextToken();
+      const std::size_t nodeIdentifyId = expectNonNegativeInt() - 1;
+      builder->addVertexLink(nodeId, nodeIdentifyId);
+    }
+  }
+
+  getNextToken();
+  if (curTok != tndm::GMSHToken::end_periodic) {
+    return logErrorAnnotated<bool>("Expected $EndPeriodic");
   }
   getNextToken();
 

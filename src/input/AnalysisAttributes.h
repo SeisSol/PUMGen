@@ -1,5 +1,8 @@
-#ifndef ANALYSISATTRIBUTES_H
-#define ANALYSISATTRIBUTES_H
+// SPDX-FileCopyrightText: 2020 SeisSol Group
+//
+// SPDX-License-Identifier: BSD-3-Clause
+#ifndef PUMGEN_SRC_INPUT_ANALYSISATTRIBUTES_H_
+#define PUMGEN_SRC_INPUT_ANALYSISATTRIBUTES_H_
 
 #include "split.h"
 #include "tinyxml2/tinyxml2.h"
@@ -28,4 +31,4 @@ class AnalysisAttributes {
   void set_BoundaryConditions();
 };
 
-#endif
+#endif // PUMGEN_SRC_INPUT_ANALYSISATTRIBUTES_H_
