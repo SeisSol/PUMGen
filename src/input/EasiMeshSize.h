@@ -1,5 +1,8 @@
-#ifndef PUMGEN_EASIMESHSIZE_H
-#define PUMGEN_EASIMESHSIZE_H
+// SPDX-FileCopyrightText: 2021 SeisSol Group
+//
+// SPDX-License-Identifier: BSD-3-Clause
+#ifndef PUMGEN_SRC_INPUT_EASIMESHSIZE_H_
+#define PUMGEN_SRC_INPUT_EASIMESHSIZE_H_
 
 #include "MeshAttributes.h"
 #include <MeshTypes.h>
@@ -37,4 +40,4 @@ class EasiMeshSize {
   double getMeshSize(const std::array<double, 3>& point);
 };
 
-#endif // PUMGEN_EASIMESHSIZE_H
+#endif // PUMGEN_SRC_INPUT_EASIMESHSIZE_H_

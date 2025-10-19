@@ -1,17 +1,11 @@
-/**
- * @file
- *  This file is part of PUMGen
- *
- *  For conditions of distribution and use, please see the copyright
- *  notice in the file 'COPYING' at the root directory of this package
- *  and the copyright notice at https://github.com/SeisSol/PUMGen
- *
- * @copyright 2017 Technical University of Munich
- * @author Sebastian Rettenberger <sebastian.rettenberger@tum.de>
- */
+// SPDX-FileCopyrightText: 2017 SeisSol Group
+// SPDX-FileCopyrightText: 2017 Technical University of Munich
+//
+// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-FileContributor: Sebastian Rettenberger <sebastian.rettenberger@tum.de>
 
-#ifndef APF_NATIVE_H
-#define APF_NATIVE_H
+#ifndef PUMGEN_SRC_INPUT_APFNATIVE_H_
+#define PUMGEN_SRC_INPUT_APFNATIVE_H_
 
 #include <apfMDS.h>
 #include <gmi_mesh.h>
@@ -35,4 +29,4 @@ class ApfNative : public ApfMeshInput {
   }
 };
 
-#endif // APF_NATIVE_H
+#endif // PUMGEN_SRC_INPUT_APFNATIVE_H_

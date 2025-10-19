@@ -1,23 +1,17 @@
-/**
- * @file
- *  This file is part of PUMGen
- *
- *  For conditions of distribution and use, please see the copyright
- *  notice in the file 'COPYING' at the root directory of this package
- *  and the copyright notice at https://github.com/SeisSol/PUMGen
- *
- * @copyright 2017 Technical University of Munich
- * @author Sebastian Rettenberger <sebastian.rettenberger@tum.de>
- */
+// SPDX-FileCopyrightText: 2017 SeisSol Group
+// SPDX-FileCopyrightText: 2017 Technical University of Munich
+//
+// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-FileContributor: Sebastian Rettenberger <sebastian.rettenberger@tum.de>
 
-#ifndef SERIAL_MESH_FILE_H
-#define SERIAL_MESH_FILE_H
+#ifndef PUMGEN_SRC_INPUT_SERIALMESHFILE_H_
+#define PUMGEN_SRC_INPUT_SERIALMESHFILE_H_
 
 #ifdef PARALLEL
 #include <mpi.h>
 #endif // PARALLEL
 
-#include "aux/Distributor.h"
+#include "helper/Distributor.h"
 #include <cstddef>
 #include <vector>
 
@@ -80,18 +74,23 @@ template <typename T> class SerialMeshFile : public FullStorageMeshData {
     const std::size_t nLocalVertices = getChunksize(nVertices, m_rank, m_nProcs);
     const std::size_t nLocalElements = getChunksize(nElements, m_rank, m_nProcs);
 
-    setup(nLocalElements, nLocalVertices);
+    bool identify = false;
+    if constexpr (T::SupportsIdentify) {
+      identify = m_meshReader.hasIdentify();
+    }
 
-    logInfo(m_rank) << "Read vertex coordinates";
+    setup(nLocalElements, nLocalVertices, identify);
+
+    logInfo() << "Read vertex coordinates";
     m_meshReader.readVertices(geometryData.data());
 
-    logInfo(m_rank) << "Read cell vertices";
+    logInfo() << "Read cell vertices";
     m_meshReader.readElements(connectivityData.data());
 
-    logInfo(m_rank) << "Read cell groups";
+    logInfo() << "Read cell groups";
     m_meshReader.readGroups(groupData.data());
 
-    logInfo(m_rank) << "Read boundary conditions";
+    logInfo() << "Read boundary conditions";
     std::vector<int> preBoundaryData(nLocalElements * (vertexSize() + 1));
     m_meshReader.readBoundaries(preBoundaryData.data());
     for (std::size_t i = 0; i < nLocalElements; ++i) {
@@ -99,7 +98,13 @@ template <typename T> class SerialMeshFile : public FullStorageMeshData {
         setBoundary(i, j, preBoundaryData[(vertexSize() + 1) * i + j]);
       }
     }
+
+    if constexpr (T::SupportsIdentify) {
+      if (identify) {
+        m_meshReader.readIdentify(identifyData.data());
+      }
+    }
   }
 };
 
-#endif // SERIAL_MESH_FILE_H
+#endif // PUMGEN_SRC_INPUT_SERIALMESHFILE_H_

@@ -1,23 +1,17 @@
-/**
- * @file
- *  This file is part of PUMGen
- *
- *  For conditions of distribution and use, please see the copyright
- *  notice in the file 'COPYING' at the root directory of this package
- *  and the copyright notice at https://github.com/SeisSol/PUMGen
- *
- * @copyright 2017 Technical University of Munich
- * @author Sebastian Rettenberger <sebastian.rettenberger@tum.de>
- */
+// SPDX-FileCopyrightText: 2017 SeisSol Group
+// SPDX-FileCopyrightText: 2017 Technical University of Munich
+//
+// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-FileContributor: Sebastian Rettenberger <sebastian.rettenberger@tum.de>
 
-#ifndef PARALLEL_GAMBIT_READER
-#define PARALLEL_GAMBIT_READER
+#ifndef PUMGEN_SRC_MESHREADER_PARALLELGAMBITREADER_H_
+#define PUMGEN_SRC_MESHREADER_PARALLELGAMBITREADER_H_
 
 #include <mpi.h>
 
 #include "GambitReader.h"
 #include "ParallelMeshReader.h"
-#include "aux/Distributor.h"
+#include "helper/Distributor.h"
 
 #include "third_party/MPITraits.h"
 
@@ -210,4 +204,4 @@ class ParallelGambitReader : public ParallelMeshReader<GambitReader> {
 
 } // namespace puml
 
-#endif // PARALLEL_GAMBIT_READER
+#endif // PUMGEN_SRC_MESHREADER_PARALLELGAMBITREADER_H_

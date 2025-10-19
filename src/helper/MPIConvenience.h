@@ -1,5 +1,8 @@
-#ifndef PUMGEN_AUX_MPI_CONVENIENCE_H_
-#define PUMGEN_AUX_MPI_CONVENIENCE_H_
+// SPDX-FileCopyrightText: 2025 SeisSol Group
+//
+// SPDX-License-Identifier: BSD-3-Clause
+#ifndef PUMGEN_SRC_HELPER_MPICONVENIENCE_H_
+#define PUMGEN_SRC_HELPER_MPICONVENIENCE_H_
 
 #include <cstddef>
 #include <mpi.h>
@@ -20,4 +23,4 @@ void largeScatterv(const void* sendbuf, const std::size_t* sendsize, const std::
                    MPI_Datatype sendtype, void* recvbuf, std::size_t recvsize,
                    MPI_Datatype recvtype, int root, MPI_Comm comm);
 
-#endif // PUMGEN_AUX_MPI_CONVENIENCE_H_
+#endif // PUMGEN_SRC_HELPER_MPICONVENIENCE_H_

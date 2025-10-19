@@ -1,9 +1,10 @@
+# SPDX-FileCopyrightText: 2017 SeisSol Group
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
 [submodule "submodules/utils"]
 	path = submodules/utils
 	url = ../../TUM-I5/utils.git
 [submodule "submodules/tinyxml2"]
 	path = submodules/tinyxml2
 	url = ../../leethomason/tinyxml2.git
-[submodule "submodules/run-clang-format"]
-	path = submodules/run-clang-format
-	url = ../../Sarcasm/run-clang-format.git

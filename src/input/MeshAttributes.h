@@ -1,5 +1,8 @@
-#ifndef MESHATTRIBUTES_H
-#define MESHATTRIBUTES_H
+// SPDX-FileCopyrightText: 2020 SeisSol Group
+//
+// SPDX-License-Identifier: BSD-3-Clause
+#ifndef PUMGEN_SRC_INPUT_MESHATTRIBUTES_H_
+#define PUMGEN_SRC_INPUT_MESHATTRIBUTES_H_
 
 #include <array>
 #include <cassert>
@@ -119,4 +122,4 @@ class MeshAttributes {
   std::list<int> fill_list_using_parsed_string(std::string line);
 };
 
-#endif
+#endif // PUMGEN_SRC_INPUT_MESHATTRIBUTES_H_

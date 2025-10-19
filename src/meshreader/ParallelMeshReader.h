@@ -1,17 +1,11 @@
-/**
- * @file
- *  This file is part of PUMGen
- *
- *  For conditions of distribution and use, please see the copyright
- *  notice in the file 'COPYING' at the root directory of this package
- *  and the copyright notice at https://github.com/SeisSol/PUMGen
- *
- * @copyright 2017 Technical University of Munich
- * @author Sebastian Rettenberger <sebastian.rettenberger@tum.de>
- */
+// SPDX-FileCopyrightText: 2017 SeisSol Group
+// SPDX-FileCopyrightText: 2017 Technical University of Munich
+//
+// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-FileContributor: Sebastian Rettenberger <sebastian.rettenberger@tum.de>
 
-#ifndef PARALLEL_MESH_READER_H
-#define PARALLEL_MESH_READER_H
+#ifndef PUMGEN_SRC_MESHREADER_PARALLELMESHREADER_H_
+#define PUMGEN_SRC_MESHREADER_PARALLELMESHREADER_H_
 
 #include <mpi.h>
 
@@ -38,6 +32,7 @@ template <class R> class ParallelMeshReader {
   public:
   constexpr static std::size_t Order = 1;
   constexpr static std::size_t Dim = 3;
+  constexpr static bool SupportsIdentify = false;
   ParallelMeshReader(MPI_Comm comm = MPI_COMM_WORLD)
       : m_nVertices(0), m_nElements(0), m_nBoundaries(0), m_comm(comm) {
     init();
@@ -208,4 +203,4 @@ template <class R> class ParallelMeshReader {
   }
 };
 
-#endif // PARALLEL_MESH_READER_H
+#endif // PUMGEN_SRC_MESHREADER_PARALLELMESHREADER_H_
