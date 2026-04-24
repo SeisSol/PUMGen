@@ -112,6 +112,15 @@ GMSHToken GMSHLexer::getToken() {
     advance();
     return GMSHToken::string;
   }
+  if (isalpha(lastChar)) {
+    do {
+      advance();
+    } while (isalpha(lastChar));
+    return GMSHToken::string;
+  }
+  // Always consume at least one character for unknown tokens to avoid
+  // getting stuck in an infinite tokenization loop.
+  advance();
   return GMSHToken::unknown_token;
 }
 
