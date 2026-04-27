@@ -158,14 +158,16 @@ bool GMSH2Parser::parsePeriodic() {
     getNextToken();
     [[maybe_unused]] const std::size_t entityIdentifyId = expectNonNegativeInt();
 
-    // fixed to 16; the main difference to MSH4.1
-    const std::size_t affineSize = 16;
-    for (std::size_t i = 0; i < affineSize; ++i) {
-      getNextToken();
-      [[maybe_unused]] const double affineValue = expectNumber();
-    }
-
     getNextToken();
+    if (curTok == GMSHToken::string) {
+      // Gmsh msh2 may write: "Affine a11 a12 ... a44" (16 values)
+      constexpr std::size_t affineSize = 16;
+      for (std::size_t i = 0; i < affineSize; ++i) {
+        getNextToken();
+        [[maybe_unused]] const double affineValue = expectNumber();
+      }
+      getNextToken();
+    }
     const std::size_t identifySize = expectNonNegativeInt();
 
     for (std::size_t i = 0; i < identifySize; ++i) {
