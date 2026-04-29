@@ -13,7 +13,9 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdlib>
 #include <iostream>
+#include <unordered_map>
 #include <vector>
 
 #include "helper/Distributor.h"
@@ -43,6 +45,7 @@ template <typename P, std::size_t OrderP> class ParallelGMSHReader {
         logError() << meshFile << std::endl << parser.getErrorMessage();
       }
       builder_.postprocess();
+      validateIdentifyTopology();
       convertBoundaryConditions();
 
       nVertices_ = builder_.vertices.size();
@@ -77,6 +80,59 @@ template <typename P, std::size_t OrderP> class ParallelGMSHReader {
   }
 
   private:
+  /**
+   * Checks that periodic vertex identification does not create non-manifold
+   * topology (i.e. identified faces shared by more than two cells).
+   */
+  void validateIdentifyTopology() const {
+    if (builder_.identify.empty()) {
+      return;
+    }
+
+    using FaceKey = std::array<std::size_t, 3>;
+    struct FaceKeyHash {
+      std::size_t operator()(const FaceKey& key) const {
+        return (key[0] * 73856093u) ^ (key[1] * 19349663u) ^ (key[2] * 83492791u);
+      }
+    };
+
+    std::unordered_map<FaceKey, std::size_t, FaceKeyHash> faceMultiplicity;
+    faceMultiplicity.reserve(builder_.elements.size() * (Dim + 1u));
+
+    bool hasNonManifoldFace = false;
+    FaceKey exampleFace{0, 0, 0};
+    std::size_t exampleCount = 0;
+
+    for (const auto& element : builder_.elements) {
+      for (int localFctNo = 0; localFctNo < Dim + 1u; ++localFctNo) {
+        FaceKey face{};
+        for (int localNo = 0; localNo < Dim; ++localNo) {
+          const auto localNoElement = Facet2Nodes[localFctNo][localNo];
+          const auto vertex = element[localNoElement];
+          face[localNo] = builder_.identify[vertex];
+        }
+        std::sort(face.begin(), face.end());
+
+        const auto count = ++faceMultiplicity[face];
+        if (count > 2) {
+          hasNonManifoldFace = true;
+          exampleFace = face;
+          exampleCount = count;
+        }
+      }
+    }
+
+    if (hasNonManifoldFace) {
+      logError()
+          << "Invalid periodic identify topology: found a face shared by more than two cells. "
+          << "Example canonical face ids: (" << exampleFace[0] << ", " << exampleFace[1] << ", "
+          << exampleFace[2] << ") with multiplicity " << exampleCount
+          << ". This mesh is too coarse or topologically incompatible with identify-vertex "
+             "periodic encoding. Refine the mesh near periodic boundaries and regenerate.";
+      MPI_Abort(comm_, EXIT_FAILURE);
+    }
+  }
+
   /**
    * GMSH stores boundary conditions on a surface mesh whereas SeisSol expects
    * boundary conditions to be stored per element. In the following we convert
