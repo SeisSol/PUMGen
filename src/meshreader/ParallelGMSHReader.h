@@ -89,7 +89,7 @@ template <typename P, std::size_t OrderP> class ParallelGMSHReader {
       return;
     }
 
-    using FaceKey = std::array<std::size_t, 3>;
+    using FaceKey = std::array<std::size_t, Dim>;
     struct FaceKeyHash {
       std::size_t operator()(const FaceKey& key) const {
         return (key[0] * 73856093u) ^ (key[1] * 19349663u) ^ (key[2] * 83492791u);
@@ -124,11 +124,12 @@ template <typename P, std::size_t OrderP> class ParallelGMSHReader {
 
     if (hasNonManifoldFace) {
       logError()
-          << "Invalid periodic identify topology: found a face shared by more than two cells. "
+          << "Invalid periodic identify topology: multiple distinct faces collapse to the same"
+          << "canonical face under indentify, yielding a face shared by more than two cells."
           << "Example canonical face ids: (" << exampleFace[0] << ", " << exampleFace[1] << ", "
-          << exampleFace[2] << ") with multiplicity " << exampleCount
-          << ". This mesh is too coarse or topologically incompatible with identify-vertex "
-             "periodic encoding. Refine the mesh near periodic boundaries and regenerate.";
+          << exampleFace[2] << ") with " << exampleCount
+          << ". Verify periodic entity pairing and the periodic section in the mesh file, "
+          << "and regenerate the mesh with consistent periodic definitions";
       MPI_Abort(comm_, EXIT_FAILURE);
     }
   }
