@@ -185,3 +185,7 @@ pumgen_add_test(msh4.periodic-binary.np2 RANKS 2 SOURCE msh4 INPUT periodic-bina
                 REFERENCE periodic.puml.h5 TOLERANCE 1e-12 IDENTIFY)
 pumgen_add_test(msh4.coarse-binary-truncated RANKS 1 SOURCE msh4
                 INPUT coarse-binary-truncated-v41.msh EXPECT_ERROR "Unexpected end of file")
+
+# a face of the surface mesh given twice
+pumgen_add_test(msh2.tiny-duplicateface RANKS 1 SOURCE msh2 INPUT tiny-duplicateface-v22.msh
+                EXPECT_ERROR "exists multiple times in the surface mesh")

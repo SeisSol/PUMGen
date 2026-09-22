@@ -366,6 +366,9 @@ def generate_tiny():
         "tiny-v22.msh": TINY_V22,
         "tiny-duplicate-v22.msh": TINY_V22.replace("3 0 1 0", "2 0 1 0"),
         "tiny-badnode-v22.msh": TINY_V22.replace("1 2 3 4\n$EndElements", "1 2 3 9\n$EndElements"),
+        "tiny-duplicateface-v22.msh": TINY_V22.replace(
+            "1\n1 4 2 7 1 1 2 3 4\n", "3\n1 4 2 7 1 1 2 3 4\n2 2 2 101 1 1 3 2\n3 2 2 105 1 2 1 3\n"
+        ),
     }
     for name, content in variants.items():
         with open(name, "w") as out:
