@@ -71,6 +71,33 @@ static int ilog(std::size_t value, int expbase = 1) {
 
 constexpr std::size_t NoSecondDim = 0;
 
+/**
+ * The smallest size in bytes of an integer type with the given signedness which holds all values
+ * of the (distributed) data. Data with negative values is not reduced.
+ */
+template <typename F>
+static std::size_t requiredIntegerBytes(const F& data, std::size_t count, bool isSigned) {
+  using ValueT = typename F::value_type;
+  unsigned long long largest = 0;
+  int negative = 0;
+  for (std::size_t i = 0; i < count; ++i) {
+    if constexpr (std::is_signed_v<ValueT>) {
+      if (data[i] < 0) {
+        negative = 1;
+        continue;
+      }
+    }
+    largest = std::max(largest, static_cast<unsigned long long>(data[i]));
+  }
+  MPI_Allreduce(MPI_IN_PLACE, &largest, 1, MPI_UNSIGNED_LONG_LONG, MPI_MAX, MPI_COMM_WORLD);
+  MPI_Allreduce(MPI_IN_PLACE, &negative, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
+  if (negative != 0) {
+    return sizeof(ValueT);
+  }
+  const std::size_t bits = ilog(largest) + (isSigned ? 1 : 0);
+  return std::max(static_cast<std::size_t>(1), (bits + 7) / 8);
+}
+
 template <typename T, typename F>
 static void writeH5Data(const F& handler, hid_t h5file, const std::string& name, void* mesh,
                         int meshdim, hid_t h5memtype, hid_t h5outtype, std::size_t chunk,
@@ -107,14 +134,17 @@ static void writeH5Data(const F& handler, hid_t h5file, const std::string& name,
   checkH5Err(H5Pset_dxpl_mpio(h5dxlist, H5FD_MPIO_COLLECTIVE));
 
   hid_t h5type = h5outtype;
-  if (reduceInts && std::is_integral_v<T>) {
-    h5type = H5Tcopy(h5outtype);
-    std::size_t bits = ilog(globalSize);
-    std::size_t unsignedSize = (bits + 7) / 8;
-    checkH5Err(h5type);
-    checkH5Err(H5Tset_size(h5type, unsignedSize));
-    checkH5Err(H5Tcommit(h5file, (std::string("/") + name + std::string("Type")).c_str(), h5type,
-                         H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT));
+  if constexpr (std::is_integral_v<T>) {
+    if (reduceInts) {
+      const std::size_t bytes = requiredIntegerBytes(handler, localSize * secondSize,
+                                                     H5Tget_sign(h5outtype) == H5T_SGN_2);
+      if (bytes < H5Tget_size(h5outtype)) {
+        h5type = checkH5Err(H5Tcopy(h5outtype));
+        checkH5Err(H5Tset_size(h5type, bytes));
+        checkH5Err(H5Tcommit(h5file, (std::string("/") + name + std::string("Type")).c_str(),
+                             h5type, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT));
+      }
+    }
   }
 
   hid_t h5filter = H5P_DEFAULT;
@@ -164,7 +194,7 @@ static void writeH5Data(const F& handler, hid_t h5file, const std::string& name,
   if (filterEnable > 0) {
     checkH5Err(H5Pclose(h5filter));
   }
-  if (reduceInts) {
+  if (h5type != h5outtype) {
     checkH5Err(H5Tclose(h5type));
   }
   checkH5Err(H5Sclose(h5space));

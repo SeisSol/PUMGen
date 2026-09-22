@@ -91,3 +91,9 @@ pumgen_add_test(msh4.layered.chunksize.np3 RANKS 3 SOURCE msh4 INPUT layered-v41
                 REFERENCE layered.puml.h5 ARGS --chunksize=4096)
 pumgen_add_test(msh4.tiny.order0 RANKS 1 SOURCE msh4 INPUT tiny-v41.msh ARGS --order=0
                 EXPECT_ERROR "mesh order has to be at least 1")
+
+# integer types reduced to the value range
+pumgen_add_test(msh4.layered.compact.np3 RANKS 3 SOURCE msh4 INPUT layered-v41.msh
+                REFERENCE layered.puml.h5 ARGS --compactify-datatypes)
+pumgen_add_test(msh2.coarse-o2.compact.np2 RANKS 2 SOURCE msh2 INPUT coarse-o2-v22.msh
+                REFERENCE coarse-o2.puml.h5 ARGS --compactify-datatypes --order=2)
