@@ -1,0 +1,11 @@
+# SPDX-FileCopyrightText: 2026 SeisSol Group
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
+version = 1
+
+[[annotations]]
+path = ["tests/fixtures/*.msh", "tests/fixtures/*.neu", "tests/fixtures/*.h5"]
+precedence = "override"
+SPDX-FileCopyrightText = "2026 SeisSol Group"
+SPDX-License-Identifier = "BSD-3-Clause"

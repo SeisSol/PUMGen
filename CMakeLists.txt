@@ -139,3 +139,8 @@ if(SIMMETRIX)
 endif()
 set_target_properties(pumgen PROPERTIES INSTALL_RPATH "${INSTALL_RPATH}")
 install(TARGETS pumgen RUNTIME DESTINATION bin DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+include(CTest)
+if (BUILD_TESTING)
+  add_subdirectory(tests)
+endif()
