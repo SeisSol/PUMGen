@@ -245,6 +245,8 @@ class GMSHParser {
 
   GMSHMeshBuilder* builder;
   std::unique_ptr<MshInput> input;
+  // errors in binary data are located by byte offset instead of line and column
+  bool binaryData = false;
 
   private:
   std::size_t bufferSize;

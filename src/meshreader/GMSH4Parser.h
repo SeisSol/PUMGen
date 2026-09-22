@@ -5,15 +5,17 @@
 #define PUMGEN_SRC_MESHREADER_GMSH4PARSER_H_
 
 #include <cstddef>
+#include <cstdint>
 #include <map>
 #include <set>
+#include <vector>
 
 #include "GMSHParser.h"
 
 namespace puml {
 
 /**
- * Parser for MSH 4.1 files.
+ * Parser for MSH 4.1 files, ASCII or binary.
  */
 class GMSH4Parser : public GMSHParser {
   public:
@@ -26,15 +28,34 @@ class GMSH4Parser : public GMSHParser {
   void parseElements();
   void parsePeriodic();
 
-  // the values of the sections
-  std::size_t readSize() { return expectSize(); }
-  long readInt() { return expectInteger(); }
-  double readDouble() { return expectNumber(); }
+  /**
+   * Starts the data of a section; in binary files, the data begins after the line break.
+   */
+  void beginSectionData();
+
+  // the values of the sections: text, or binary with sizeof(size_t) == dataSize and 4-byte ints
+  std::size_t readSize();
+  long readInt();
+  double readDouble();
+  // bulk reading of binary sizes and doubles
+  void readSizes(std::size_t* values, std::size_t count);
+  void readDoubles(double* values, std::size_t count);
+  void readBinary(void* data, std::size_t bytes);
 
   /**
-   * Reads a node tag and returns the index of the node.
+   * The offset of the next value, e.g. for error messages.
    */
-  std::size_t readNodeIndex();
+  std::size_t position();
+
+  /**
+   * The index of the node with the given tag; the tag started at the given file offset.
+   */
+  std::size_t nodeIndex(std::size_t tag, std::size_t offset);
+
+  bool binary = false;
+  bool swapBytes = false;
+  std::size_t dataSize = 8;
+  std::vector<std::uint32_t> narrowSizes;
 
   /**
    * The physical tag of the elements of an entity; 0 if the entity has no physical group.

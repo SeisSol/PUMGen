@@ -10,6 +10,8 @@ from the gmsh model directly, i.e. independently of PUMGen.
 """
 
 import itertools
+import os
+import struct
 
 import gmsh
 import h5py
@@ -141,6 +143,86 @@ def write_mesh(path, version, binary=False):
     gmsh.option.setNumber("Mesh.Binary", 0)
 
 
+# nodes per element type, for the element types in the fixtures
+ELEMENT_NODES = {15: 1, 1: 2, 2: 3, 4: 4, 8: 3, 9: 6, 11: 10}
+
+
+def convert_binary(source, target, byte_order, size_bytes):
+    """Rewrites a binary MSH 4.1 file (as written by gmsh: little endian, 8-byte sizes) with
+    another byte order ("<" or ">") and size of size_t (4 or 8)."""
+    with open(source, "rb") as f:
+        data = f.read()
+    pos = 0
+    out = bytearray()
+    size_format = "Q" if size_bytes == 8 else "I"
+
+    def line():
+        nonlocal pos
+        end = data.index(b"\n", pos)
+        text = data[pos:end]
+        pos = end + 1
+        return text
+
+    def get(fmt, count=1):
+        nonlocal pos
+        fmt = f"<{count}{fmt}"
+        values = struct.unpack_from(fmt, data, pos)
+        pos += struct.calcsize(fmt)
+        out.extend(struct.pack(byte_order + fmt[1:].replace("Q", size_format), *values))
+        return values
+
+    def sizes(count=1):
+        return get("Q", count)
+
+    assert line() == b"$MeshFormat" and line() == b"4.1 1 8"
+    out.extend(f"$MeshFormat\n4.1 1 {size_bytes}\n".encode())
+    assert get("i")[0] == 1
+    assert line() == b""
+    out.extend(b"\n")
+    while pos < len(data):
+        text = line()
+        out.extend(text + b"\n")
+        if text == b"$MeshFormat":
+            continue
+        if text == b"$Entities":
+            counts = sizes(4)
+            for kind, count in enumerate(counts):
+                for _ in range(count):
+                    get("i")
+                    get("d", 3 if kind == 0 else 6)
+                    get("i", sizes()[0])
+                    if kind > 0:
+                        get("i", sizes()[0])
+        elif text == b"$Nodes":
+            num_blocks = sizes(4)[0]
+            for _ in range(num_blocks):
+                dim, _, parametric = get("i", 3)
+                count = sizes()[0]
+                sizes(count)
+                get("d", count * (3 + (dim if parametric else 0)))
+        elif text == b"$Elements":
+            num_blocks = sizes(4)[0]
+            for _ in range(num_blocks):
+                _, _, element_type = get("i", 3)
+                count = sizes()[0]
+                sizes(count * (1 + ELEMENT_NODES[element_type]))
+        elif text == b"$Periodic":
+            for _ in range(sizes()[0]):
+                get("i", 3)
+                get("d", sizes()[0])
+                sizes(2 * sizes()[0])
+        elif text.startswith(b"$End"):
+            continue
+        else:
+            raise ValueError(f"unexpected section {text}")
+        assert line() == b""
+        end = line()
+        assert end == b"$End" + text[1:]
+        out.extend(b"\n" + end + b"\n")
+    with open(target, "wb") as f:
+        f.write(out)
+
+
 def counts_exercise_chunking(count):
     # the element/vertex counts are chosen such that the default chunk distribution differs
     # from a ceil-based one for 3 and for 4 ranks
@@ -157,6 +239,7 @@ def generate_layered():
     print(f"layered: {len(cells)} cells, {len(vertices)} vertices, size {size_top:.4f}")
 
     write_mesh("layered-v41.msh", 4.1)
+    write_mesh("layered-binary-v41.msh", 4.1, binary=True)
     write_mesh("layered-v22.msh", 2.2)
     gmsh.write("layered.neu")
     write_reference("layered.puml.h5", "layered-v41.msh")
@@ -179,11 +262,24 @@ def generate_coarse():
 
     gmsh.model.mesh.setOrder(2)
     write_mesh("coarse-o2-v41.msh", 4.1)
+    write_mesh("coarse-o2-binary-v41.msh", 4.1, binary=True)
     write_mesh("coarse-o2-v22.msh", 2.2)
     gmsh.model.mesh.setOrder(1)
 
     gmsh.model.mesh.partition(2)
     write_mesh("coarse-partitioned-v41.msh", 4.1)
+
+    # the converter reproduces gmsh's layout exactly before it is used for other layouts
+    convert_binary("coarse-binary-v41.msh", "coarse-binary-copy.msh", "<", 8)
+    with open("coarse-binary-v41.msh", "rb") as a, open("coarse-binary-copy.msh", "rb") as b:
+        assert a.read() == b.read()
+    os.remove("coarse-binary-copy.msh")
+    convert_binary("coarse-binary-v41.msh", "coarse-binary-bigendian-v41.msh", ">", 8)
+    convert_binary("coarse-binary-v41.msh", "coarse-binary-size4-v41.msh", "<", 4)
+    with open("coarse-binary-v41.msh", "rb") as f:
+        data = f.read()
+    with open("coarse-binary-truncated-v41.msh", "wb") as f:
+        f.write(data[: data.index(b"$Elements") + 400])
 
     write_reference("coarse.puml.h5", "coarse-v41.msh")
     write_reference("coarse-o2.puml.h5", "coarse-o2-v41.msh")
@@ -204,6 +300,7 @@ def generate_periodic():
     gmsh.option.setNumber("Mesh.MeshSizeMax", 0.4)
     gmsh.model.mesh.generate(3)
     write_mesh("periodic-v41.msh", 4.1)
+    write_mesh("periodic-binary-v41.msh", 4.1, binary=True)
     gmsh.option.setNumber("Mesh.SaveParametric", 1)
     write_mesh("periodic-parametric-v41.msh", 4.1)
     gmsh.option.setNumber("Mesh.SaveParametric", 0)

@@ -92,6 +92,11 @@ int main(int argc, char** argv) {
   ok &= check<puml::GMSH4Parser, 1>(fixtures + "/periodic-parametric-v41.msh");
   ok &= check<puml::GMSH4Parser, 2>(fixtures + "/coarse-o2-v41.msh");
   ok &= check<puml::GMSH2Parser, 2>(fixtures + "/coarse-o2-v22.msh");
+  ok &= check<puml::GMSH4Parser, 1>(fixtures + "/layered-binary-v41.msh");
+  ok &= check<puml::GMSH4Parser, 1>(fixtures + "/periodic-binary-v41.msh");
+  ok &= check<puml::GMSH4Parser, 1>(fixtures + "/coarse-binary-bigendian-v41.msh");
+  ok &= check<puml::GMSH4Parser, 1>(fixtures + "/coarse-binary-size4-v41.msh");
+  ok &= check<puml::GMSH4Parser, 2>(fixtures + "/coarse-o2-binary-v41.msh");
   ok &= checkSkippedSection(fixtures);
   return ok ? 0 : 1;
 }

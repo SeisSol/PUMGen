@@ -28,16 +28,22 @@ bool GMSHParser::parseFile(const std::string& fileName) {
 }
 
 void GMSHParser::failAt(std::size_t offset, std::string_view message) {
-  const auto [line, column] = input->location(offset);
   std::stringstream stream;
-  stream << "GMSH parser error in line " << line << " in column " << column << ":\n";
+  if (binaryData) {
+    stream << "GMSH parser error at byte " << offset << ":\n";
+  } else {
+    const auto [line, column] = input->location(offset);
+    stream << "GMSH parser error in line " << line << " in column " << column << ":\n";
+  }
   stream << '\t' << message << '\n';
   errorMsg += stream.str();
   throw ParseError{};
 }
 
 void GMSHParser::fail(std::string_view message) {
-  input->skipWhitespace();
+  if (!binaryData) {
+    input->skipWhitespace();
+  }
   failAt(input->offset(), message);
 }
 
@@ -49,6 +55,7 @@ void GMSHParser::failFile(std::string_view message) {
 }
 
 void GMSHParser::expectToken(std::string_view token) {
+  binaryData = false;
   input->skipWhitespace();
   const auto offset = input->offset();
   if (input->readToken() != token) {

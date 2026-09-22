@@ -126,8 +126,6 @@ pumgen_add_test(msh4.tiny-unknowntype RANKS 1 SOURCE msh4 INPUT tiny-unknowntype
                 EXPECT_ERROR "Unknown element type 999")
 pumgen_add_test(msh4.tiny-v40 RANKS 1 SOURCE msh4 INPUT tiny-v40.msh
                 EXPECT_ERROR "MSH 4.0 is not supported")
-pumgen_add_test(msh4.coarse-binary RANKS 1 SOURCE msh4 INPUT coarse-binary-v41.msh
-                EXPECT_ERROR "Binary MSH files are not supported")
 pumgen_add_test(msh2.tiny-as-msh4 RANKS 1 SOURCE msh2 INPUT tiny-v41.msh
                 EXPECT_ERROR "Unsupported MSH version 4.1")
 
@@ -168,3 +166,19 @@ pumgen_add_test(msh4.coarse-partitioned RANKS 1 SOURCE msh4 INPUT coarse-partiti
                 EXPECT_ERROR "Partitioned MSH files are not supported")
 pumgen_add_test(msh4.tiny-nophysical RANKS 1 SOURCE msh4 INPUT tiny-nophysical-v41.msh
                 EXPECT_OUTPUT "1 volume[(]s[)] and 0 surface[(]s[)] without a physical group")
+
+# binary MSH 4.1; the coordinates of the references come from the ASCII files
+foreach(ranks 1 2 3)
+  pumgen_add_test(msh4.layered-binary.np${ranks} RANKS ${ranks} SOURCE msh4
+                  INPUT layered-binary-v41.msh REFERENCE layered.puml.h5 TOLERANCE 1e-12)
+endforeach()
+foreach(variant binary binary-bigendian binary-size4)
+  pumgen_add_test(msh4.coarse-${variant}.np2 RANKS 2 SOURCE msh4 INPUT coarse-${variant}-v41.msh
+                  REFERENCE coarse.puml.h5 TOLERANCE 1e-12)
+endforeach()
+pumgen_add_test(msh4.coarse-o2-binary.np2 RANKS 2 SOURCE msh4 INPUT coarse-o2-binary-v41.msh
+                REFERENCE coarse-o2.puml.h5 TOLERANCE 1e-12 ARGS --order=2)
+pumgen_add_test(msh4.periodic-binary.np2 RANKS 2 SOURCE msh4 INPUT periodic-binary-v41.msh
+                REFERENCE periodic.puml.h5 TOLERANCE 1e-12 IDENTIFY)
+pumgen_add_test(msh4.coarse-binary-truncated RANKS 1 SOURCE msh4
+                INPUT coarse-binary-truncated-v41.msh EXPECT_ERROR "Unexpected end of file")
