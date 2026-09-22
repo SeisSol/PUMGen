@@ -46,6 +46,8 @@ template <typename P, std::size_t OrderP> class ParallelGMSHReader {
       }
       builder_.postprocess();
       convertBoundaryConditions();
+      release(builder_.facets);
+      release(builder_.bcs);
 
       nVertices_ = builder_.vertices.size();
       nElements_ = builder_.elements.size();
@@ -59,28 +61,48 @@ template <typename P, std::size_t OrderP> class ParallelGMSHReader {
 
   [[nodiscard]] std::size_t nVertices() const { return nVertices_; }
   [[nodiscard]] std::size_t nElements() const { return nElements_; }
-  void readElements(std::size_t* elements) const {
+
+  // Each read function distributes one part of the mesh and releases it on rank 0 afterwards, so
+  // it can be called only once.
+
+  void readElements(std::size_t* elements) {
     static_assert(sizeof(typename GMSHBuilder<Dim, Order>::element_t) ==
                   nodeCount(Dim, Order) * sizeof(std::size_t));
-    scatter(builder_.elements.data()->data(), elements, nElements(), nodeCount(Dim, Order));
+    scatter(flatData(builder_.elements), elements, nElements(), nodeCount(Dim, Order));
+    release(builder_.elements);
   }
-  void readVertices(double* vertices) const {
+  void readVertices(double* vertices) {
     static_assert(sizeof(typename GMSHBuilder<Dim, Order>::vertex_t) == Dim * sizeof(double));
-    scatter(builder_.vertices.data()->data(), vertices, nVertices(), Dim);
+    scatter(flatData(builder_.vertices), vertices, nVertices(), Dim);
+    release(builder_.vertices);
   }
-  void readBoundaries(int* boundaries) const {
+  void readBoundaries(int* boundaries) {
     static_assert(sizeof(bc_t) == (Dim + 1) * sizeof(int));
-    scatter(bcs_.data()->data(), boundaries, nElements(), Dim + 1);
+    scatter(flatData(bcs_), boundaries, nElements(), Dim + 1);
+    release(bcs_);
   }
-  void readGroups(int* groups) const { scatter(builder_.groups.data(), groups, nElements(), 1); }
+  void readGroups(int* groups) {
+    scatter(builder_.groups.data(), groups, nElements(), 1);
+    release(builder_.groups);
+  }
 
   constexpr static bool SupportsIdentify = true;
   bool hasIdentify() const { return hasIdentify_ != 0; }
-  void readIdentify(std::size_t* vertices) const {
+  void readIdentify(std::size_t* vertices) {
     scatter(builder_.identify.data(), vertices, nVertices(), 1);
+    release(builder_.identify);
   }
 
   private:
+  template <typename T, std::size_t N>
+  static const T* flatData(const std::vector<std::array<T, N>>& values) {
+    return values.empty() ? nullptr : values.front().data();
+  }
+
+  template <typename T> static void release(std::vector<T>& values) {
+    std::vector<T>().swap(values);
+  }
+
   /**
    * GMSH stores boundary conditions on a surface mesh whereas SeisSol expects
    * boundary conditions to be stored per element. In the following we convert
