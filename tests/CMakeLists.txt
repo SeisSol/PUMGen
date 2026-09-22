@@ -192,8 +192,18 @@ pumgen_add_test(msh2.tiny-duplicateface RANKS 1 SOURCE msh2 INPUT tiny-duplicate
 
 # velocity-aware sizing, with a material of shear wave speed 1 in group 1 and 2 in group 2
 if(EASI)
+  configure_file(fixtures/velocity-settings.xml.in ${CMAKE_CURRENT_BINARY_DIR}/velocity-settings.xml
+                 @ONLY)
   configure_file(fixtures/velocity-sizefield.xml.in
                  ${CMAKE_CURRENT_BINARY_DIR}/velocity-sizefield.xml @ONLY)
+
+  # the counts are computed independently from the reference of the coarse mesh
+  pumgen_add_test(
+    msh4.coarse.velocity-check RANKS 2 SOURCE msh4 INPUT coarse-v41.msh
+    ARGS --velocity-check=${CMAKE_CURRENT_BINARY_DIR}/velocity-settings.xml
+    EXPECT_OUTPUT
+      "320 of 320 cells lie in refinement regions.*mean edge:[^\n]*; 4 cells above 1.*longest edge:[^\n]*; 143 cells above 1"
+  )
 
   # the expected grids are verified independently; they must not depend on the number of ranks
   foreach(ranks 1 3)
@@ -208,4 +218,8 @@ if(EASI)
                      ${CMAKE_CURRENT_SOURCE_DIR}/RunSizefieldTest.cmake)
     set_tests_properties(sizefield.np${ranks} PROPERTIES PROCESSORS ${ranks} TIMEOUT 120)
   endforeach()
+endif()
+if(NOT EASI)
+  pumgen_add_test(msh4.tiny.velocity-check-without-easi RANKS 1 SOURCE msh4 INPUT tiny-v41.msh
+                  ARGS --velocity-check=unused.xml EXPECT_ERROR "compiled without easi")
 endif()

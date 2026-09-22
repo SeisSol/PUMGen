@@ -149,6 +149,7 @@ if (EASI)
   target_compile_definitions(pumgen_sizing PRIVATE LOG_LEVEL=${LOG_LEVEL})
   target_link_libraries(pumgen_sizing PUBLIC easi::easi tinyxml2)
   target_link_libraries(pumgen PUBLIC pumgen_sizing)
+  target_sources(pumgen PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/sizing/VelocityCheck.cpp)
   target_compile_definitions(pumgen PUBLIC USE_EASI)
 
   add_executable(pumgen-sizefield ${CMAKE_CURRENT_SOURCE_DIR}/src/sizefield.cpp)

@@ -1,0 +1,16 @@
+<!--
+    SPDX-FileCopyrightText: 2026 SeisSol Group
+
+    SPDX-License-Identifier: BSD-3-Clause
+-->
+
+<!-- mesh sizes 0.5 in the upper layer (group 1) and 1 below (group 2) of the coarse fixture -->
+<VelocityAwareMeshing easiFile="@PUMGEN_TEST_FIXTURES@/velocity-material.yaml"
+                      elementsPerWaveLength="2">
+    <VelocityRefinementCuboid frequency="1" centerX="1" centerY="1" centerZ="-0.125"
+                              halfSizeX="1" halfSizeY="1" halfSizeZ="0.125"
+                              bypassFindRegionAndUseGroup="1"/>
+    <VelocityRefinementCuboid frequency="1" centerX="1" centerY="1" centerZ="-0.625"
+                              halfSizeX="1" halfSizeY="1" halfSizeZ="0.375"
+                              bypassFindRegionAndUseGroup="2"/>
+</VelocityAwareMeshing>

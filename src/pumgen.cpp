@@ -51,6 +51,13 @@
 
 #include "helper/InsphereCalculator.h"
 
+#ifdef USE_EASI
+#include "sizing/VelocityAwareMeshSize.h"
+#include "sizing/VelocityAwareSettings.h"
+#include "sizing/VelocityCheck.h"
+#include "tinyxml2/tinyxml2.h"
+#endif
+
 template <typename TT> static TT _checkH5Err(TT&& status, const char* file, int line) {
   if (status < 0) {
     logError() << utils::nospace << "An HDF5 error occurred (" << file << ": " << line << ")";
@@ -282,6 +289,10 @@ int main(int argc, char* argv[]) {
   args.addAdditionalOption("input", "Input file (mesh or model)");
   args.addAdditionalOption("output", "Output parallel unstructured mesh file", false);
   args.addOption("order", 'o', "Mesh order (default: 1)", utils::Args::Required, false);
+  args.addOption("velocity-check", 0,
+                 "Compare the cell sizes with the velocity-aware mesh size of the "
+                 "VelocityAwareMeshing element of a mesh attributes file (XML)",
+                 utils::Args::Required, false);
 
   if (args.parse(argc, argv, rank == 0) != utils::Args::Success)
     return 1;
@@ -462,6 +473,25 @@ int main(int argc, char* argv[]) {
                                  : *std::min_element(inspheres.begin(), inspheres.end());
   MPI_Reduce((rank == 0 ? MPI_IN_PLACE : &min), &min, 1, MPI_DOUBLE, MPI_MIN, 0, MPI_COMM_WORLD);
   logInfo() << "Minimum insphere found:" << min;
+
+  if (args.isSet("velocity-check")) {
+#ifdef USE_EASI
+    const auto* settingsFile = args.getArgument<const char*>("velocity-check");
+    tinyxml2::XMLDocument doc;
+    if (doc.LoadFile(settingsFile) != tinyxml2::XML_SUCCESS) {
+      logError() << "Could not read" << settingsFile;
+    }
+    const auto settings = readVelocityAwareSettings(doc);
+    if (!settings.isVelocityAwareRefinementOn()) {
+      logError() << "No refinement cuboid in" << settingsFile;
+    }
+    const VelocityAwareMeshSize meshSize(settings);
+    checkVelocityAwareMeshSize(meshSize, cellVertices, meshInput->group(), MPI_COMM_WORLD);
+#else
+    logError() << "This version of PUMGen has been compiled without easi; hence, --velocity-check "
+                  "is not available.";
+#endif
+  }
 
   // Get offsets
   std::size_t offsets[2] = {localSize[0], localSize[1]};
