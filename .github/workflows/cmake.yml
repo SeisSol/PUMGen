@@ -29,11 +29,15 @@ jobs:
         run: |
           git submodule update --init --recursive
           mkdir build_${{ matrix.build_type}} && cd build_${{ matrix.build_type}}
-          cmake .. -DCMAKE_PREFIX_PATH=${{ runner.workspace }}/opt -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+          cmake .. -DCMAKE_PREFIX_PATH=${{ runner.workspace }}/opt -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DMPIEXEC_PREFLAGS=--oversubscribe
 
       - name: Build
         working-directory: ${{ github.workspace }}/build_${{ matrix.build_type }}
         run: cmake --build .
+
+      - name: Test
+        working-directory: ${{ github.workspace }}/build_${{ matrix.build_type }}
+        run: ctest --output-on-failure
 
   pre-commit-check:
     runs-on: ubuntu-latest

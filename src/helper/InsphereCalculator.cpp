@@ -12,11 +12,10 @@
 
 #include "MPIConvenience.h"
 
-std::vector<double> calculateInsphere(const std::vector<std::size_t>& connectivity,
-                                      const std::vector<double>& geometry, MPI_Comm comm) {
+CellVertices::CellVertices(const std::vector<std::size_t>& connectivity,
+                           const std::vector<double>& geometry, std::size_t cellSize, MPI_Comm comm)
+    : connectivity(connectivity), geometry(geometry), cellSize(cellSize) {
   int commsize;
-  int commrank;
-
   MPI_Comm_size(comm, &commsize);
   MPI_Comm_rank(comm, &commrank);
 
@@ -30,7 +29,7 @@ std::vector<double> calculateInsphere(const std::vector<std::size_t>& connectivi
 
   std::size_t localVertices = geometry.size() / 3;
 
-  std::vector<std::size_t> vertexDist(commsize + 1);
+  vertexDist.resize(commsize + 1);
 
   MPI_Allgather(&localVertices, 1, tndm::mpi_type_t<std::size_t>(), vertexDist.data() + 1, 1,
                 tndm::mpi_type_t<std::size_t>(), comm);
@@ -39,9 +38,13 @@ std::vector<double> calculateInsphere(const std::vector<std::size_t>& connectivi
     vertexDist[i + 1] += vertexDist[i];
   }
 
-  std::vector<std::unordered_map<std::size_t, std::size_t>> outidxmap(commsize);
+  outidxmap.resize(commsize);
 
-  for (const auto& vertex : connectivity) {
+  for (std::size_t node = 0; node < connectivity.size(); ++node) {
+    if (node % cellSize >= VerticesPerCell) {
+      continue;
+    }
+    const auto vertex = connectivity[node];
     auto itPosition = std::upper_bound(vertexDist.begin(), vertexDist.end(), vertex);
     auto position = std::distance(vertexDist.begin(), itPosition) - 1;
     auto localVertex = vertex - vertexDist[position];
@@ -57,7 +60,7 @@ std::vector<double> calculateInsphere(const std::vector<std::size_t>& connectivi
   MPI_Alltoall(outrequests.data(), 1, tndm::mpi_type_t<std::size_t>(), inrequests.data(), 1,
                tndm::mpi_type_t<std::size_t>(), comm);
 
-  std::vector<std::size_t> outdisp(commsize + 1);
+  outdisp.resize(commsize + 1);
   std::vector<std::size_t> indisp(commsize + 1);
   for (std::size_t i = 1; i < commsize + 1; ++i) {
     outdisp[i] = outdisp[i - 1] + outrequests[i - 1];
@@ -84,7 +87,7 @@ std::vector<double> calculateInsphere(const std::vector<std::size_t>& connectivi
                     tndm::mpi_type_t<std::size_t>(), comm);
   }
 
-  std::vector<double> outvertices(3 * connectivity.size());
+  outvertices.resize(3 * outdisp[commsize]);
 
   {
     std::vector<double> invertices(3 * indisp[commsize]);
@@ -101,27 +104,36 @@ std::vector<double> calculateInsphere(const std::vector<std::size_t>& connectivi
                     outvertices.data(), outrequests.data(), outdisp.data(), vertexType, comm);
   }
 
-  std::vector<std::size_t> counter(commsize);
-  std::vector<double> inspheres(connectivity.size() / 4);
+  MPI_Type_free(&vertexType);
+}
 
-  for (std::size_t i = 0; i < connectivity.size() / 4; ++i) {
-    std::array<std::array<double, 3>, 4> vertices;
-    for (int j = 0; j < 4; ++j) {
-      auto vertex = connectivity[i * 4 + j];
-      auto itPosition = std::upper_bound(vertexDist.begin(), vertexDist.end(), vertex);
-      auto position = std::distance(vertexDist.begin(), itPosition) - 1;
-      auto localVertex = vertex - vertexDist[position];
-      if (position == commrank) {
-        vertices[j][0] = geometry[localVertex * 3 + 0];
-        vertices[j][1] = geometry[localVertex * 3 + 1];
-        vertices[j][2] = geometry[localVertex * 3 + 2];
-      } else {
-        auto transferidx = outidxmap[position][localVertex] + outdisp[position];
-        vertices[j][0] = outvertices[transferidx * 3 + 0];
-        vertices[j][1] = outvertices[transferidx * 3 + 1];
-        vertices[j][2] = outvertices[transferidx * 3 + 2];
-      }
+std::array<std::array<double, 3>, CellVertices::VerticesPerCell>
+CellVertices::operator()(std::size_t cell) const {
+  std::array<std::array<double, 3>, VerticesPerCell> vertices;
+  for (std::size_t j = 0; j < VerticesPerCell; ++j) {
+    auto vertex = connectivity[cell * cellSize + j];
+    auto itPosition = std::upper_bound(vertexDist.begin(), vertexDist.end(), vertex);
+    auto position = std::distance(vertexDist.begin(), itPosition) - 1;
+    auto localVertex = vertex - vertexDist[position];
+    if (position == commrank) {
+      vertices[j][0] = geometry[localVertex * 3 + 0];
+      vertices[j][1] = geometry[localVertex * 3 + 1];
+      vertices[j][2] = geometry[localVertex * 3 + 2];
+    } else {
+      auto transferidx = outidxmap[position].at(localVertex) + outdisp[position];
+      vertices[j][0] = outvertices[transferidx * 3 + 0];
+      vertices[j][1] = outvertices[transferidx * 3 + 1];
+      vertices[j][2] = outvertices[transferidx * 3 + 2];
     }
+  }
+  return vertices;
+}
+
+std::vector<double> calculateInsphere(const CellVertices& cells) {
+  std::vector<double> inspheres(cells.numCells());
+
+  for (std::size_t i = 0; i < cells.numCells(); ++i) {
+    const auto vertices = cells(i);
     double a11 = vertices[1][0] - vertices[0][0];
     double a12 = vertices[1][1] - vertices[0][1];
     double a13 = vertices[1][2] - vertices[0][2];
@@ -161,8 +173,6 @@ std::vector<double> calculateInsphere(const std::vector<std::size_t>& connectivi
 
     inspheres[i] = gram / faces;
   }
-
-  MPI_Type_free(&vertexType);
 
   return inspheres;
 }

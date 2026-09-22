@@ -1,12 +1,13 @@
 // SPDX-FileCopyrightText: 2022 SeisSol Group
 //
 // SPDX-License-Identifier: BSD-3-Clause
-#ifndef PUMGEN_SRC_THIRD_PARTY_GMSHMESHBUILDER_H_
-#define PUMGEN_SRC_THIRD_PARTY_GMSHMESHBUILDER_H_
+#ifndef PUMGEN_SRC_MESHREADER_GMSHMESHBUILDER_H_
+#define PUMGEN_SRC_MESHREADER_GMSHMESHBUILDER_H_
 
 #include <array>
+#include <cstddef>
 
-namespace tndm {
+namespace puml {
 
 class GMSHMeshBuilder {
   public:
@@ -19,6 +20,6 @@ class GMSHMeshBuilder {
   virtual void postprocess() = 0;
 };
 
-} // namespace tndm
+} // namespace puml
 
-#endif // PUMGEN_SRC_THIRD_PARTY_GMSHMESHBUILDER_H_
+#endif // PUMGEN_SRC_MESHREADER_GMSHMESHBUILDER_H_

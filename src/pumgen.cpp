@@ -44,12 +44,20 @@
 #ifdef USE_SIMMOD
 #include "input/SimModSuite.h"
 #endif // USE_SIMMOD
+#include "meshreader/DistributedGMSHReader.h"
+#include "meshreader/GMSH2Parser.h"
 #include "meshreader/GMSH4Parser.h"
 #include "meshreader/ParallelGMSHReader.h"
 #include "meshreader/ParallelGambitReader.h"
-#include "third_party/GMSH2Parser.h"
 
 #include "helper/InsphereCalculator.h"
+
+#ifdef USE_EASI
+#include "sizing/VelocityAwareMeshSize.h"
+#include "sizing/VelocityAwareSettings.h"
+#include "sizing/VelocityCheck.h"
+#include "tinyxml2/tinyxml2.h"
+#endif
 
 template <typename TT> static TT _checkH5Err(TT&& status, const char* file, int line) {
   if (status < 0) {
@@ -70,6 +78,33 @@ static int ilog(std::size_t value, int expbase = 1) {
 }
 
 constexpr std::size_t NoSecondDim = 0;
+
+/**
+ * The smallest size in bytes of an integer type with the given signedness which holds all values
+ * of the (distributed) data. Data with negative values is not reduced.
+ */
+template <typename F>
+static std::size_t requiredIntegerBytes(const F& data, std::size_t count, bool isSigned) {
+  using ValueT = typename F::value_type;
+  unsigned long long largest = 0;
+  int negative = 0;
+  for (std::size_t i = 0; i < count; ++i) {
+    if constexpr (std::is_signed_v<ValueT>) {
+      if (data[i] < 0) {
+        negative = 1;
+        continue;
+      }
+    }
+    largest = std::max(largest, static_cast<unsigned long long>(data[i]));
+  }
+  MPI_Allreduce(MPI_IN_PLACE, &largest, 1, MPI_UNSIGNED_LONG_LONG, MPI_MAX, MPI_COMM_WORLD);
+  MPI_Allreduce(MPI_IN_PLACE, &negative, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
+  if (negative != 0) {
+    return sizeof(ValueT);
+  }
+  const std::size_t bits = ilog(largest) + (isSigned ? 1 : 0);
+  return std::max(static_cast<std::size_t>(1), (bits + 7) / 8);
+}
 
 template <typename T, typename F>
 static void writeH5Data(const F& handler, hid_t h5file, const std::string& name, void* mesh,
@@ -107,21 +142,27 @@ static void writeH5Data(const F& handler, hid_t h5file, const std::string& name,
   checkH5Err(H5Pset_dxpl_mpio(h5dxlist, H5FD_MPIO_COLLECTIVE));
 
   hid_t h5type = h5outtype;
-  if (reduceInts && std::is_integral_v<T>) {
-    h5type = H5Tcopy(h5outtype);
-    std::size_t bits = ilog(globalSize);
-    std::size_t unsignedSize = (bits + 7) / 8;
-    checkH5Err(h5type);
-    checkH5Err(H5Tset_size(h5type, unsignedSize));
-    checkH5Err(H5Tcommit(h5file, (std::string("/") + name + std::string("Type")).c_str(), h5type,
-                         H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT));
+  if constexpr (std::is_integral_v<T>) {
+    if (reduceInts) {
+      const std::size_t bytes = requiredIntegerBytes(handler, localSize * secondSize,
+                                                     H5Tget_sign(h5outtype) == H5T_SGN_2);
+      if (bytes < H5Tget_size(h5outtype)) {
+        h5type = checkH5Err(H5Tcopy(h5outtype));
+        checkH5Err(H5Tset_size(h5type, bytes));
+        checkH5Err(H5Tcommit(h5file, (std::string("/") + name + std::string("Type")).c_str(),
+                             h5type, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT));
+      }
+    }
   }
 
   hid_t h5filter = H5P_DEFAULT;
   if (filterEnable > 0) {
     h5filter = checkH5Err(H5Pcreate(H5P_DATASET_CREATE));
-    hsize_t chunk[2] = {std::min(filterChunksize, bufferSize), secondDim};
-    checkH5Err(H5Pset_chunk(h5filter, 2, chunk));
+    // the dataset creation is collective, so the chunk shape must not depend on the local size
+    const hsize_t chunkRows =
+        std::max(static_cast<hsize_t>(1), std::min<hsize_t>(filterChunksize, globalSize));
+    hsize_t chunk[2] = {chunkRows, secondDim};
+    checkH5Err(H5Pset_chunk(h5filter, dimensions, chunk));
     if (filterEnable == 1 && std::is_integral_v<T>) {
       checkH5Err(H5Pset_scaleoffset(h5filter, H5Z_SO_INT, H5Z_SO_INT_MINBITS_DEFAULT));
     } else if (filterEnable < 11) {
@@ -143,9 +184,15 @@ static void writeH5Data(const F& handler, hid_t h5file, const std::string& name,
 
     std::copy_n(handler.begin() + written * secondSize, count[0] * secondSize, data.begin());
 
-    checkH5Err(H5Sselect_hyperslab(h5memspace, H5S_SELECT_SET, nullstart, nullptr, count, nullptr));
-
-    checkH5Err(H5Sselect_hyperslab(h5space, H5S_SELECT_SET, start, nullptr, count, nullptr));
+    if (count[0] > 0) {
+      checkH5Err(
+          H5Sselect_hyperslab(h5memspace, H5S_SELECT_SET, nullstart, nullptr, count, nullptr));
+      checkH5Err(H5Sselect_hyperslab(h5space, H5S_SELECT_SET, start, nullptr, count, nullptr));
+    } else {
+      // ranks without (further) data still take part in the collective write
+      checkH5Err(H5Sselect_none(h5memspace));
+      checkH5Err(H5Sselect_none(h5space));
+    }
 
     checkH5Err(H5Dwrite(h5data, h5memtype, h5memspace, h5space, h5dxlist, data.data()));
 
@@ -155,7 +202,7 @@ static void writeH5Data(const F& handler, hid_t h5file, const std::string& name,
   if (filterEnable > 0) {
     checkH5Err(H5Pclose(h5filter));
   }
-  if (reduceInts) {
+  if (h5type != h5outtype) {
     checkH5Err(H5Tclose(h5type));
   }
   checkH5Err(H5Sclose(h5space));
@@ -178,9 +225,11 @@ void addAttribute(hid_t h5file, const std::string& name, const std::string& valu
 }
 
 template <std::size_t Order>
-using SMF2 = SerialMeshFile<puml::ParallelGMSHReader<tndm::GMSH2Parser, Order>>;
+using SMF2 = SerialMeshFile<puml::ParallelGMSHReader<puml::GMSH2Parser, Order>>;
 template <std::size_t Order>
 using SMF4 = SerialMeshFile<puml::ParallelGMSHReader<puml::GMSH4Parser, Order>>;
+template <std::size_t Order>
+using SMF4Distributed = SerialMeshFile<puml::DistributedGMSHReader<Order>>;
 
 int main(int argc, char* argv[]) {
   int rank = 0;
@@ -209,7 +258,7 @@ int main(int argc, char* argv[]) {
                                                 "deflate7", "deflate8",    "deflate9"};
   args.addOption("compactify-datatypes", 0,
                  "Compress index and group data types to minimum byte size (no HDF5 filters)",
-                 utils::Args::Required, false);
+                 utils::Args::No, false);
   args.addEnumOption("filter-enable", filters, 0,
                      "Apply HDF5 filters (i.e. compression). Disabled by default.", false);
   args.addOption("filter-chunksize", 0, "Chunksize for filters (default=4096).",
@@ -242,7 +291,16 @@ int main(int argc, char* argv[]) {
   args.addOption("sim_log", 0, "Create SimModSuite log", utils::Args::Required, false);
   args.addAdditionalOption("input", "Input file (mesh or model)");
   args.addAdditionalOption("output", "Output parallel unstructured mesh file", false);
-  args.addOption("order", 'o', "Mesh order", utils::Args::Optional, false);
+  args.addOption("order", 'o', "Mesh order (default: 1)", utils::Args::Required, false);
+  const auto gmshReaders = std::vector<std::string>{"auto", "serial"};
+  args.addEnumOption("gmsh-reader", gmshReaders, 0,
+                     "Reader for msh4 meshes (default: auto, which reads binary MSH 4.1 files "
+                     "with all ranks; serial: rank 0 reads the file)",
+                     false);
+  args.addOption("velocity-check", 0,
+                 "Compare the cell sizes with the velocity-aware mesh size of the "
+                 "VelocityAwareMeshing element of a mesh attributes file (XML)",
+                 utils::Args::Required, false);
 
   if (args.parse(argc, argv, rank == 0) != utils::Args::Success)
     return 1;
@@ -262,7 +320,7 @@ int main(int argc, char* argv[]) {
     outputFile.append(".puml.h5");
   }
 
-  hsize_t chunksize = args.getArgument<hsize_t>("filter-chunksize", static_cast<hsize_t>(1) << 30);
+  hsize_t chunksize = args.getArgument<hsize_t>("chunksize", static_cast<hsize_t>(1) << 30);
 
   bool reduceInts = args.isSet("compactify-datatypes");
   int filterEnable = args.getArgument("filter-enable", 0);
@@ -325,6 +383,9 @@ int main(int argc, char* argv[]) {
   }
 
   const auto meshOrder = args.getArgument<int>("order", 1);
+  if (meshOrder < 1) {
+    logError() << "The mesh order has to be at least 1, got" << meshOrder;
+  }
 
   // Create/read the mesh
   MeshData* meshInput = nullptr;
@@ -337,10 +398,21 @@ int main(int argc, char* argv[]) {
     logInfo() << "Using GMSH mesh format 2 (msh2) mesh";
     meshInput = puml::makePointer<MeshData, SMF2>(meshOrder, inputFile, faceOffset);
     break;
-  case 2:
-    logInfo() << "Using GMSH mesh format 4 (msh4) mesh";
-    meshInput = puml::makePointer<MeshData, SMF4>(meshOrder, inputFile, faceOffset);
+  case 2: {
+    int distributed = 0;
+    if (rank == 0) {
+      distributed = args.getArgument<int>("gmsh-reader", 0) == 0 && puml::isBinaryMsh4(inputFile);
+    }
+    MPI_Bcast(&distributed, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    if (distributed != 0) {
+      logInfo() << "Using GMSH mesh format 4 (msh4) mesh, binary, read by all ranks";
+      meshInput = puml::makePointer<MeshData, SMF4Distributed>(meshOrder, inputFile, faceOffset);
+    } else {
+      logInfo() << "Using GMSH mesh format 4 (msh4) mesh";
+      meshInput = puml::makePointer<MeshData, SMF4>(meshOrder, inputFile, faceOffset);
+    }
     break;
+  }
   case 3:
 #ifdef USE_NETCDF
     logInfo() << "Using netCDF mesh";
@@ -413,11 +485,32 @@ int main(int argc, char* argv[]) {
   logInfo() << "Total vertex count:" << globalSize[1];
   logInfo() << "Vertex identification:" << meshInput->hasIdentify();
 
-  auto inspheres =
-      calculateInsphere(meshInput->connectivity(), meshInput->geometry(), MPI_COMM_WORLD);
-  double min = *std::min_element(inspheres.begin(), inspheres.end());
+  const CellVertices cellVertices(meshInput->connectivity(), meshInput->geometry(),
+                                  meshInput->cellSize(), MPI_COMM_WORLD);
+  auto inspheres = calculateInsphere(cellVertices);
+  double min = inspheres.empty() ? std::numeric_limits<double>::infinity()
+                                 : *std::min_element(inspheres.begin(), inspheres.end());
   MPI_Reduce((rank == 0 ? MPI_IN_PLACE : &min), &min, 1, MPI_DOUBLE, MPI_MIN, 0, MPI_COMM_WORLD);
   logInfo() << "Minimum insphere found:" << min;
+
+  if (args.isSet("velocity-check")) {
+#ifdef USE_EASI
+    const auto* settingsFile = args.getArgument<const char*>("velocity-check");
+    tinyxml2::XMLDocument doc;
+    if (doc.LoadFile(settingsFile) != tinyxml2::XML_SUCCESS) {
+      logError() << "Could not read" << settingsFile;
+    }
+    const auto settings = readVelocityAwareSettings(doc);
+    if (!settings.isVelocityAwareRefinementOn()) {
+      logError() << "No refinement cuboid in" << settingsFile;
+    }
+    const VelocityAwareMeshSize meshSize(settings);
+    checkVelocityAwareMeshSize(meshSize, cellVertices, meshInput->group(), MPI_COMM_WORLD);
+#else
+    logError() << "This version of PUMGen has been compiled without easi; hence, --velocity-check "
+                  "is not available.";
+#endif
+  }
 
   // Get offsets
   std::size_t offsets[2] = {localSize[0], localSize[1]};

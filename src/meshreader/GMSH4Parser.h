@@ -4,44 +4,75 @@
 #ifndef PUMGEN_SRC_MESHREADER_GMSH4PARSER_H_
 #define PUMGEN_SRC_MESHREADER_GMSH4PARSER_H_
 
+#include <cstddef>
+#include <cstdint>
 #include <map>
-#include <string>
-#include <string_view>
+#include <set>
+#include <vector>
 
-#include "meshreader/GMSHBuilder.h"
-#include "third_party/GMSHLexer.h"
-#include "third_party/GMSHParser.h"
+#include "GMSHParser.h"
 
 namespace puml {
 
-class GMSH4Parser : public tndm::GMSHParser {
+/**
+ * Parser for MSH 4.1 files, ASCII or binary.
+ */
+class GMSH4Parser : public GMSHParser {
   public:
-  using tndm::GMSHParser::GMSHParser;
+  using GMSHParser::GMSHParser;
 
-  private:
-  std::map<unsigned long, long> physicalSurfaceIds;
-  std::map<unsigned long, long> physicalVolumeIds;
+  protected:
+  void parse_() override;
+  void parseEntities();
+  // overridden by readers which only locate the data of these sections
+  virtual void parseNodes();
+  virtual void parseElements();
+  virtual void parsePeriodic();
 
-  unsigned long expectNonNegativeInt() {
-    if (curTok != tndm::GMSHToken::integer || lexer.getInteger() < 0) {
-      return logErrorAnnotated<bool>("Expected non-negative integer");
-    }
-    return static_cast<unsigned long>(lexer.getInteger());
-  }
+  /**
+   * Starts the data of a section; in binary files, the data begins after the line break.
+   */
+  void beginSectionData();
 
-  double expectNumber() {
-    auto num = getNumber();
-    if (!num) {
-      return logErrorAnnotated<bool>("Expected number");
-    }
-    return num.value();
-  }
+  // the values of the sections: text, or binary with sizeof(size_t) == dataSize and 4-byte ints
+  std::size_t readSize();
+  long readInt();
+  double readDouble();
+  // bulk reading of binary sizes and doubles
+  void readSizes(std::size_t* values, std::size_t count);
+  void readDoubles(double* values, std::size_t count);
+  void readBinary(void* data, std::size_t bytes);
 
-  bool parseEntities();
-  bool parseNodes();
-  bool parseElements();
-  bool parsePeriodic(bool variableAffine);
-  virtual bool parse_() override;
+  /**
+   * The offset of the next value, e.g. for error messages.
+   */
+  std::size_t position();
+
+  /**
+   * The index of the node with the given tag; the tag started at the given file offset.
+   */
+  std::size_t nodeIndex(std::size_t tag, std::size_t offset);
+
+  bool binary = false;
+  bool swapBytes = false;
+  std::size_t dataSize = 8;
+  std::vector<std::uint32_t> narrowSizes;
+
+  /**
+   * The physical tag of the elements of an entity; 0 if the entity has no physical group.
+   */
+  long physicalTag(std::size_t dim, long entityTag);
+
+  std::map<long, long> physicalSurfaceIds;
+  std::map<long, long> physicalVolumeIds;
+  // surface and volume entities with elements, but without a physical group
+  std::set<long> unassignedSurfaces;
+  std::set<long> unassignedVolumes;
+
+  // the node tags form the contiguous range [firstNodeTag, firstNodeTag + numNodes)
+  bool hasNodes = false;
+  std::size_t firstNodeTag = 0;
+  std::size_t numNodes = 0;
 };
 
 } // namespace puml

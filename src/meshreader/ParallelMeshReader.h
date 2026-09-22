@@ -10,9 +10,13 @@
 #include <mpi.h>
 
 #include <array>
+#include <cstddef>
+#include <limits>
 #include <vector>
 
+#include "helper/Distributor.h"
 #include "third_party/MPITraits.h"
+#include "utils/logger.h"
 
 template <class R> class ParallelMeshReader {
   private:
@@ -77,129 +81,87 @@ template <class R> class ParallelMeshReader {
   std::size_t nBoundaries() const { return m_nBoundaries; }
 
   /**
-   * Reads all vertices
-   * Each process gets <code>nVertices() + processes - 1) / processes</code>
-   * elements, except for the last, which gets the remaining elements
+   * Reads all vertices. Each process gets the chunk given by getChunksize/getChunksum.
    *
-   * This is a collective operation
+   * This is a collective operation.
    *
    * @todo Only 3 dimensional meshes are supported
    */
   void readVertices(double* vertices) {
-    std::size_t chunkSize = (m_nVertices + m_nProcs - 1) / m_nProcs;
-
-    if (m_rank == 0) {
-      // Allocate second buffer so we can read and send in parallel
-      std::vector<double> tempVertices(chunkSize * 3);
-      double* vertices2 = tempVertices.data();
-      if (m_nProcs % 2 == 0) {
-        // swap once so we have the correct buffer at the end
-        swap(vertices, vertices2);
-      }
-
-      MPI_Request request = MPI_REQUEST_NULL;
-      for (int i = 1; i < m_nProcs - 1; i++) {
-        logInfo() << "Reading vertices part" << i << "of" << m_nProcs;
-        m_serialReader.readVertices(i * chunkSize, chunkSize, vertices);
-        MPI_Wait(&request, MPI_STATUS_IGNORE);
-        MPI_Isend(vertices, chunkSize * 3, MPI_DOUBLE, i, 0, m_comm, &request);
-        swap(vertices, vertices2);
-      }
-
-      if (m_nProcs > 1) {
-        // Read last one
-        const std::size_t lastChunkSize = m_nVertices - (m_nProcs - 1) * chunkSize;
-        logInfo() << "Reading vertices part" << (m_nProcs - 1) << "of" << m_nProcs;
-        m_serialReader.readVertices((m_nProcs - 1) * chunkSize, lastChunkSize, vertices);
-        MPI_Wait(&request, MPI_STATUS_IGNORE);
-        MPI_Isend(vertices, lastChunkSize * 3, MPI_DOUBLE, m_nProcs - 1, 0, m_comm, &request);
-        swap(vertices, vertices2);
-      }
-
-      // Finally read the first part
-      logInfo() << "Reading vertices part" << m_nProcs << "of" << m_nProcs;
-      m_serialReader.readVertices(0, chunkSize, vertices);
-      MPI_Wait(&request, MPI_STATUS_IGNORE);
-    } else {
-      if (m_rank == m_nProcs - 1)
-        chunkSize = m_nVertices - (m_nProcs - 1) * chunkSize;
-
-      MPI_Recv(vertices, chunkSize * 3, MPI_DOUBLE, 0, 0, m_comm, MPI_STATUS_IGNORE);
-    }
+    distributeChunks(m_nVertices, 3, vertices, "vertices",
+                     [&](std::size_t start, std::size_t count, double* buffer) {
+                       m_serialReader.readVertices(start, count, buffer);
+                     });
   }
 
   /**
-   * Reads all elements.
-   * Each process gets <code>nElements() + processes - 1) / processes</code>
-   * elements, except for the last, which gets the remaining elements
+   * Reads all elements. Each process gets the chunk given by getChunksize/getChunksum.
    *
    * This is a collective operation.
    *
    * @todo Only tetrahedral meshes are supported
    */
   virtual void readElements(std::size_t* elements) {
-    std::size_t chunkSize = (m_nElements + m_nProcs - 1) / m_nProcs;
+    distributeChunks(m_nElements, 4, elements, "elements",
+                     [&](std::size_t start, std::size_t count, std::size_t* buffer) {
+                       m_serialReader.readElements(start, count, buffer);
+                     });
+  }
 
-    if (m_rank == 0) {
-      // Allocate second buffer so we can read and send in parallel
-      std::vector<std::size_t> tempElements(chunkSize * 4);
-      std::size_t* elements2 = tempElements.data();
-      if (m_nProcs % 2 == 0) {
-        // swap once so we have the correct buffer at the end
-        swap(elements, elements2);
-      }
-
-      MPI_Request request = MPI_REQUEST_NULL;
-
-      for (int i = 1; i < m_nProcs - 1; i++) {
-        logInfo() << "Reading elements part" << i << "of" << m_nProcs;
-        m_serialReader.readElements(i * chunkSize, chunkSize, elements);
-        MPI_Wait(&request, MPI_STATUS_IGNORE);
-        MPI_Isend(elements, chunkSize * 4, tndm::mpi_type_t<std::size_t>(), i, 0, m_comm, &request);
-        swap(elements, elements2);
-      }
-
-      if (m_nProcs > 1) {
-        // Read last one
-        const std::size_t lastChunkSize = m_nElements - (m_nProcs - 1) * chunkSize;
-        logInfo() << "Reading elements part" << (m_nProcs - 1) << "of" << m_nProcs;
-        m_serialReader.readElements((m_nProcs - 1) * chunkSize, lastChunkSize, elements);
-        MPI_Wait(&request, MPI_STATUS_IGNORE);
-        MPI_Isend(elements, lastChunkSize * 4, tndm::mpi_type_t<std::size_t>(), m_nProcs - 1, 0,
-                  m_comm, &request);
-        swap(elements, elements2);
-      }
-
-      // Finally read the first part
-      logInfo() << "Reading elements part" << m_nProcs << "of" << m_nProcs;
-      m_serialReader.readElements(0, chunkSize, elements);
-      MPI_Wait(&request, MPI_STATUS_IGNORE);
-    } else {
-      if (m_rank == m_nProcs - 1)
-        chunkSize = m_nElements - (m_nProcs - 1) * chunkSize;
-
-      MPI_Recv(elements, chunkSize * 4, tndm::mpi_type_t<std::size_t>(), 0, 0, m_comm,
-               MPI_STATUS_IGNORE);
+  protected:
+  static int messageSize(std::size_t count) {
+    if (count > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
+      logError() << "MPI message too large:" << count;
     }
+    return static_cast<int>(count);
   }
 
   private:
+  /**
+   * Reads the items on rank 0 and sends each process its chunk.
+   *
+   * @param read Callable (start, count, buffer) reading <code>count</code> items starting at
+   * <code>start</code>
+   */
+  template <typename T, typename ReadF>
+  void distributeChunks(std::size_t total, std::size_t valuesPerItem, T* local, const char* name,
+                        ReadF&& read) {
+    const std::size_t localCount = getChunksize(total, m_rank, m_nProcs);
+
+    if (m_rank != 0) {
+      MPI_Recv(local, messageSize(localCount * valuesPerItem), tndm::mpi_type_t<T>(), 0, 0, m_comm,
+               MPI_STATUS_IGNORE);
+      return;
+    }
+
+    // two send buffers, so that reading the next chunk overlaps with sending the previous one
+    const std::size_t maxCount = getChunksize(total, 0, m_nProcs);
+    std::array<std::vector<T>, 2> buffers;
+    std::array<MPI_Request, 2> requests = {MPI_REQUEST_NULL, MPI_REQUEST_NULL};
+
+    for (int rank = 1; rank < m_nProcs; ++rank) {
+      const auto slot = rank % 2;
+      MPI_Wait(&requests[slot], MPI_STATUS_IGNORE);
+      buffers[slot].resize(maxCount * valuesPerItem);
+
+      const std::size_t count = getChunksize(total, rank, m_nProcs);
+      logInfo() << "Reading" << name << "for rank" << rank << "of" << m_nProcs;
+      read(getChunksum(total, rank, m_nProcs), count, buffers[slot].data());
+      MPI_Isend(buffers[slot].data(), messageSize(count * valuesPerItem), tndm::mpi_type_t<T>(),
+                rank, 0, m_comm, &requests[slot]);
+    }
+
+    logInfo() << "Reading" << name << "for rank 0 of" << m_nProcs;
+    read(0, localCount, local);
+    MPI_Waitall(2, requests.data(), MPI_STATUSES_IGNORE);
+  }
+
   /**
    * Initialize some parameters
    */
   void init() {
     MPI_Comm_rank(m_comm, &m_rank);
     MPI_Comm_size(m_comm, &m_nProcs);
-  }
-
-  protected:
-  /**
-   * Swaps two pointers
-   */
-  template <typename T> static void swap(T*& p1, T*& p2) {
-    T* tmp = p1;
-    p1 = p2;
-    p2 = tmp;
   }
 };
 
