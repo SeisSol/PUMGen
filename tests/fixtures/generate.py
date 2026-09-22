@@ -350,6 +350,19 @@ $EndElements
 """
 
 
+def tiny_binary(node_tags, element_nodes, node_header=(1, 4, 1, 4)):
+    """The single tetrahedron of TINY_V41 as binary MSH 4.1 file."""
+    data = b"$MeshFormat\n4.1 1 8\n" + struct.pack("<i", 1) + b"\n$EndMeshFormat\n"
+    data += b"$Entities\n" + struct.pack("<4Q", 0, 0, 0, 1)
+    data += struct.pack("<i6dQiQ", 1, 0, 0, 0, 1, 1, 1, 1, 7, 0) + b"\n$EndEntities\n"
+    data += b"$Nodes\n" + struct.pack("<4Q", *node_header) + struct.pack("<3iQ", 3, 1, 0, 4)
+    data += struct.pack("<4Q", *node_tags)
+    data += struct.pack("<12d", 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1) + b"\n$EndNodes\n"
+    data += b"$Elements\n" + struct.pack("<4Q", 1, 1, 1, 1) + struct.pack("<3iQ", 3, 1, 4, 1)
+    data += struct.pack("<5Q", 1, *element_nodes) + b"\n$EndElements\n"
+    return data
+
+
 def generate_tiny():
     variants = {
         "tiny-v41.msh": TINY_V41,
@@ -372,6 +385,15 @@ def generate_tiny():
     }
     for name, content in variants.items():
         with open(name, "w") as out:
+            out.write(content)
+    binary_variants = {
+        "tiny-binary-v41.msh": tiny_binary((1, 2, 3, 4), (1, 2, 3, 4)),
+        "tiny-binary-duplicate-v41.msh": tiny_binary((1, 2, 2, 4), (1, 2, 3, 4)),
+        "tiny-binary-badnode-v41.msh": tiny_binary((1, 2, 3, 4), (1, 2, 3, 9)),
+        "tiny-binary-sparse-v41.msh": tiny_binary((1, 2, 3, 5), (1, 2, 3, 5), (1, 4, 1, 5)),
+    }
+    for name, content in binary_variants.items():
+        with open(name, "wb") as out:
             out.write(content)
     write_reference("tiny.puml.h5", "tiny-v41.msh")
 

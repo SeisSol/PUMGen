@@ -44,6 +44,7 @@
 #ifdef USE_SIMMOD
 #include "input/SimModSuite.h"
 #endif // USE_SIMMOD
+#include "meshreader/DistributedGMSHReader.h"
 #include "meshreader/GMSH2Parser.h"
 #include "meshreader/GMSH4Parser.h"
 #include "meshreader/ParallelGMSHReader.h"
@@ -227,6 +228,8 @@ template <std::size_t Order>
 using SMF2 = SerialMeshFile<puml::ParallelGMSHReader<puml::GMSH2Parser, Order>>;
 template <std::size_t Order>
 using SMF4 = SerialMeshFile<puml::ParallelGMSHReader<puml::GMSH4Parser, Order>>;
+template <std::size_t Order>
+using SMF4Distributed = SerialMeshFile<puml::DistributedGMSHReader<Order>>;
 
 int main(int argc, char* argv[]) {
   int rank = 0;
@@ -289,6 +292,11 @@ int main(int argc, char* argv[]) {
   args.addAdditionalOption("input", "Input file (mesh or model)");
   args.addAdditionalOption("output", "Output parallel unstructured mesh file", false);
   args.addOption("order", 'o', "Mesh order (default: 1)", utils::Args::Required, false);
+  const auto gmshReaders = std::vector<std::string>{"auto", "serial"};
+  args.addEnumOption("gmsh-reader", gmshReaders, 0,
+                     "Reader for msh4 meshes (default: auto, which reads binary MSH 4.1 files "
+                     "with all ranks; serial: rank 0 reads the file)",
+                     false);
   args.addOption("velocity-check", 0,
                  "Compare the cell sizes with the velocity-aware mesh size of the "
                  "VelocityAwareMeshing element of a mesh attributes file (XML)",
@@ -390,10 +398,21 @@ int main(int argc, char* argv[]) {
     logInfo() << "Using GMSH mesh format 2 (msh2) mesh";
     meshInput = puml::makePointer<MeshData, SMF2>(meshOrder, inputFile, faceOffset);
     break;
-  case 2:
-    logInfo() << "Using GMSH mesh format 4 (msh4) mesh";
-    meshInput = puml::makePointer<MeshData, SMF4>(meshOrder, inputFile, faceOffset);
+  case 2: {
+    int distributed = 0;
+    if (rank == 0) {
+      distributed = args.getArgument<int>("gmsh-reader", 0) == 0 && puml::isBinaryMsh4(inputFile);
+    }
+    MPI_Bcast(&distributed, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    if (distributed != 0) {
+      logInfo() << "Using GMSH mesh format 4 (msh4) mesh, binary, read by all ranks";
+      meshInput = puml::makePointer<MeshData, SMF4Distributed>(meshOrder, inputFile, faceOffset);
+    } else {
+      logInfo() << "Using GMSH mesh format 4 (msh4) mesh";
+      meshInput = puml::makePointer<MeshData, SMF4>(meshOrder, inputFile, faceOffset);
+    }
     break;
+  }
   case 3:
 #ifdef USE_NETCDF
     logInfo() << "Using netCDF mesh";

@@ -128,6 +128,12 @@ class MshInput {
   bool readRaw(void* data, std::size_t bytes);
 
   /**
+   * Continues reading at the given file offset; returns false if the offset lies behind the end
+   * of the file.
+   */
+  bool seek(std::size_t offset);
+
+  /**
    * Skips everything up to and including the next occurrence of the marker.
    */
   bool skipTo(std::string_view marker);

@@ -21,12 +21,13 @@ class GMSH4Parser : public GMSHParser {
   public:
   using GMSHParser::GMSHParser;
 
-  private:
+  protected:
   void parse_() override;
   void parseEntities();
-  void parseNodes();
-  void parseElements();
-  void parsePeriodic();
+  // overridden by readers which only locate the data of these sections
+  virtual void parseNodes();
+  virtual void parseElements();
+  virtual void parsePeriodic();
 
   /**
    * Starts the data of a section; in binary files, the data begins after the line break.

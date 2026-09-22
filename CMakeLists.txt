@@ -42,6 +42,8 @@ add_executable(pumgen
   ${CMAKE_CURRENT_SOURCE_DIR}/src/meshreader/GMSH2Parser.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/meshreader/GMSH4Parser.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/meshreader/MshInput.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/meshreader/Msh4Index.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/meshreader/DistributedGMSHReader.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/input/ParallelVertexFilter.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/helper/InsphereCalculator.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/helper/MPIConvenience.cpp

@@ -186,6 +186,26 @@ pumgen_add_test(msh4.periodic-binary.np2 RANKS 2 SOURCE msh4 INPUT periodic-bina
 pumgen_add_test(msh4.coarse-binary-truncated RANKS 1 SOURCE msh4
                 INPUT coarse-binary-truncated-v41.msh EXPECT_ERROR "Unexpected end of file")
 
+# binary MSH 4.1 files are read by all ranks unless --gmsh-reader=serial
+foreach(ranks 4 7)
+  pumgen_add_test(msh4.layered-binary.np${ranks} RANKS ${ranks} SOURCE msh4
+                  INPUT layered-binary-v41.msh REFERENCE layered.puml.h5 TOLERANCE 1e-12)
+endforeach()
+pumgen_add_test(msh4.layered-binary-serial.np3 RANKS 3 SOURCE msh4 INPUT layered-binary-v41.msh
+                REFERENCE layered.puml.h5 TOLERANCE 1e-12 ARGS --gmsh-reader=serial)
+pumgen_add_test(msh4.periodic-binary-serial.np2 RANKS 2 SOURCE msh4 INPUT periodic-binary-v41.msh
+                REFERENCE periodic.puml.h5 TOLERANCE 1e-12 IDENTIFY ARGS --gmsh-reader=serial)
+pumgen_add_test(msh4.periodic-binary.np3 RANKS 3 SOURCE msh4 INPUT periodic-binary-v41.msh
+                REFERENCE periodic.puml.h5 TOLERANCE 1e-12 IDENTIFY)
+pumgen_add_test(msh4.tiny-binary.np3 RANKS 3 SOURCE msh4 INPUT tiny-binary-v41.msh
+                REFERENCE tiny.puml.h5)
+pumgen_add_test(msh4.tiny-binary-duplicate RANKS 1 SOURCE msh4 INPUT tiny-binary-duplicate-v41.msh
+                EXPECT_ERROR "Duplicate node tag 2")
+pumgen_add_test(msh4.tiny-binary-badnode RANKS 1 SOURCE msh4 INPUT tiny-binary-badnode-v41.msh
+                EXPECT_ERROR "Unknown node tag 9")
+pumgen_add_test(msh4.tiny-binary-sparse RANKS 1 SOURCE msh4 INPUT tiny-binary-sparse-v41.msh
+                EXPECT_ERROR "Non-contiguous node tags are not supported")
+
 # a face of the surface mesh given twice
 pumgen_add_test(msh2.tiny-duplicateface RANKS 1 SOURCE msh2 INPUT tiny-duplicateface-v22.msh
                 EXPECT_ERROR "exists multiple times in the surface mesh")

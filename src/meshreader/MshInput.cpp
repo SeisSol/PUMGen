@@ -77,6 +77,25 @@ bool MshInput::readRaw(void* data, std::size_t bytes) {
   return true;
 }
 
+bool MshInput::seek(std::size_t offset) {
+  if (offset >= bufferOffset && offset <= bufferOffset + end) {
+    begin = offset - bufferOffset;
+    return true;
+  }
+  if (std::fseek(file, 0, SEEK_END) != 0) {
+    return false;
+  }
+  const auto size = static_cast<std::size_t>(std::ftell(file));
+  if (offset > size || std::fseek(file, static_cast<long>(offset), SEEK_SET) != 0) {
+    return false;
+  }
+  bufferOffset = offset;
+  begin = end = 0;
+  buffer[0] = '\0';
+  eof = false;
+  return true;
+}
+
 bool MshInput::skipTo(std::string_view marker) {
   while (true) {
     const std::string_view data(buffer.data() + begin, end - begin);
