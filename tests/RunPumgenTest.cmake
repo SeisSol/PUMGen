@@ -12,6 +12,7 @@
 #   IDENTIFY      (optional) also compare the vertex identification of periodic meshes
 #   H5DIFF        h5diff executable, required together with REFERENCE
 #   EXPECT_ERROR  (optional) pumgen has to fail with a message matching this regular expression
+#   EXPECT_OUTPUT (optional) the output of a successful run has to match this regular expression
 
 string(REPLACE "|" ";" command "${COMMAND}")
 file(REMOVE "${OUTPUT}")
@@ -36,6 +37,10 @@ endif()
 
 if(NOT result EQUAL 0)
   message(FATAL_ERROR "pumgen failed: ${result}")
+endif()
+
+if(DEFINED EXPECT_OUTPUT AND NOT log MATCHES "${EXPECT_OUTPUT}")
+  message(FATAL_ERROR "The output does not match \"${EXPECT_OUTPUT}\"")
 endif()
 
 if(DEFINED REFERENCE)

@@ -73,6 +73,9 @@ GMSHToken GMSHLexer::getToken() {
     case "EndPeriodic"_fnv1a:
       token = GMSHToken::end_periodic;
       break;
+    case "PartitionedEntities"_fnv1a:
+      token = GMSHToken::partitioned_entities;
+      break;
     default:
       break;
     }

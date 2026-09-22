@@ -256,6 +256,7 @@ $EndElements
 def generate_tiny():
     variants = {
         "tiny-v41.msh": TINY_V41,
+        "tiny-nophysical-v41.msh": TINY_V41.replace("1 0 0 0 1 1 1 1 7 0", "1 0 0 0 1 1 1 0 0"),
         "tiny-v40.msh": TINY_V41.replace("4.1 0 8", "4 0 8"),
         "tiny-truncated-v41.msh": TINY_V41.split("$Elements")[0] + "$Elements\n1 1 1 1\n3 1 4 1\n1 1 2\n",
         "tiny-badnumber-v41.msh": TINY_V41.replace("1 0 0\n0 1 0", "1 abc 0\n0 1 0"),

@@ -6,6 +6,7 @@
 
 #include <cstdio>
 #include <map>
+#include <set>
 #include <string>
 #include <string_view>
 
@@ -22,6 +23,14 @@ class GMSH4Parser : public tndm::GMSHParser {
   private:
   std::map<unsigned long, long> physicalSurfaceIds;
   std::map<unsigned long, long> physicalVolumeIds;
+  // surface and volume entities with elements, but without a physical group
+  std::set<unsigned long> unassignedSurfaces;
+  std::set<unsigned long> unassignedVolumes;
+
+  /**
+   * The physical tag of the elements of an entity; 0 if the entity has no physical group.
+   */
+  long physicalTag(std::size_t dim, unsigned long entityTag);
 
   // the node tags form the contiguous range [firstNodeTag, firstNodeTag + numNodes)
   bool hasNodes = false;

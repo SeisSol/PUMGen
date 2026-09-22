@@ -12,11 +12,11 @@ set(PUMGEN_TEST_OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/output)
 file(MAKE_DIRECTORY ${PUMGEN_TEST_OUTPUT})
 
 # pumgen_add_test(<name> RANKS <n> SOURCE <source> INPUT <fixture>
-#                 [REFERENCE <fixture> [TOLERANCE <tolerance>] [IDENTIFY]] [EXPECT_ERROR <regex>]
-#                 [ARGS <argument>...])
+#                 [REFERENCE <fixture> [TOLERANCE <tolerance>] [IDENTIFY]]
+#                 [EXPECT_OUTPUT <regex>] [EXPECT_ERROR <regex>] [ARGS <argument>...])
 function(pumgen_add_test name)
   cmake_parse_arguments(PARSE_ARGV 1 TEST "IDENTIFY"
-                        "RANKS;SOURCE;INPUT;REFERENCE;TOLERANCE;EXPECT_ERROR" "ARGS")
+                        "RANKS;SOURCE;INPUT;REFERENCE;TOLERANCE;EXPECT_OUTPUT;EXPECT_ERROR" "ARGS")
   set(output ${PUMGEN_TEST_OUTPUT}/${name}.puml.h5)
   set(command
       ${MPIEXEC_EXECUTABLE}
@@ -33,6 +33,9 @@ function(pumgen_add_test name)
   string(REPLACE ";" "|" command "${command}")
 
   set(script_args -DCOMMAND=${command} -DOUTPUT=${output})
+  if(DEFINED TEST_EXPECT_OUTPUT)
+    list(APPEND script_args "-DEXPECT_OUTPUT=${TEST_EXPECT_OUTPUT}")
+  endif()
   if(DEFINED TEST_EXPECT_ERROR)
     list(APPEND script_args "-DEXPECT_ERROR=${TEST_EXPECT_ERROR}")
   elseif(DEFINED TEST_REFERENCE AND H5DIFF_EXECUTABLE)
@@ -136,3 +139,19 @@ pumgen_add_test(msh2.tiny-duplicate RANKS 1 SOURCE msh2 INPUT tiny-duplicate-v22
                 EXPECT_ERROR "Duplicate node tag 2")
 pumgen_add_test(msh2.tiny-badnode RANKS 1 SOURCE msh2 INPUT tiny-badnode-v22.msh
                 EXPECT_ERROR "Unknown node tag")
+
+# higher-order meshes (with the inspheres of the linear mesh) and partitioned files
+foreach(ranks 1 2)
+  pumgen_add_test(msh4.coarse-o2.np${ranks} RANKS ${ranks} SOURCE msh4 INPUT coarse-o2-v41.msh
+                  REFERENCE coarse-o2.puml.h5 ARGS --order=2
+                  EXPECT_OUTPUT "Minimum insphere found: 0[.]03184[67]")
+endforeach()
+pumgen_add_test(msh2.coarse-o2.np2 RANKS 2 SOURCE msh2 INPUT coarse-o2-v22.msh
+                REFERENCE coarse-o2.puml.h5 ARGS --order=2
+                EXPECT_OUTPUT "Minimum insphere found: 0[.]03184[67]")
+pumgen_add_test(msh4.coarse.insphere RANKS 1 SOURCE msh4 INPUT coarse-v41.msh
+                EXPECT_OUTPUT "Minimum insphere found: 0[.]03184[67]")
+pumgen_add_test(msh4.coarse-partitioned RANKS 1 SOURCE msh4 INPUT coarse-partitioned-v41.msh
+                EXPECT_ERROR "Partitioned MSH files are not supported")
+pumgen_add_test(msh4.tiny-nophysical RANKS 1 SOURCE msh4 INPUT tiny-nophysical-v41.msh
+                EXPECT_OUTPUT "1 volume[(]s[)] and 0 surface[(]s[)] without a physical group")

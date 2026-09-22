@@ -13,7 +13,11 @@
 #include "MPIConvenience.h"
 
 std::vector<double> calculateInsphere(const std::vector<std::size_t>& connectivity,
-                                      const std::vector<double>& geometry, MPI_Comm comm) {
+                                      const std::vector<double>& geometry, std::size_t cellSize,
+                                      MPI_Comm comm) {
+  constexpr std::size_t VerticesPerCell = 4;
+  const std::size_t numCells = connectivity.size() / cellSize;
+
   int commsize;
   int commrank;
 
@@ -41,7 +45,11 @@ std::vector<double> calculateInsphere(const std::vector<std::size_t>& connectivi
 
   std::vector<std::unordered_map<std::size_t, std::size_t>> outidxmap(commsize);
 
-  for (const auto& vertex : connectivity) {
+  for (std::size_t node = 0; node < connectivity.size(); ++node) {
+    if (node % cellSize >= VerticesPerCell) {
+      continue;
+    }
+    const auto vertex = connectivity[node];
     auto itPosition = std::upper_bound(vertexDist.begin(), vertexDist.end(), vertex);
     auto position = std::distance(vertexDist.begin(), itPosition) - 1;
     auto localVertex = vertex - vertexDist[position];
@@ -84,7 +92,7 @@ std::vector<double> calculateInsphere(const std::vector<std::size_t>& connectivi
                     tndm::mpi_type_t<std::size_t>(), comm);
   }
 
-  std::vector<double> outvertices(3 * connectivity.size());
+  std::vector<double> outvertices(3 * outdisp[commsize]);
 
   {
     std::vector<double> invertices(3 * indisp[commsize]);
@@ -102,12 +110,12 @@ std::vector<double> calculateInsphere(const std::vector<std::size_t>& connectivi
   }
 
   std::vector<std::size_t> counter(commsize);
-  std::vector<double> inspheres(connectivity.size() / 4);
+  std::vector<double> inspheres(numCells);
 
-  for (std::size_t i = 0; i < connectivity.size() / 4; ++i) {
-    std::array<std::array<double, 3>, 4> vertices;
-    for (int j = 0; j < 4; ++j) {
-      auto vertex = connectivity[i * 4 + j];
+  for (std::size_t i = 0; i < numCells; ++i) {
+    std::array<std::array<double, 3>, VerticesPerCell> vertices;
+    for (std::size_t j = 0; j < VerticesPerCell; ++j) {
+      auto vertex = connectivity[i * cellSize + j];
       auto itPosition = std::upper_bound(vertexDist.begin(), vertexDist.end(), vertex);
       auto position = std::distance(vertexDist.begin(), itPosition) - 1;
       auto localVertex = vertex - vertexDist[position];

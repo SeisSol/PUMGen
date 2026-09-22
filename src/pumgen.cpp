@@ -455,8 +455,8 @@ int main(int argc, char* argv[]) {
   logInfo() << "Total vertex count:" << globalSize[1];
   logInfo() << "Vertex identification:" << meshInput->hasIdentify();
 
-  auto inspheres =
-      calculateInsphere(meshInput->connectivity(), meshInput->geometry(), MPI_COMM_WORLD);
+  auto inspheres = calculateInsphere(meshInput->connectivity(), meshInput->geometry(),
+                                     meshInput->cellSize(), MPI_COMM_WORLD);
   double min = inspheres.empty() ? std::numeric_limits<double>::infinity()
                                  : *std::min_element(inspheres.begin(), inspheres.end());
   MPI_Reduce((rank == 0 ? MPI_IN_PLACE : &min), &min, 1, MPI_DOUBLE, MPI_MIN, 0, MPI_COMM_WORLD);

@@ -40,6 +40,9 @@ bool GMSH4Parser::parse_() {
     case tndm::GMSHToken::periodic:
       hasPeriodic = parsePeriodic();
       break;
+    case tndm::GMSHToken::partitioned_entities:
+      return logErrorAnnotated<bool>(
+          "Partitioned MSH files are not supported; save the mesh without partitions");
     default:
       getNextToken();
       break;
@@ -55,7 +58,25 @@ bool GMSH4Parser::parse_() {
   if (!hasElements) {
     return logError<bool>("Missing $Elements section");
   }
+  if (!unassignedVolumes.empty() || !unassignedSurfaces.empty()) {
+    logWarning() << "The elements of" << unassignedVolumes.size() << "volume(s) and"
+                 << unassignedSurfaces.size()
+                 << "surface(s) without a physical group get group or boundary condition 0";
+  }
   return true;
+}
+
+long GMSH4Parser::physicalTag(std::size_t dim, unsigned long entityTag) {
+  if (dim != 2 && dim != 3) {
+    return 0;
+  }
+  const auto& physicalIds = dim == 3 ? physicalVolumeIds : physicalSurfaceIds;
+  const auto it = physicalIds.find(entityTag);
+  if (it == physicalIds.end()) {
+    (dim == 3 ? unassignedVolumes : unassignedSurfaces).insert(entityTag);
+    return 0;
+  }
+  return it->second;
 }
 
 bool GMSH4Parser::parseEntities() {
@@ -280,7 +301,7 @@ bool GMSH4Parser::parseElements() {
 
   for (std::size_t blockIdx = 0; blockIdx < numBlocks; blockIdx++) {
     getNextToken();
-    [[maybe_unused]] const std::size_t dim = expectNonNegativeInt();
+    const std::size_t dim = expectNonNegativeInt();
     getNextToken();
     const std::size_t entityTag = expectNonNegativeInt();
     getNextToken();
@@ -292,6 +313,7 @@ bool GMSH4Parser::parseElements() {
     }
     getNextToken();
     const std::size_t numElementsInBlock = expectNonNegativeInt();
+    const long tag = numElementsInBlock > 0 ? physicalTag(dim, entityTag) : 0;
     for (std::size_t elementIdx = 0; elementIdx < numElementsInBlock; ++elementIdx) {
       getNextToken();
       [[maybe_unused]] const std::size_t id = expectNonNegativeInt();
@@ -299,8 +321,7 @@ bool GMSH4Parser::parseElements() {
         getNextToken();
         nodes[nodeIdx] = static_cast<long>(expectNodeIndex());
       }
-      std::size_t tag = (type == 2) ? physicalSurfaceIds[entityTag] : physicalVolumeIds[entityTag];
-      builder->addElement(type, tag, nodes.data(), NumNodes[type - 1]);
+      builder->addElement(static_cast<long>(type), tag, nodes.data(), NumNodes[type - 1]);
     }
   }
   getNextToken();

@@ -10,7 +10,12 @@
 
 // assumes a contiguous distribution of all vertices over all processes
 
+/**
+ * The insphere radius of each tetrahedron. Each cell has cellSize nodes, the first four of which
+ * are its vertices.
+ */
 std::vector<double> calculateInsphere(const std::vector<std::size_t>& connectivity,
-                                      const std::vector<double>& geometry, MPI_Comm comm);
+                                      const std::vector<double>& geometry, std::size_t cellSize,
+                                      MPI_Comm comm);
 
 #endif // PUMGEN_SRC_HELPER_INSPHERECALCULATOR_H_

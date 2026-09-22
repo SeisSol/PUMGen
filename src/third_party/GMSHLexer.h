@@ -25,6 +25,7 @@ enum class GMSHToken {
   end_elements,
   periodic,
   end_periodic,
+  partitioned_entities,
   unknown_section,
   unknown_token
 };
