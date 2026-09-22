@@ -218,7 +218,7 @@ int main(int argc, char* argv[]) {
                                                 "deflate7", "deflate8",    "deflate9"};
   args.addOption("compactify-datatypes", 0,
                  "Compress index and group data types to minimum byte size (no HDF5 filters)",
-                 utils::Args::Required, false);
+                 utils::Args::No, false);
   args.addEnumOption("filter-enable", filters, 0,
                      "Apply HDF5 filters (i.e. compression). Disabled by default.", false);
   args.addOption("filter-chunksize", 0, "Chunksize for filters (default=4096).",
@@ -251,7 +251,7 @@ int main(int argc, char* argv[]) {
   args.addOption("sim_log", 0, "Create SimModSuite log", utils::Args::Required, false);
   args.addAdditionalOption("input", "Input file (mesh or model)");
   args.addAdditionalOption("output", "Output parallel unstructured mesh file", false);
-  args.addOption("order", 'o', "Mesh order", utils::Args::Optional, false);
+  args.addOption("order", 'o', "Mesh order (default: 1)", utils::Args::Required, false);
 
   if (args.parse(argc, argv, rank == 0) != utils::Args::Success)
     return 1;
@@ -271,7 +271,7 @@ int main(int argc, char* argv[]) {
     outputFile.append(".puml.h5");
   }
 
-  hsize_t chunksize = args.getArgument<hsize_t>("filter-chunksize", static_cast<hsize_t>(1) << 30);
+  hsize_t chunksize = args.getArgument<hsize_t>("chunksize", static_cast<hsize_t>(1) << 30);
 
   bool reduceInts = args.isSet("compactify-datatypes");
   int filterEnable = args.getArgument("filter-enable", 0);
@@ -334,6 +334,9 @@ int main(int argc, char* argv[]) {
   }
 
   const auto meshOrder = args.getArgument<int>("order", 1);
+  if (meshOrder < 1) {
+    logError() << "The mesh order has to be at least 1, got" << meshOrder;
+  }
 
   // Create/read the mesh
   MeshData* meshInput = nullptr;

@@ -83,3 +83,11 @@ pumgen_add_test(msh4.layered.deflate.np3 RANKS 3 SOURCE msh4 INPUT layered-v41.m
                 REFERENCE layered.puml.h5 ARGS --filter-enable=deflate1 --filter-chunksize=64)
 pumgen_add_test(msh4.tiny.scaleoffset.np3 RANKS 3 SOURCE msh4 INPUT tiny-v41.msh
                 REFERENCE tiny.puml.h5 ARGS --filter-enable=scaleoffset)
+
+# command line options
+pumgen_add_test(msh2.coarse-o2.shortopt.np1 RANKS 1 SOURCE msh2 INPUT coarse-o2-v22.msh
+                REFERENCE coarse-o2.puml.h5 ARGS -o 2)
+pumgen_add_test(msh4.layered.chunksize.np3 RANKS 3 SOURCE msh4 INPUT layered-v41.msh
+                REFERENCE layered.puml.h5 ARGS --chunksize=4096)
+pumgen_add_test(msh4.tiny.order0 RANKS 1 SOURCE msh4 INPUT tiny-v41.msh ARGS --order=0
+                EXPECT_ERROR "mesh order has to be at least 1")
