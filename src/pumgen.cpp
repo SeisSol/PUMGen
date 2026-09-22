@@ -120,8 +120,11 @@ static void writeH5Data(const F& handler, hid_t h5file, const std::string& name,
   hid_t h5filter = H5P_DEFAULT;
   if (filterEnable > 0) {
     h5filter = checkH5Err(H5Pcreate(H5P_DATASET_CREATE));
-    hsize_t chunk[2] = {std::min(filterChunksize, bufferSize), secondDim};
-    checkH5Err(H5Pset_chunk(h5filter, 2, chunk));
+    // the dataset creation is collective, so the chunk shape must not depend on the local size
+    const hsize_t chunkRows =
+        std::max(static_cast<hsize_t>(1), std::min<hsize_t>(filterChunksize, globalSize));
+    hsize_t chunk[2] = {chunkRows, secondDim};
+    checkH5Err(H5Pset_chunk(h5filter, dimensions, chunk));
     if (filterEnable == 1 && std::is_integral_v<T>) {
       checkH5Err(H5Pset_scaleoffset(h5filter, H5Z_SO_INT, H5Z_SO_INT_MINBITS_DEFAULT));
     } else if (filterEnable < 11) {
@@ -143,9 +146,15 @@ static void writeH5Data(const F& handler, hid_t h5file, const std::string& name,
 
     std::copy_n(handler.begin() + written * secondSize, count[0] * secondSize, data.begin());
 
-    checkH5Err(H5Sselect_hyperslab(h5memspace, H5S_SELECT_SET, nullstart, nullptr, count, nullptr));
-
-    checkH5Err(H5Sselect_hyperslab(h5space, H5S_SELECT_SET, start, nullptr, count, nullptr));
+    if (count[0] > 0) {
+      checkH5Err(
+          H5Sselect_hyperslab(h5memspace, H5S_SELECT_SET, nullstart, nullptr, count, nullptr));
+      checkH5Err(H5Sselect_hyperslab(h5space, H5S_SELECT_SET, start, nullptr, count, nullptr));
+    } else {
+      // ranks without (further) data still take part in the collective write
+      checkH5Err(H5Sselect_none(h5memspace));
+      checkH5Err(H5Sselect_none(h5space));
+    }
 
     checkH5Err(H5Dwrite(h5data, h5memtype, h5memspace, h5space, h5dxlist, data.data()));
 
@@ -415,7 +424,8 @@ int main(int argc, char* argv[]) {
 
   auto inspheres =
       calculateInsphere(meshInput->connectivity(), meshInput->geometry(), MPI_COMM_WORLD);
-  double min = *std::min_element(inspheres.begin(), inspheres.end());
+  double min = inspheres.empty() ? std::numeric_limits<double>::infinity()
+                                 : *std::min_element(inspheres.begin(), inspheres.end());
   MPI_Reduce((rank == 0 ? MPI_IN_PLACE : &min), &min, 1, MPI_DOUBLE, MPI_MIN, 0, MPI_COMM_WORLD);
   logInfo() << "Minimum insphere found:" << min;
 

@@ -71,3 +71,15 @@ pumgen_add_test(msh2.coarse-o2.np1 RANKS 1 SOURCE msh2 INPUT coarse-o2-v22.msh
                 REFERENCE coarse-o2.puml.h5 ARGS --order=2)
 pumgen_add_test(msh4.tiny.np1 RANKS 1 SOURCE msh4 INPUT tiny-v41.msh REFERENCE tiny.puml.h5)
 pumgen_add_test(msh2.tiny.np1 RANKS 1 SOURCE msh2 INPUT tiny-v22.msh REFERENCE tiny.puml.h5)
+
+# more ranks than cells
+foreach(ranks 2 3)
+  pumgen_add_test(msh4.tiny.np${ranks} RANKS ${ranks} SOURCE msh4 INPUT tiny-v41.msh
+                  REFERENCE tiny.puml.h5)
+endforeach()
+
+# HDF5 filters
+pumgen_add_test(msh4.layered.deflate.np3 RANKS 3 SOURCE msh4 INPUT layered-v41.msh
+                REFERENCE layered.puml.h5 ARGS --filter-enable=deflate1 --filter-chunksize=64)
+pumgen_add_test(msh4.tiny.scaleoffset.np3 RANKS 3 SOURCE msh4 INPUT tiny-v41.msh
+                REFERENCE tiny.puml.h5 ARGS --filter-enable=scaleoffset)
