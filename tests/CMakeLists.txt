@@ -18,18 +18,21 @@ function(pumgen_add_test name)
   cmake_parse_arguments(PARSE_ARGV 1 TEST "IDENTIFY"
                         "RANKS;SOURCE;INPUT;REFERENCE;TOLERANCE;EXPECT_OUTPUT;EXPECT_ERROR" "ARGS")
   set(output ${PUMGEN_TEST_OUTPUT}/${name}.puml.h5)
-  set(command
-      ${MPIEXEC_EXECUTABLE}
-      ${MPIEXEC_NUMPROC_FLAG}
-      ${TEST_RANKS}
-      ${MPIEXEC_PREFLAGS}
-      $<TARGET_FILE:pumgen>
-      ${MPIEXEC_POSTFLAGS}
-      -s
-      ${TEST_SOURCE}
-      ${TEST_ARGS}
-      ${PUMGEN_TEST_FIXTURES}/${TEST_INPUT}
-      ${output})
+  if(DEFINED TEST_EXPECT_ERROR AND TEST_RANKS EQUAL 1)
+    # started as MPI singleton, since mpiexec may drop the output of a process ending with
+    # MPI_Abort
+    set(command $<TARGET_FILE:pumgen>)
+  else()
+    set(command
+        ${MPIEXEC_EXECUTABLE}
+        ${MPIEXEC_NUMPROC_FLAG}
+        ${TEST_RANKS}
+        ${MPIEXEC_PREFLAGS}
+        $<TARGET_FILE:pumgen>
+        ${MPIEXEC_POSTFLAGS})
+  endif()
+  list(APPEND command -s ${TEST_SOURCE} ${TEST_ARGS} ${PUMGEN_TEST_FIXTURES}/${TEST_INPUT}
+       ${output})
   string(REPLACE ";" "|" command "${command}")
 
   set(script_args -DCOMMAND=${command} -DOUTPUT=${output})
