@@ -140,6 +140,7 @@ if (EASI)
   add_library(pumgen_sizing STATIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src/sizing/VelocityAwareSettings.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/sizing/VelocityAwareMeshSize.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/sizing/SizeField.cpp
   )
   target_include_directories(pumgen_sizing PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/src
@@ -149,6 +150,12 @@ if (EASI)
   target_link_libraries(pumgen_sizing PUBLIC easi::easi tinyxml2)
   target_link_libraries(pumgen PUBLIC pumgen_sizing)
   target_compile_definitions(pumgen PUBLIC USE_EASI)
+
+  add_executable(pumgen-sizefield ${CMAKE_CURRENT_SOURCE_DIR}/src/sizefield.cpp)
+  target_compile_definitions(pumgen-sizefield PRIVATE LOG_LEVEL=${LOG_LEVEL})
+  target_link_libraries(pumgen-sizefield PRIVATE pumgen_sizing MPI::MPI_CXX)
+  set_target_properties(pumgen-sizefield PROPERTIES INSTALL_RPATH "${INSTALL_RPATH}")
+  install(TARGETS pumgen-sizefield RUNTIME DESTINATION bin)
 endif()
 if(SIMMETRIX)
   set(INSTALL_RPATH "${SIM_PS_KRNL_LIB_DIR}:${INSTALL_RPATH}")

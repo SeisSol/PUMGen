@@ -189,3 +189,23 @@ pumgen_add_test(msh4.coarse-binary-truncated RANKS 1 SOURCE msh4
 # a face of the surface mesh given twice
 pumgen_add_test(msh2.tiny-duplicateface RANKS 1 SOURCE msh2 INPUT tiny-duplicateface-v22.msh
                 EXPECT_ERROR "exists multiple times in the surface mesh")
+
+# velocity-aware sizing, with a material of shear wave speed 1 in group 1 and 2 in group 2
+if(EASI)
+  configure_file(fixtures/velocity-sizefield.xml.in
+                 ${CMAKE_CURRENT_BINARY_DIR}/velocity-sizefield.xml @ONLY)
+
+  # the expected grids are verified independently; they must not depend on the number of ranks
+  foreach(ranks 1 3)
+    set(prefix ${PUMGEN_TEST_OUTPUT}/sizefield-np${ranks})
+    set(command ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${ranks} ${MPIEXEC_PREFLAGS}
+                $<TARGET_FILE:pumgen-sizefield> ${MPIEXEC_POSTFLAGS} --spacing 0.25
+                ${CMAKE_CURRENT_BINARY_DIR}/velocity-sizefield.xml ${prefix})
+    string(REPLACE ";" "|" command "${command}")
+    add_test(NAME sizefield.np${ranks}
+             COMMAND ${CMAKE_COMMAND} -DCOMMAND=${command} -DPREFIX=${prefix}
+                     -DEXPECTED=${PUMGEN_TEST_FIXTURES}/velocity-sizefield -DGRIDS=2 -P
+                     ${CMAKE_CURRENT_SOURCE_DIR}/RunSizefieldTest.cmake)
+    set_tests_properties(sizefield.np${ranks} PROPERTIES PROCESSORS ${ranks} TIMEOUT 120)
+  endforeach()
+endif()

@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: 2026 SeisSol Group
+#
+# SPDX-License-Identifier: BSD-3-Clause
+
+# shear wave speed 1 in group 1 and 2 in group 2
+!Any
+components:
+  - !GroupFilter
+    groups: [1]
+    components: !ConstantMap
+      map:
+        rho: 1.0
+        mu: 1.0
+        lambda: 2.0
+  - !GroupFilter
+    groups: [2]
+    components: !ConstantMap
+      map:
+        rho: 1.0
+        mu: 4.0
+        lambda: 8.0

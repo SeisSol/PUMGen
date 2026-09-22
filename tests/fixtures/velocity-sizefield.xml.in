@@ -1,0 +1,16 @@
+<!--
+    SPDX-FileCopyrightText: 2026 SeisSol Group
+
+    SPDX-License-Identifier: BSD-3-Clause
+-->
+
+<!-- an axis-aligned cuboid (group 1, mesh size 0.5) and a rotated one (group 2, mesh size 1) -->
+<VelocityAwareMeshing easiFile="@PUMGEN_TEST_FIXTURES@/velocity-material.yaml"
+                      elementsPerWaveLength="2">
+    <VelocityRefinementCuboid frequency="1" centerX="1" centerY="1" centerZ="-0.125"
+                              halfSizeX="1" halfSizeY="1" halfSizeZ="0.125"
+                              bypassFindRegionAndUseGroup="1"/>
+    <VelocityRefinementCuboid frequency="1" centerX="1" centerY="1" centerZ="-0.625"
+                              halfSizeX="1" halfSizeY="0.5" halfSizeZ="0.375"
+                              rotationZAnticlockwiseFromX="30" bypassFindRegionAndUseGroup="2"/>
+</VelocityAwareMeshing>
