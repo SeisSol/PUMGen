@@ -62,6 +62,10 @@ foreach(ranks 1 2 3)
   pumgen_add_test(msh2.layered.np${ranks} RANKS ${ranks} SOURCE msh2 INPUT layered-v22.msh
                   REFERENCE layered.puml.h5)
 endforeach()
+foreach(ranks 1 2 3 4)
+  pumgen_add_test(gambit.layered.np${ranks} RANKS ${ranks} SOURCE gambit INPUT layered.neu
+                  REFERENCE layered.puml.h5 TOLERANCE 1e-9)
+endforeach()
 pumgen_add_test(msh4.coarse.np2 RANKS 2 SOURCE msh4 INPUT coarse-v41.msh REFERENCE coarse.puml.h5)
 pumgen_add_test(msh2.coarse-o2.np1 RANKS 1 SOURCE msh2 INPUT coarse-o2-v22.msh
                 REFERENCE coarse-o2.puml.h5 ARGS --order=2)

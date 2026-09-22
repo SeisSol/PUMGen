@@ -393,7 +393,7 @@ class GambitReader : public MeshReader {
 
     // Get the group, were we should start reading
     std::vector<GroupSection>::const_iterator section;
-    for (section = m_groups.begin(); section != m_groups.end() && section->nLines < start;
+    for (section = m_groups.begin(); section != m_groups.end() && section->nLines <= start;
          section++) {
       start -= section->nLines;
     }
@@ -417,7 +417,9 @@ class GambitReader : public MeshReader {
         start = 0;
         section++;
 
-        m_mesh.seekg(section->seekPosition);
+        if (section != m_groups.end()) {
+          m_mesh.seekg(section->seekPosition);
+        }
       } else if (start % ELEMENTS_PER_LINE_GROUP == 0)
         // Skip newline char at end of line
         m_mesh.seekg(section->lineSize - section->elementSize * ELEMENTS_PER_LINE_GROUP,
@@ -456,7 +458,7 @@ class GambitReader : public MeshReader {
 
     // Get the boundary, were we should start reading
     std::vector<BoundarySection>::const_iterator section;
-    for (section = m_boundaries.begin(); section != m_boundaries.end() && section->nLines < start;
+    for (section = m_boundaries.begin(); section != m_boundaries.end() && section->nLines <= start;
          section++) {
       start -= section->nLines;
     }
