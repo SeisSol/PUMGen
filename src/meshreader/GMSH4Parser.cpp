@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "GMSH4Parser.h"
 
-#include <cassert>
 #include <cstdio>
 
 #include "utils/logger.h"
@@ -24,7 +23,6 @@ bool GMSH4Parser::parse_() {
   }
 
   bool hasEntities = false;
-  bool hasNodes = false;
   bool hasElements = false;
   bool hasPeriodic = false;
 
@@ -34,7 +32,7 @@ bool GMSH4Parser::parse_() {
       hasEntities = parseEntities();
       break;
     case tndm::GMSHToken::nodes:
-      hasNodes = parseNodes();
+      parseNodes();
       break;
     case tndm::GMSHToken::elements:
       hasElements = parseElements();
@@ -199,18 +197,32 @@ bool GMSH4Parser::parseNodes() {
   getNextToken();
   const std::size_t numVertices = expectNonNegativeInt();
   getNextToken();
-  [[maybe_unused]] const std::size_t minNodeTag = expectNonNegativeInt();
+  const std::size_t minNodeTag = expectNonNegativeInt();
   getNextToken();
-  [[maybe_unused]] const std::size_t maxNodeTag = expectNonNegativeInt();
+  const std::size_t maxNodeTag = expectNonNegativeInt();
+  if (numVertices > 0 &&
+      (minNodeTag == 0 || maxNodeTag < minNodeTag || maxNodeTag - minNodeTag + 1 != numVertices)) {
+    char buf[192];
+    snprintf(buf, sizeof(buf),
+             "Non-contiguous node tags are not supported (%zu nodes with tags from %zu to %zu)",
+             numVertices, minNodeTag, maxNodeTag);
+    return logErrorAnnotated<bool>(buf);
+  }
+  hasNodes = true;
+  firstNodeTag = minNodeTag;
+  numNodes = numVertices;
   builder->setNumVertices(numVertices);
+
+  // with as many distinct tags as the tag range is long, every node is defined exactly once
+  std::vector<bool> defined(numVertices, false);
 
   for (std::size_t blockIdx = 0; blockIdx < numBlocks; blockIdx++) {
     getNextToken();
-    [[maybe_unused]] const std::size_t dim = expectNonNegativeInt();
+    const std::size_t dim = expectNonNegativeInt();
     getNextToken();
     [[maybe_unused]] const std::size_t entityTag = expectNonNegativeInt();
     getNextToken();
-    [[maybe_unused]] const std::size_t parametric = expectNonNegativeInt();
+    const std::size_t parametric = expectNonNegativeInt();
     getNextToken();
     const std::size_t numVerticesInBlock = expectNonNegativeInt();
     std::vector<std::size_t> vertexIds;
@@ -218,17 +230,28 @@ bool GMSH4Parser::parseNodes() {
     // first read vertex ids
     for (std::size_t vertexIdx = 0; vertexIdx < numVerticesInBlock; ++vertexIdx) {
       getNextToken();
-      vertexIds.push_back(expectNonNegativeInt() - 1);
+      const std::size_t index = expectNodeIndex();
+      if (defined[index]) {
+        char buf[128];
+        snprintf(buf, sizeof(buf), "Duplicate node tag %zu", firstNodeTag + index);
+        return logErrorAnnotated<bool>(buf);
+      }
+      defined[index] = true;
+      vertexIds.push_back(index);
     }
-    // then read vertex data
+    // then read vertex data; parametric nodes carry dim additional parametric coordinates
+    const std::size_t numParametric = parametric != 0 ? dim : 0;
     for (std::size_t vertexIdx = 0; vertexIdx < numVerticesInBlock; ++vertexIdx) {
       std::array<double, 3> x{};
       for (std::size_t i = 0; i < 3; i++) {
         getNextToken();
         x[i] = expectNumber();
       }
-      assert(vertexIds.at(vertexIdx) < numVertices);
-      builder->setVertex(vertexIds.at(vertexIdx), x);
+      for (std::size_t i = 0; i < numParametric; ++i) {
+        getNextToken();
+        expectNumber();
+      }
+      builder->setVertex(vertexIds[vertexIdx], x);
     }
   }
   getNextToken();
@@ -240,6 +263,9 @@ bool GMSH4Parser::parseNodes() {
 }
 
 bool GMSH4Parser::parseElements() {
+  if (!hasNodes) {
+    return logErrorAnnotated<bool>("Expected $Nodes before $Elements");
+  }
   getNextToken();
   const std::size_t numBlocks = expectNonNegativeInt();
   getNextToken();
@@ -271,7 +297,7 @@ bool GMSH4Parser::parseElements() {
       [[maybe_unused]] const std::size_t id = expectNonNegativeInt();
       for (std::size_t nodeIdx = 0; nodeIdx < NumNodes[type - 1]; nodeIdx++) {
         getNextToken();
-        nodes[nodeIdx] = expectNonNegativeInt() - 1;
+        nodes[nodeIdx] = static_cast<long>(expectNodeIndex());
       }
       std::size_t tag = (type == 2) ? physicalSurfaceIds[entityTag] : physicalVolumeIds[entityTag];
       builder->addElement(type, tag, nodes.data(), NumNodes[type - 1]);
@@ -287,6 +313,9 @@ bool GMSH4Parser::parseElements() {
 }
 
 bool GMSH4Parser::parsePeriodic() {
+  if (!hasNodes) {
+    return logErrorAnnotated<bool>("Expected $Nodes before $Periodic");
+  }
   getNextToken();
   const auto numPeriodic = expectNonNegativeInt();
 
@@ -312,9 +341,9 @@ bool GMSH4Parser::parsePeriodic() {
 
     for (std::size_t i = 0; i < identifySize; ++i) {
       getNextToken();
-      const std::size_t nodeId = expectNonNegativeInt() - 1;
+      const std::size_t nodeId = expectNodeIndex();
       getNextToken();
-      const std::size_t nodeIdentifyId = expectNonNegativeInt() - 1;
+      const std::size_t nodeIdentifyId = expectNodeIndex();
       builder->addVertexLink(nodeId, nodeIdentifyId);
     }
   }

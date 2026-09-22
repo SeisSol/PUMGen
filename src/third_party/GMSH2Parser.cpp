@@ -6,6 +6,7 @@
 #include "GMSHLexer.h"
 
 #include <cstdio>
+#include <vector>
 
 namespace tndm {
 
@@ -55,6 +56,11 @@ bool GMSH2Parser::parseNodes() {
   }
   std::size_t numVertices = lexer.getInteger();
   builder->setNumVertices(numVertices);
+  hasNodes = true;
+  numNodes = numVertices;
+
+  // with numVertices distinct tags in [1, numVertices], every node is defined exactly once
+  std::vector<bool> defined(numVertices, false);
 
   for (std::size_t i = 0; i < numVertices; ++i) {
     getNextToken();
@@ -65,6 +71,12 @@ bool GMSH2Parser::parseNodes() {
       return logErrorAnnotated<bool>(buf);
     }
     std::size_t id = lexer.getInteger() - 1;
+    if (defined[id]) {
+      char buf[128];
+      snprintf(buf, sizeof(buf), "Duplicate node tag %zu", id + 1);
+      return logErrorAnnotated<bool>(buf);
+    }
+    defined[id] = true;
 
     std::array<double, 3> x;
     for (std::size_t i = 0; i < 3; ++i) {
@@ -86,6 +98,9 @@ bool GMSH2Parser::parseNodes() {
 }
 
 bool GMSH2Parser::parseElements() {
+  if (!hasNodes) {
+    return logErrorAnnotated<bool>("Expected $Nodes before $Elements");
+  }
   getNextToken();
   if (curTok != GMSHToken::integer || lexer.getInteger() < 0) {
     return logErrorAnnotated<bool>("Expected non-negative integer");
@@ -132,13 +147,7 @@ bool GMSH2Parser::parseElements() {
 
     for (std::size_t nodeIdx = 0; nodeIdx < NumNodes[type - 1]; ++nodeIdx) {
       getNextToken();
-      if (curTok != GMSHToken::integer || lexer.getInteger() < 1) {
-        char buf[128];
-        snprintf(buf, sizeof(buf), "Expected node number > 0 (%zu/%zu for type %li)", nodeIdx + 1,
-                 NumNodes[type - 1], type);
-        return logErrorAnnotated<bool>(buf);
-      }
-      nodes[nodeIdx] = lexer.getInteger() - 1;
+      nodes[nodeIdx] = static_cast<long>(expectNodeIndex());
     }
 
     builder->addElement(type, tag, nodes.data(), NumNodes[type - 1]);
@@ -153,6 +162,9 @@ bool GMSH2Parser::parseElements() {
 }
 
 bool GMSH2Parser::parsePeriodic() {
+  if (!hasNodes) {
+    return logErrorAnnotated<bool>("Expected $Nodes before $Periodic");
+  }
   getNextToken();
   const auto numPeriodic = expectNonNegativeInt();
 
@@ -180,9 +192,9 @@ bool GMSH2Parser::parsePeriodic() {
 
     for (std::size_t i = 0; i < identifySize; ++i) {
       getNextToken();
-      const std::size_t nodeId = expectNonNegativeInt() - 1;
+      const std::size_t nodeId = expectNodeIndex();
       getNextToken();
-      const std::size_t nodeIdentifyId = expectNonNegativeInt() - 1;
+      const std::size_t nodeIdentifyId = expectNodeIndex();
       builder->addVertexLink(nodeId, nodeIdentifyId);
     }
   }

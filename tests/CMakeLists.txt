@@ -120,3 +120,19 @@ foreach(ranks 1 2 3)
   pumgen_add_test(msh4.periodic.np${ranks} RANKS ${ranks} SOURCE msh4 INPUT periodic-v41.msh
                   REFERENCE periodic.puml.h5 IDENTIFY)
 endforeach()
+
+# node tags
+pumgen_add_test(msh4.coarse-offset.np2 RANKS 2 SOURCE msh4 INPUT coarse-offset-v41.msh
+                REFERENCE coarse.puml.h5)
+pumgen_add_test(msh4.periodic-parametric.np2 RANKS 2 SOURCE msh4 INPUT periodic-parametric-v41.msh
+                REFERENCE periodic.puml.h5 IDENTIFY)
+pumgen_add_test(msh4.tiny-sparse RANKS 1 SOURCE msh4 INPUT tiny-sparse-v41.msh
+                EXPECT_ERROR "Non-contiguous node tags are not supported")
+pumgen_add_test(msh4.tiny-duplicate RANKS 1 SOURCE msh4 INPUT tiny-duplicate-v41.msh
+                EXPECT_ERROR "Duplicate node tag 2")
+pumgen_add_test(msh4.tiny-badnode RANKS 1 SOURCE msh4 INPUT tiny-badnode-v41.msh
+                EXPECT_ERROR "Unknown node tag 9")
+pumgen_add_test(msh2.tiny-duplicate RANKS 1 SOURCE msh2 INPUT tiny-duplicate-v22.msh
+                EXPECT_ERROR "Duplicate node tag 2")
+pumgen_add_test(msh2.tiny-badnode RANKS 1 SOURCE msh2 INPUT tiny-badnode-v22.msh
+                EXPECT_ERROR "Unknown node tag")

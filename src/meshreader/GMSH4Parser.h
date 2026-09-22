@@ -4,6 +4,7 @@
 #ifndef PUMGEN_SRC_MESHREADER_GMSH4PARSER_H_
 #define PUMGEN_SRC_MESHREADER_GMSH4PARSER_H_
 
+#include <cstdio>
 #include <map>
 #include <string>
 #include <string_view>
@@ -21,6 +22,24 @@ class GMSH4Parser : public tndm::GMSHParser {
   private:
   std::map<unsigned long, long> physicalSurfaceIds;
   std::map<unsigned long, long> physicalVolumeIds;
+
+  // the node tags form the contiguous range [firstNodeTag, firstNodeTag + numNodes)
+  bool hasNodes = false;
+  std::size_t firstNodeTag = 0;
+  std::size_t numNodes = 0;
+
+  /**
+   * Reads a node tag and returns the index of the node.
+   */
+  std::size_t expectNodeIndex() {
+    const std::size_t tag = expectNonNegativeInt();
+    if (tag < firstNodeTag || tag - firstNodeTag >= numNodes) {
+      char buf[128];
+      snprintf(buf, sizeof(buf), "Unknown node tag %zu", tag);
+      return logErrorAnnotated<std::size_t>(buf);
+    }
+    return tag - firstNodeTag;
+  }
 
   unsigned long expectNonNegativeInt() {
     if (curTok != tndm::GMSHToken::integer || lexer.getInteger() < 0) {

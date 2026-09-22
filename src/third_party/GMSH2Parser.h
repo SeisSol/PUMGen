@@ -37,6 +37,21 @@ class GMSH2Parser : public GMSHParser {
     return num.value();
   }
 
+  // the node tags are 1, ..., numNodes
+  bool hasNodes = false;
+  std::size_t numNodes = 0;
+
+  /**
+   * Reads a node tag and returns the index of the node.
+   */
+  std::size_t expectNodeIndex() {
+    if (curTok != GMSHToken::integer || lexer.getInteger() < 1 ||
+        static_cast<std::size_t>(lexer.getInteger()) > numNodes) {
+      return logErrorAnnotated<std::size_t>("Unknown node tag");
+    }
+    return static_cast<std::size_t>(lexer.getInteger()) - 1;
+  }
+
   bool parseNodes();
   bool parseElements();
   bool parsePeriodic();

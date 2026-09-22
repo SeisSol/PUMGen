@@ -147,7 +147,7 @@ template <std::size_t D, std::size_t Order> class GMSHBuilder : public tndm::GMS
   public:
   using vertex_t = std::array<double, D>;
   using element_t = std::array<std::size_t, nodeCount(D, Order)>;
-  using facet_t = std::array<int, nodeCount(D - 1u, Order)>;
+  using facet_t = std::array<std::size_t, nodeCount(D - 1u, Order)>;
 
   std::vector<vertex_t> vertices;
   std::vector<std::size_t> identify;
