@@ -44,10 +44,10 @@
 #ifdef USE_SIMMOD
 #include "input/SimModSuite.h"
 #endif // USE_SIMMOD
+#include "meshreader/GMSH2Parser.h"
 #include "meshreader/GMSH4Parser.h"
 #include "meshreader/ParallelGMSHReader.h"
 #include "meshreader/ParallelGambitReader.h"
-#include "third_party/GMSH2Parser.h"
 
 #include "helper/InsphereCalculator.h"
 
@@ -217,7 +217,7 @@ void addAttribute(hid_t h5file, const std::string& name, const std::string& valu
 }
 
 template <std::size_t Order>
-using SMF2 = SerialMeshFile<puml::ParallelGMSHReader<tndm::GMSH2Parser, Order>>;
+using SMF2 = SerialMeshFile<puml::ParallelGMSHReader<puml::GMSH2Parser, Order>>;
 template <std::size_t Order>
 using SMF4 = SerialMeshFile<puml::ParallelGMSHReader<puml::GMSH4Parser, Order>>;
 

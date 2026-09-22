@@ -14,7 +14,7 @@
 
 #include "utils/logger.h"
 
-#include "third_party/GMSHMeshBuilder.h"
+#include "GMSHMeshBuilder.h"
 
 namespace puml {
 
@@ -143,7 +143,7 @@ template <> struct GMSHSimplexType<3U, 10U> {
   static constexpr long type = 75;
 };
 
-template <std::size_t D, std::size_t Order> class GMSHBuilder : public tndm::GMSHMeshBuilder {
+template <std::size_t D, std::size_t Order> class GMSHBuilder : public GMSHMeshBuilder {
   public:
   using vertex_t = std::array<double, D>;
   using element_t = std::array<std::size_t, nodeCount(D, Order)>;

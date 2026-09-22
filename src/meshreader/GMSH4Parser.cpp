@@ -3,70 +3,244 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "GMSH4Parser.h"
 
+#include <array>
 #include <cstdio>
+#include <string>
+#include <string_view>
+#include <vector>
 
 #include "utils/logger.h"
 
 namespace puml {
-bool GMSH4Parser::parse_() {
-  getNextToken();
 
-  const double version = parseMeshFormat();
-  if (version < 4.0 || version >= 5.0) {
+void GMSH4Parser::parse_() {
+  const auto format = parseMeshFormatHeader();
+  if (format.version < 4.0 || format.version >= 5.0) {
     char buf[128];
-    snprintf(buf, sizeof(buf), "Unsupported MSH version %.1lf", version);
-    return logError<bool>(buf);
+    snprintf(buf, sizeof(buf), "Unsupported MSH version %.1lf", format.version);
+    failFile(buf);
   }
-  if (version < 4.1) {
-    return logError<bool>(
-        "MSH 4.0 is not supported; write the mesh as MSH 4.1 (Mesh.MshFileVersion = 4.1)");
+  if (format.version < 4.1) {
+    failFile("MSH 4.0 is not supported; write the mesh as MSH 4.1 (Mesh.MshFileVersion = 4.1)");
   }
+  if (format.fileType == 1) {
+    failFile("Binary MSH files are not supported; write the mesh as ASCII (Mesh.Binary = 0)");
+  }
+  if (format.fileType != 0) {
+    failFile("Expected file type 0 (ASCII)");
+  }
+  expectToken("$EndMeshFormat");
 
   bool hasEntities = false;
   bool hasElements = false;
-  bool hasPeriodic = false;
-
-  while (curTok != tndm::GMSHToken::eof) {
-    switch (curTok) {
-    case tndm::GMSHToken::entities:
-      hasEntities = parseEntities();
+  while (true) {
+    const auto section = nextSection();
+    if (section.empty()) {
       break;
-    case tndm::GMSHToken::nodes:
+    }
+    if (section == "$Entities") {
+      parseEntities();
+      hasEntities = true;
+    } else if (section == "$Nodes") {
       parseNodes();
-      break;
-    case tndm::GMSHToken::elements:
-      hasElements = parseElements();
-      break;
-    case tndm::GMSHToken::periodic:
-      hasPeriodic = parsePeriodic();
-      break;
-    case tndm::GMSHToken::partitioned_entities:
-      return logErrorAnnotated<bool>(
-          "Partitioned MSH files are not supported; save the mesh without partitions");
-    default:
-      getNextToken();
-      break;
+    } else if (section == "$Elements") {
+      parseElements();
+      hasElements = true;
+    } else if (section == "$Periodic") {
+      parsePeriodic();
+    } else if (section == "$PartitionedEntities") {
+      failFile("Partitioned MSH files are not supported; save the mesh without partitions");
+    } else {
+      skipSection(section);
     }
   }
 
   if (!hasEntities) {
-    return logError<bool>("Missing $Entities section");
+    failFile("Missing $Entities section");
   }
   if (!hasNodes) {
-    return logError<bool>("Missing $Nodes section");
+    failFile("Missing $Nodes section");
   }
   if (!hasElements) {
-    return logError<bool>("Missing $Elements section");
+    failFile("Missing $Elements section");
   }
   if (!unassignedVolumes.empty() || !unassignedSurfaces.empty()) {
     logWarning() << "The elements of" << unassignedVolumes.size() << "volume(s) and"
                  << unassignedSurfaces.size()
                  << "surface(s) without a physical group get group or boundary condition 0";
   }
-  return true;
 }
 
-long GMSH4Parser::physicalTag(std::size_t dim, unsigned long entityTag) {
+void GMSH4Parser::parseEntities() {
+  const std::size_t numPoints = readSize();
+  const std::size_t numCurves = readSize();
+  const std::size_t numSurfaces = readSize();
+  const std::size_t numVolumes = readSize();
+
+  for (std::size_t i = 0; i < numPoints; ++i) {
+    readInt();
+    for (int k = 0; k < 3; ++k) {
+      readDouble();
+    }
+    const std::size_t numPhysicalTags = readSize();
+    for (std::size_t j = 0; j < numPhysicalTags; ++j) {
+      readInt();
+    }
+  }
+
+  const auto readEntities = [&](std::size_t count, std::map<long, long>* physicalIds) {
+    for (std::size_t i = 0; i < count; ++i) {
+      const long tag = readInt();
+      for (int k = 0; k < 6; ++k) {
+        readDouble();
+      }
+      const std::size_t numPhysicalTags = readSize();
+      for (std::size_t j = 0; j < numPhysicalTags; ++j) {
+        const long physical = readInt();
+        if (j == 0 && physicalIds != nullptr) {
+          physicalIds->insert_or_assign(tag, physical);
+        }
+      }
+      const std::size_t numBoundingEntities = readSize();
+      for (std::size_t j = 0; j < numBoundingEntities; ++j) {
+        readInt();
+      }
+    }
+  };
+  readEntities(numCurves, nullptr);
+  readEntities(numSurfaces, &physicalSurfaceIds);
+  readEntities(numVolumes, &physicalVolumeIds);
+
+  expectToken("$EndEntities");
+}
+
+std::size_t GMSH4Parser::readNodeIndex() {
+  input->skipWhitespace();
+  const auto offset = input->offset();
+  const std::size_t tag = readSize();
+  if (tag < firstNodeTag || tag - firstNodeTag >= numNodes) {
+    failAt(offset, "Unknown node tag " + std::to_string(tag));
+  }
+  return tag - firstNodeTag;
+}
+
+void GMSH4Parser::parseNodes() {
+  const std::size_t numBlocks = readSize();
+  const std::size_t numVertices = readSize();
+  const std::size_t minNodeTag = readSize();
+  const std::size_t maxNodeTag = readSize();
+  if (numVertices > 0 &&
+      (minNodeTag == 0 || maxNodeTag < minNodeTag || maxNodeTag - minNodeTag + 1 != numVertices)) {
+    char buf[192];
+    snprintf(buf, sizeof(buf),
+             "Non-contiguous node tags are not supported (%zu nodes with tags from %zu to %zu)",
+             numVertices, minNodeTag, maxNodeTag);
+    fail(buf);
+  }
+  hasNodes = true;
+  firstNodeTag = minNodeTag;
+  numNodes = numVertices;
+  builder->setNumVertices(numVertices);
+
+  // with as many distinct tags as the tag range is long, every node is defined exactly once
+  std::vector<bool> defined(numVertices, false);
+  std::vector<std::size_t> indices;
+
+  for (std::size_t blockIdx = 0; blockIdx < numBlocks; ++blockIdx) {
+    const long dim = readInt();
+    readInt(); // entity tag
+    const long parametric = readInt();
+    const std::size_t numVerticesInBlock = readSize();
+
+    indices.resize(numVerticesInBlock);
+    for (auto& index : indices) {
+      input->skipWhitespace();
+      const auto offset = input->offset();
+      index = readNodeIndex();
+      if (defined[index]) {
+        failAt(offset, "Duplicate node tag " + std::to_string(firstNodeTag + index));
+      }
+      defined[index] = true;
+    }
+
+    // parametric nodes carry dim additional parametric coordinates
+    const long numParametric = parametric != 0 ? dim : 0;
+    for (const auto index : indices) {
+      std::array<double, 3> x{};
+      for (auto& coordinate : x) {
+        coordinate = readDouble();
+      }
+      for (long i = 0; i < numParametric; ++i) {
+        readDouble();
+      }
+      builder->setVertex(static_cast<long>(index), x);
+    }
+  }
+  expectToken("$EndNodes");
+}
+
+void GMSH4Parser::parseElements() {
+  if (!hasNodes) {
+    fail("Expected $Nodes before $Elements");
+  }
+  const std::size_t numBlocks = readSize();
+  const std::size_t numElements = readSize();
+  readSize(); // minimal element tag
+  readSize(); // maximal element tag
+  builder->setNumElements(numElements);
+
+  std::array<long, MaxNodesPerElement> nodes{};
+
+  for (std::size_t blockIdx = 0; blockIdx < numBlocks; ++blockIdx) {
+    const long dim = readInt();
+    const long entityTag = readInt();
+    input->skipWhitespace();
+    const auto typeOffset = input->offset();
+    const long type = readInt();
+    if (type < 1 || type > static_cast<long>(NumTypes) || NumNodes[type - 1] == 0) {
+      failAt(typeOffset, "Unknown element type " + std::to_string(type));
+    }
+    const std::size_t numNodesPerElement = NumNodes[type - 1];
+    const std::size_t numElementsInBlock = readSize();
+    const long tag = numElementsInBlock > 0 ? physicalTag(dim, entityTag) : 0;
+
+    for (std::size_t elementIdx = 0; elementIdx < numElementsInBlock; ++elementIdx) {
+      readSize(); // element tag
+      for (std::size_t nodeIdx = 0; nodeIdx < numNodesPerElement; ++nodeIdx) {
+        nodes[nodeIdx] = static_cast<long>(readNodeIndex());
+      }
+      builder->addElement(type, tag, nodes.data(), numNodesPerElement);
+    }
+  }
+  expectToken("$EndElements");
+}
+
+void GMSH4Parser::parsePeriodic() {
+  if (!hasNodes) {
+    fail("Expected $Nodes before $Periodic");
+  }
+  const std::size_t numPeriodic = readSize();
+
+  // only the node identification is needed
+  for (std::size_t blockIdx = 0; blockIdx < numPeriodic; ++blockIdx) {
+    readInt(); // entity dimension
+    readInt(); // entity tag
+    readInt(); // master entity tag
+    const std::size_t numAffine = readSize();
+    for (std::size_t i = 0; i < numAffine; ++i) {
+      readDouble();
+    }
+    const std::size_t numIdentified = readSize();
+    for (std::size_t i = 0; i < numIdentified; ++i) {
+      const std::size_t node = readNodeIndex();
+      const std::size_t master = readNodeIndex();
+      builder->addVertexLink(node, master);
+    }
+  }
+  expectToken("$EndPeriodic");
+}
+
+long GMSH4Parser::physicalTag(std::size_t dim, long entityTag) {
   if (dim != 2 && dim != 3) {
     return 0;
   }
@@ -77,305 +251,6 @@ long GMSH4Parser::physicalTag(std::size_t dim, unsigned long entityTag) {
     return 0;
   }
   return it->second;
-}
-
-bool GMSH4Parser::parseEntities() {
-  getNextToken();
-  const std::size_t numPoints = expectNonNegativeInt();
-  getNextToken();
-  const std::size_t numCurves = expectNonNegativeInt();
-  getNextToken();
-  const std::size_t numSurfaces = expectNonNegativeInt();
-  getNextToken();
-  const std::size_t numVolumes = expectNonNegativeInt();
-
-  // ignore points
-  for (std::size_t i = 0; i < numPoints; ++i) {
-    getNextToken();
-    [[maybe_unused]] const std::size_t id = expectNonNegativeInt();
-    getNextToken();
-    [[maybe_unused]] const double x_1 = expectNumber();
-    getNextToken();
-    [[maybe_unused]] const double y_1 = expectNumber();
-    getNextToken();
-    [[maybe_unused]] const double z_1 = expectNumber();
-    getNextToken();
-    const std::size_t numTags = expectNonNegativeInt();
-    // ignore tags
-    for (std::size_t tagIdx = 0; tagIdx < numTags; tagIdx++) {
-      getNextToken();
-    }
-  }
-
-  //  ignore curves
-  for (std::size_t i = 0; i < numCurves; ++i) {
-    getNextToken();
-    [[maybe_unused]] const std::size_t id = expectNonNegativeInt();
-    getNextToken();
-    [[maybe_unused]] const double x_1 = expectNumber();
-    getNextToken();
-    [[maybe_unused]] const double y_1 = expectNumber();
-    getNextToken();
-    [[maybe_unused]] const double z_1 = expectNumber();
-    getNextToken();
-    [[maybe_unused]] const double x_2 = expectNumber();
-    getNextToken();
-    [[maybe_unused]] const double y_2 = expectNumber();
-    getNextToken();
-    [[maybe_unused]] const double z_2 = expectNumber();
-    getNextToken();
-    const std::size_t numPhysicalTags = expectNonNegativeInt();
-    getNextToken();
-    // ignore tags
-    for (std::size_t tagIdx = 0; tagIdx < numPhysicalTags; tagIdx++) {
-      getNextToken();
-    }
-    std::size_t numBoundaryTags = expectNonNegativeInt();
-    // ignore boundary
-    for (std::size_t tagIdx = 0; tagIdx < numBoundaryTags; tagIdx++) {
-      getNextToken();
-    }
-  }
-
-  //  read surfaces
-  for (std::size_t i = 0; i < numSurfaces; ++i) {
-    getNextToken();
-    const std::size_t id = expectNonNegativeInt();
-    getNextToken();
-    [[maybe_unused]] const double x_1 = expectNumber();
-    getNextToken();
-    [[maybe_unused]] const double y_1 = expectNumber();
-    getNextToken();
-    [[maybe_unused]] const double z_1 = expectNumber();
-    getNextToken();
-    [[maybe_unused]] const double x_2 = expectNumber();
-    getNextToken();
-    [[maybe_unused]] const double y_2 = expectNumber();
-    getNextToken();
-    [[maybe_unused]] const double z_2 = expectNumber();
-    getNextToken();
-    const std::size_t numPhysicalTags = expectNonNegativeInt();
-    std::vector<std::size_t> tags;
-    for (std::size_t tagIdx = 0; tagIdx < numPhysicalTags; ++tagIdx) {
-      getNextToken();
-      tags.push_back(expectNonNegativeInt());
-    }
-    if (!tags.empty()) {
-      physicalSurfaceIds.insert_or_assign(id, tags.at(0));
-    }
-    getNextToken();
-    std::size_t numBoundaryTags = expectNonNegativeInt();
-    // ignore boundary
-    for (std::size_t curveIdx = 0; curveIdx < numBoundaryTags; ++curveIdx) {
-      getNextToken();
-    }
-  }
-
-  //  read volumes
-  for (std::size_t i = 0; i < numVolumes; ++i) {
-    getNextToken();
-    const std::size_t id = expectNonNegativeInt();
-    getNextToken();
-    [[maybe_unused]] const double x_1 = expectNumber();
-    getNextToken();
-    [[maybe_unused]] const double y_1 = expectNumber();
-    getNextToken();
-    [[maybe_unused]] const double z_1 = expectNumber();
-    getNextToken();
-    [[maybe_unused]] const double x_2 = expectNumber();
-    getNextToken();
-    [[maybe_unused]] const double y_2 = expectNumber();
-    getNextToken();
-    [[maybe_unused]] const double z_2 = expectNumber();
-    getNextToken();
-    const std::size_t numPhysicalTags = expectNonNegativeInt();
-    std::vector<std::size_t> tags;
-    for (std::size_t tagIdx = 0; tagIdx < numPhysicalTags; ++tagIdx) {
-      getNextToken();
-      tags.push_back(expectNonNegativeInt());
-    }
-    if (!tags.empty()) {
-      physicalVolumeIds.insert_or_assign(id, tags.at(0));
-    }
-    getNextToken();
-    const std::size_t numBoundaryTags = expectNonNegativeInt();
-    // ignore boundary
-    for (std::size_t curveIdx = 0; curveIdx < numBoundaryTags; ++curveIdx) {
-      getNextToken();
-    }
-  }
-  getNextToken();
-  if (curTok != tndm::GMSHToken::end_entities) {
-    return logErrorAnnotated<bool>("Expected $EndEntities");
-  }
-  getNextToken();
-  return true;
-}
-
-bool GMSH4Parser::parseNodes() {
-  getNextToken();
-  const std::size_t numBlocks = expectNonNegativeInt();
-  getNextToken();
-  const std::size_t numVertices = expectNonNegativeInt();
-  getNextToken();
-  const std::size_t minNodeTag = expectNonNegativeInt();
-  getNextToken();
-  const std::size_t maxNodeTag = expectNonNegativeInt();
-  if (numVertices > 0 &&
-      (minNodeTag == 0 || maxNodeTag < minNodeTag || maxNodeTag - minNodeTag + 1 != numVertices)) {
-    char buf[192];
-    snprintf(buf, sizeof(buf),
-             "Non-contiguous node tags are not supported (%zu nodes with tags from %zu to %zu)",
-             numVertices, minNodeTag, maxNodeTag);
-    return logErrorAnnotated<bool>(buf);
-  }
-  hasNodes = true;
-  firstNodeTag = minNodeTag;
-  numNodes = numVertices;
-  builder->setNumVertices(numVertices);
-
-  // with as many distinct tags as the tag range is long, every node is defined exactly once
-  std::vector<bool> defined(numVertices, false);
-
-  for (std::size_t blockIdx = 0; blockIdx < numBlocks; blockIdx++) {
-    getNextToken();
-    const std::size_t dim = expectNonNegativeInt();
-    getNextToken();
-    [[maybe_unused]] const std::size_t entityTag = expectNonNegativeInt();
-    getNextToken();
-    const std::size_t parametric = expectNonNegativeInt();
-    getNextToken();
-    const std::size_t numVerticesInBlock = expectNonNegativeInt();
-    std::vector<std::size_t> vertexIds;
-    vertexIds.reserve(numVerticesInBlock);
-    // first read vertex ids
-    for (std::size_t vertexIdx = 0; vertexIdx < numVerticesInBlock; ++vertexIdx) {
-      getNextToken();
-      const std::size_t index = expectNodeIndex();
-      if (defined[index]) {
-        char buf[128];
-        snprintf(buf, sizeof(buf), "Duplicate node tag %zu", firstNodeTag + index);
-        return logErrorAnnotated<bool>(buf);
-      }
-      defined[index] = true;
-      vertexIds.push_back(index);
-    }
-    // then read vertex data; parametric nodes carry dim additional parametric coordinates
-    const std::size_t numParametric = parametric != 0 ? dim : 0;
-    for (std::size_t vertexIdx = 0; vertexIdx < numVerticesInBlock; ++vertexIdx) {
-      std::array<double, 3> x{};
-      for (std::size_t i = 0; i < 3; i++) {
-        getNextToken();
-        x[i] = expectNumber();
-      }
-      for (std::size_t i = 0; i < numParametric; ++i) {
-        getNextToken();
-        expectNumber();
-      }
-      builder->setVertex(vertexIds[vertexIdx], x);
-    }
-  }
-  getNextToken();
-  if (curTok != tndm::GMSHToken::end_nodes) {
-    return logErrorAnnotated<bool>("Expected $EndNodes");
-  }
-  getNextToken();
-  return true;
-}
-
-bool GMSH4Parser::parseElements() {
-  if (!hasNodes) {
-    return logErrorAnnotated<bool>("Expected $Nodes before $Elements");
-  }
-  getNextToken();
-  const std::size_t numBlocks = expectNonNegativeInt();
-  getNextToken();
-  const std::size_t numElements = expectNonNegativeInt();
-  getNextToken();
-  [[maybe_unused]] const std::size_t minElementTag = expectNonNegativeInt();
-  getNextToken();
-  [[maybe_unused]] const std::size_t maxElementTag = expectNonNegativeInt();
-  builder->setNumElements(numElements);
-
-  std::array<long, MaxNodesPerElement> nodes{};
-
-  for (std::size_t blockIdx = 0; blockIdx < numBlocks; blockIdx++) {
-    getNextToken();
-    const std::size_t dim = expectNonNegativeInt();
-    getNextToken();
-    const std::size_t entityTag = expectNonNegativeInt();
-    getNextToken();
-    const std::size_t type = expectNonNegativeInt();
-    if (type < 1 || type > NumTypes || NumNodes[type - 1] == 0) {
-      char buf[128];
-      snprintf(buf, sizeof(buf), "Unknown element type %zu", type);
-      return logErrorAnnotated<bool>(buf);
-    }
-    getNextToken();
-    const std::size_t numElementsInBlock = expectNonNegativeInt();
-    const long tag = numElementsInBlock > 0 ? physicalTag(dim, entityTag) : 0;
-    for (std::size_t elementIdx = 0; elementIdx < numElementsInBlock; ++elementIdx) {
-      getNextToken();
-      [[maybe_unused]] const std::size_t id = expectNonNegativeInt();
-      for (std::size_t nodeIdx = 0; nodeIdx < NumNodes[type - 1]; nodeIdx++) {
-        getNextToken();
-        nodes[nodeIdx] = static_cast<long>(expectNodeIndex());
-      }
-      builder->addElement(static_cast<long>(type), tag, nodes.data(), NumNodes[type - 1]);
-    }
-  }
-  getNextToken();
-  if (curTok != tndm::GMSHToken::end_elements) {
-    return logErrorAnnotated<bool>("Expected $EndElements");
-  }
-  getNextToken();
-
-  return true;
-}
-
-bool GMSH4Parser::parsePeriodic() {
-  if (!hasNodes) {
-    return logErrorAnnotated<bool>("Expected $Nodes before $Periodic");
-  }
-  getNextToken();
-  const auto numPeriodic = expectNonNegativeInt();
-
-  // ignore everything but the node identification
-
-  for (std::size_t blockIdx = 0; blockIdx < numPeriodic; blockIdx++) {
-    getNextToken();
-    [[maybe_unused]] const std::size_t entityDim = expectNonNegativeInt();
-    getNextToken();
-    [[maybe_unused]] const std::size_t entityId = expectNonNegativeInt();
-    getNextToken();
-    [[maybe_unused]] const std::size_t entityIdentifyId = expectNonNegativeInt();
-
-    getNextToken();
-    const std::size_t affineSize = expectNonNegativeInt();
-    for (std::size_t i = 0; i < affineSize; ++i) {
-      getNextToken();
-      [[maybe_unused]] const double affineValue = expectNumber();
-    }
-
-    getNextToken();
-    const std::size_t identifySize = expectNonNegativeInt();
-
-    for (std::size_t i = 0; i < identifySize; ++i) {
-      getNextToken();
-      const std::size_t nodeId = expectNodeIndex();
-      getNextToken();
-      const std::size_t nodeIdentifyId = expectNodeIndex();
-      builder->addVertexLink(nodeId, nodeIdentifyId);
-    }
-  }
-
-  getNextToken();
-  if (curTok != tndm::GMSHToken::end_periodic) {
-    return logErrorAnnotated<bool>("Expected $EndPeriodic");
-  }
-  getNextToken();
-
-  return true;
 }
 
 } // namespace puml

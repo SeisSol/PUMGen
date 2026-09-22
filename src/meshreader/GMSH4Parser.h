@@ -4,72 +4,53 @@
 #ifndef PUMGEN_SRC_MESHREADER_GMSH4PARSER_H_
 #define PUMGEN_SRC_MESHREADER_GMSH4PARSER_H_
 
-#include <cstdio>
+#include <cstddef>
 #include <map>
 #include <set>
-#include <string>
-#include <string_view>
 
-#include "meshreader/GMSHBuilder.h"
-#include "third_party/GMSHLexer.h"
-#include "third_party/GMSHParser.h"
+#include "GMSHParser.h"
 
 namespace puml {
 
-class GMSH4Parser : public tndm::GMSHParser {
+/**
+ * Parser for MSH 4.1 files.
+ */
+class GMSH4Parser : public GMSHParser {
   public:
-  using tndm::GMSHParser::GMSHParser;
+  using GMSHParser::GMSHParser;
 
   private:
-  std::map<unsigned long, long> physicalSurfaceIds;
-  std::map<unsigned long, long> physicalVolumeIds;
-  // surface and volume entities with elements, but without a physical group
-  std::set<unsigned long> unassignedSurfaces;
-  std::set<unsigned long> unassignedVolumes;
+  void parse_() override;
+  void parseEntities();
+  void parseNodes();
+  void parseElements();
+  void parsePeriodic();
+
+  // the values of the sections
+  std::size_t readSize() { return expectSize(); }
+  long readInt() { return expectInteger(); }
+  double readDouble() { return expectNumber(); }
+
+  /**
+   * Reads a node tag and returns the index of the node.
+   */
+  std::size_t readNodeIndex();
 
   /**
    * The physical tag of the elements of an entity; 0 if the entity has no physical group.
    */
-  long physicalTag(std::size_t dim, unsigned long entityTag);
+  long physicalTag(std::size_t dim, long entityTag);
+
+  std::map<long, long> physicalSurfaceIds;
+  std::map<long, long> physicalVolumeIds;
+  // surface and volume entities with elements, but without a physical group
+  std::set<long> unassignedSurfaces;
+  std::set<long> unassignedVolumes;
 
   // the node tags form the contiguous range [firstNodeTag, firstNodeTag + numNodes)
   bool hasNodes = false;
   std::size_t firstNodeTag = 0;
   std::size_t numNodes = 0;
-
-  /**
-   * Reads a node tag and returns the index of the node.
-   */
-  std::size_t expectNodeIndex() {
-    const std::size_t tag = expectNonNegativeInt();
-    if (tag < firstNodeTag || tag - firstNodeTag >= numNodes) {
-      char buf[128];
-      snprintf(buf, sizeof(buf), "Unknown node tag %zu", tag);
-      return logErrorAnnotated<std::size_t>(buf);
-    }
-    return tag - firstNodeTag;
-  }
-
-  unsigned long expectNonNegativeInt() {
-    if (curTok != tndm::GMSHToken::integer || lexer.getInteger() < 0) {
-      return logErrorAnnotated<bool>("Expected non-negative integer");
-    }
-    return static_cast<unsigned long>(lexer.getInteger());
-  }
-
-  double expectNumber() {
-    auto num = getNumber();
-    if (!num) {
-      return logErrorAnnotated<bool>("Expected number");
-    }
-    return num.value();
-  }
-
-  bool parseEntities();
-  bool parseNodes();
-  bool parseElements();
-  bool parsePeriodic();
-  virtual bool parse_() override;
 };
 
 } // namespace puml

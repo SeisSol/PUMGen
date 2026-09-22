@@ -2,20 +2,18 @@
 // SPDX-FileCopyrightText: 2020 Ludwig-Maximilians-Universität München
 //
 // SPDX-License-Identifier: BSD-3-Clause
-#ifndef PUMGEN_SRC_THIRD_PARTY_GMSHPARSER_H_
-#define PUMGEN_SRC_THIRD_PARTY_GMSHPARSER_H_
+#ifndef PUMGEN_SRC_MESHREADER_GMSHPARSER_H_
+#define PUMGEN_SRC_MESHREADER_GMSHPARSER_H_
 
-#include <fstream>
-#include <optional>
-#include <sstream>
-#include <stdexcept>
+#include <cstddef>
+#include <memory>
 #include <string>
 #include <string_view>
 
-#include "GMSHLexer.h"
 #include "GMSHMeshBuilder.h"
+#include "MshInput.h"
 
-namespace tndm {
+namespace puml {
 
 namespace detail {
 template <std::size_t N> constexpr std::size_t maxEntry(const std::size_t (&values)[N]) {
@@ -27,6 +25,9 @@ template <std::size_t N> constexpr std::size_t maxEntry(const std::size_t (&valu
 }
 } // namespace detail
 
+/**
+ * Common parts of the MSH parsers: element types, error handling and reading of text values.
+ */
 class GMSHParser {
   public:
   // Look-up table from gmsh type to number of nodes
@@ -163,80 +164,93 @@ class GMSHParser {
   static constexpr std::size_t NumTypes = sizeof(NumNodes) / sizeof(NumNodes[0]);
   static constexpr std::size_t MaxNodesPerElement = detail::maxEntry(NumNodes);
 
-  explicit GMSHParser(GMSHMeshBuilder* builder) : builder(builder) {};
-  [[nodiscard]] std::string_view getErrorMessage() const { return errorMsg; }
+  explicit GMSHParser(GMSHMeshBuilder* builder,
+                      std::size_t bufferSize = MshInput::DefaultBufferSize)
+      : builder(builder), bufferSize(bufferSize) {}
+  virtual ~GMSHParser() = default;
 
   /**
    * Parses the file; stops at the first error, whose description getErrorMessage() returns.
    */
-  bool parseFile(std::string const& fileName) {
-    errorMsg.clear();
-    std::ifstream in(fileName);
-    if (!in.is_open()) {
-      errorMsg = "GMSH parser error:\n\tUnable to open MSH file\n";
-      return false;
-    }
-    lexer.setIStream(&in);
-    try {
-      return parse_();
-    } catch (const ParseError&) {
-      return false;
-    } catch (const std::runtime_error& error) {
-      appendAnnotated(error.what());
-      return false;
-    }
-  }
+  bool parseFile(const std::string& fileName);
+
+  [[nodiscard]] std::string_view getErrorMessage() const { return errorMsg; }
 
   protected:
+  struct MeshFormat {
+    double version;
+    long fileType;
+    std::size_t dataSize;
+  };
+
   /**
    * Thrown after an error has been recorded in errorMsg.
    */
   struct ParseError {};
 
-  template <typename T> T logErrorAnnotated(std::string_view msg) {
-    appendAnnotated(msg);
-    throw ParseError{};
+  /**
+   * Records an error at the given file offset and aborts parsing.
+   */
+  [[noreturn]] void failAt(std::size_t offset, std::string_view message);
+
+  /**
+   * Records an error at the next token and aborts parsing.
+   */
+  [[noreturn]] void fail(std::string_view message);
+
+  /**
+   * Records an error concerning the whole file and aborts parsing.
+   */
+  [[noreturn]] void failFile(std::string_view message);
+
+  std::size_t expectSize() {
+    if (const auto value = input->readInteger<std::size_t>()) {
+      return *value;
+    }
+    fail("Expected non-negative integer");
   }
 
-  template <typename T> T logError(std::string_view msg) {
-    errorMsg += "GMSH parser error:\n\t";
-    errorMsg += msg;
-    errorMsg += '\n';
-    throw ParseError{};
+  long expectInteger() {
+    if (const auto value = input->readInteger<long>()) {
+      return *value;
+    }
+    fail("Expected integer");
   }
+
+  double expectNumber() {
+    if (const auto value = input->readReal()) {
+      return *value;
+    }
+    fail("Expected number");
+  }
+
+  void expectToken(std::string_view token);
+
+  /**
+   * Reads the $MeshFormat section up to (and including) the data size.
+   */
+  MeshFormat parseMeshFormatHeader();
+
+  /**
+   * Returns the name of the next section (e.g. "$Nodes"), or an empty view at the end of the file.
+   */
+  std::string_view nextSection();
+
+  /**
+   * Skips the rest of a section which is not needed.
+   */
+  void skipSection(std::string_view section);
+
+  virtual void parse_() = 0;
 
   GMSHMeshBuilder* builder;
-  GMSHSourceLocation curLoc = {0, 0};
-  GMSHToken curTok;
-  GMSHLexer lexer;
-  std::string errorMsg;
-
-  GMSHToken getNextToken() {
-    curLoc = lexer.getSourceLoc();
-    return curTok = lexer.getToken();
-  }
-
-  std::optional<double> getNumber() {
-    if (curTok == GMSHToken::integer) {
-      return {lexer.getInteger()};
-    } else if (curTok == GMSHToken::real) {
-      return {lexer.getReal()};
-    }
-    return std::nullopt;
-  }
-
-  virtual bool parse_() = 0;
-
-  double parseMeshFormat();
+  std::unique_ptr<MshInput> input;
 
   private:
-  void appendAnnotated(std::string_view msg) {
-    std::stringstream ss;
-    ss << "GMSH parser error in line " << curLoc.line << " in column " << curLoc.col << ":\n";
-    ss << '\t' << msg << '\n';
-    errorMsg += ss.str();
-  }
+  std::size_t bufferSize;
+  std::string errorMsg;
 };
-} // namespace tndm
 
-#endif // PUMGEN_SRC_THIRD_PARTY_GMSHPARSER_H_
+} // namespace puml
+
+#endif // PUMGEN_SRC_MESHREADER_GMSHPARSER_H_
