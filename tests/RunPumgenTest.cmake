@@ -9,6 +9,7 @@
 #   OUTPUT        file written by pumgen
 #   REFERENCE     (optional) reference PUML file the output has to match
 #   TOLERANCE     (optional) absolute tolerance for the vertex coordinates
+#   IDENTIFY      (optional) also compare the vertex identification of periodic meshes
 #   H5DIFF        h5diff executable, required together with REFERENCE
 #   EXPECT_ERROR  (optional) pumgen has to fail with a message matching this regular expression
 
@@ -39,7 +40,11 @@ endif()
 
 if(DEFINED REFERENCE)
   set(failures "")
-  foreach(dataset connect geometry group boundary)
+  set(datasets connect geometry group boundary)
+  if(IDENTIFY)
+    list(APPEND datasets identify)
+  endif()
+  foreach(dataset ${datasets})
     set(options "")
     if(dataset STREQUAL "geometry" AND DEFINED TOLERANCE)
       set(options -d ${TOLERANCE})

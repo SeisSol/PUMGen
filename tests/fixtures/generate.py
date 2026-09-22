@@ -99,7 +99,28 @@ def reference_data():
     return vertices, np.asarray(cells), np.asarray(groups), np.asarray(boundary)
 
 
-def write_reference(path, mesh_file):
+def periodic_identification(num_vertices):
+    """Each vertex is identified with the smallest vertex index of its periodic class."""
+    parent = list(range(num_vertices))
+
+    def find(v):
+        while parent[v] != v:
+            parent[v] = parent[parent[v]]
+            v = parent[v]
+        return v
+
+    for dim in range(3):
+        for _, tag in gmsh.model.getEntities(dim):
+            master, nodes, master_nodes, _ = gmsh.model.mesh.getPeriodicNodes(dim, tag)
+            if master == tag:
+                continue
+            for node, master_node in zip(nodes, master_nodes):
+                a, b = find(int(node) - 1), find(int(master_node) - 1)
+                parent[max(a, b)] = min(a, b)
+    return np.array([find(v) for v in range(num_vertices)])
+
+
+def write_reference(path, mesh_file, periodic=False):
     """Reference PUML data from a written mesh file, so coordinates match their text form."""
     gmsh.clear()
     gmsh.open(mesh_file)
@@ -109,6 +130,8 @@ def write_reference(path, mesh_file):
         out.create_dataset("geometry", data=vertices.astype("<f8"))
         out.create_dataset("group", data=groups.astype("<i4"))
         out.create_dataset("boundary", data=boundary.astype("<i4"))
+        if periodic:
+            out.create_dataset("identify", data=periodic_identification(len(vertices)).astype("<u8"))
 
 
 def write_mesh(path, version, binary=False):
@@ -164,6 +187,27 @@ def generate_coarse():
 
     write_reference("coarse.puml.h5", "coarse-v41.msh")
     write_reference("coarse-o2.puml.h5", "coarse-o2-v41.msh")
+
+
+def generate_periodic():
+    gmsh.clear()
+    gmsh.model.add("periodic")
+    gmsh.model.occ.addBox(0, 0, 0, 1, 1, 1)
+    gmsh.model.occ.synchronize()
+    translation = [1, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
+    left = [tag for _, tag in gmsh.model.getEntitiesInBoundingBox(-TOL, -TOL, -TOL, TOL, 1 + TOL, 1 + TOL, 2)]
+    right = [tag for _, tag in gmsh.model.getEntitiesInBoundingBox(1 - TOL, -TOL, -TOL, 1 + TOL, 1 + TOL, 1 + TOL, 2)]
+    gmsh.model.mesh.setPeriodic(2, right, left, translation)
+    gmsh.model.addPhysicalGroup(3, [1], 1)
+    others = [tag for _, tag in gmsh.model.getEntities(2) if tag not in left + right]
+    gmsh.model.addPhysicalGroup(2, others, FREE_SURFACE)
+    gmsh.option.setNumber("Mesh.MeshSizeMax", 0.4)
+    gmsh.model.mesh.generate(3)
+    write_mesh("periodic-v41.msh", 4.1)
+    gmsh.option.setNumber("Mesh.SaveParametric", 1)
+    write_mesh("periodic-parametric-v41.msh", 4.1)
+    gmsh.option.setNumber("Mesh.SaveParametric", 0)
+    write_reference("periodic.puml.h5", "periodic-v41.msh", periodic=True)
 
 
 TINY_V41 = """$MeshFormat
@@ -238,6 +282,7 @@ def main():
     gmsh.option.setNumber("Mesh.Algorithm3D", 1)
     generate_layered()
     generate_coarse()
+    generate_periodic()
     generate_tiny()
     gmsh.finalize()
 

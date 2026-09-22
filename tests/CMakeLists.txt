@@ -12,11 +12,11 @@ set(PUMGEN_TEST_OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/output)
 file(MAKE_DIRECTORY ${PUMGEN_TEST_OUTPUT})
 
 # pumgen_add_test(<name> RANKS <n> SOURCE <source> INPUT <fixture>
-#                 [REFERENCE <fixture> [TOLERANCE <tolerance>]] [EXPECT_ERROR <regex>]
+#                 [REFERENCE <fixture> [TOLERANCE <tolerance>] [IDENTIFY]] [EXPECT_ERROR <regex>]
 #                 [ARGS <argument>...])
 function(pumgen_add_test name)
-  cmake_parse_arguments(PARSE_ARGV 1 TEST "" "RANKS;SOURCE;INPUT;REFERENCE;TOLERANCE;EXPECT_ERROR"
-                        "ARGS")
+  cmake_parse_arguments(PARSE_ARGV 1 TEST "IDENTIFY"
+                        "RANKS;SOURCE;INPUT;REFERENCE;TOLERANCE;EXPECT_ERROR" "ARGS")
   set(output ${PUMGEN_TEST_OUTPUT}/${name}.puml.h5)
   set(command
       ${MPIEXEC_EXECUTABLE}
@@ -40,6 +40,9 @@ function(pumgen_add_test name)
          -DH5DIFF=${H5DIFF_EXECUTABLE})
     if(DEFINED TEST_TOLERANCE)
       list(APPEND script_args -DTOLERANCE=${TEST_TOLERANCE})
+    endif()
+    if(TEST_IDENTIFY)
+      list(APPEND script_args -DIDENTIFY=ON)
     endif()
   endif()
 
@@ -111,3 +114,9 @@ pumgen_add_test(msh4.coarse-binary RANKS 1 SOURCE msh4 INPUT coarse-binary-v41.m
                 EXPECT_ERROR "Binary MSH files are not supported")
 pumgen_add_test(msh2.tiny-as-msh4 RANKS 1 SOURCE msh2 INPUT tiny-v41.msh
                 EXPECT_ERROR "Unsupported MSH version 4.1")
+
+# periodic meshes
+foreach(ranks 1 2 3)
+  pumgen_add_test(msh4.periodic.np${ranks} RANKS ${ranks} SOURCE msh4 INPUT periodic-v41.msh
+                  REFERENCE periodic.puml.h5 IDENTIFY)
+endforeach()

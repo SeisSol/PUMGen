@@ -47,10 +47,12 @@ template <typename P, std::size_t OrderP> class ParallelGMSHReader {
 
       nVertices_ = builder_.vertices.size();
       nElements_ = builder_.elements.size();
+      hasIdentify_ = builder_.identify.empty() ? 0 : 1;
     }
 
     MPI_Bcast(&nVertices_, 1, tndm::mpi_type_t<decltype(nVertices_)>(), 0, comm_);
     MPI_Bcast(&nElements_, 1, tndm::mpi_type_t<decltype(nElements_)>(), 0, comm_);
+    MPI_Bcast(&hasIdentify_, 1, tndm::mpi_type_t<decltype(hasIdentify_)>(), 0, comm_);
   }
 
   [[nodiscard]] std::size_t nVertices() const { return nVertices_; }
@@ -71,7 +73,7 @@ template <typename P, std::size_t OrderP> class ParallelGMSHReader {
   void readGroups(int* groups) const { scatter(builder_.groups.data(), groups, nElements(), 1); }
 
   constexpr static bool SupportsIdentify = true;
-  bool hasIdentify() const { return !builder_.identify.empty(); }
+  bool hasIdentify() const { return hasIdentify_ != 0; }
   void readIdentify(std::size_t* vertices) const {
     scatter(builder_.identify.data(), vertices, nVertices(), 1);
   }
@@ -175,6 +177,8 @@ template <typename P, std::size_t OrderP> class ParallelGMSHReader {
   std::vector<bc_t> bcs_;
   std::size_t nVertices_ = 0;
   std::size_t nElements_ = 0;
+  // only rank 0 parses the file, so all ranks need this flag for the collective reads and writes
+  int hasIdentify_ = 0;
 };
 
 } // namespace puml
