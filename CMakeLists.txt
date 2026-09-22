@@ -13,6 +13,7 @@ set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-omit-frame-pointer -fsa
 set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
 
 option(SIMMETRIX "Use simmetrix libraries" OFF)
+option(EASI "Build the velocity-aware sizing with easi (always on with SIMMETRIX)" OFF)
 set(SIMMETRIX_ROOT "" CACHE STRING "Root directory of simmetrix dev files")
 set(SIM_MPI "" CACHE STRING "MPI version used by simmetrix")
 option(NETCDF "Use netcdf" OFF)
@@ -93,10 +94,6 @@ target_link_libraries(pumgen PUBLIC tinyxml2)
 if (SIMMETRIX)
     find_package(SIMMETRIX REQUIRED)
 
-    # easi
-    find_package(easi 1.0.0 REQUIRED)
-    target_link_libraries(pumgen PUBLIC easi::easi)
-
     target_sources(pumgen PUBLIC
       ${CMAKE_CURRENT_SOURCE_DIR}/src/input/AnalysisAttributes.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/src/input/EasiMeshSize.cpp
@@ -134,6 +131,25 @@ endfunction()
 
 cast_log_level_to_int(LOG_LEVEL LOG_LEVEL)
 target_compile_definitions(pumgen PUBLIC LOG_LEVEL=${LOG_LEVEL})
+
+if (SIMMETRIX)
+  set(EASI ON)
+endif()
+if (EASI)
+  find_package(easi 1.0.0 REQUIRED)
+  add_library(pumgen_sizing STATIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/sizing/VelocityAwareSettings.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/sizing/VelocityAwareMeshSize.cpp
+  )
+  target_include_directories(pumgen_sizing PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/submodules
+  )
+  target_compile_definitions(pumgen_sizing PRIVATE LOG_LEVEL=${LOG_LEVEL})
+  target_link_libraries(pumgen_sizing PUBLIC easi::easi tinyxml2)
+  target_link_libraries(pumgen PUBLIC pumgen_sizing)
+  target_compile_definitions(pumgen PUBLIC USE_EASI)
+endif()
 if(SIMMETRIX)
   set(INSTALL_RPATH "${SIM_PS_KRNL_LIB_DIR}:${INSTALL_RPATH}")
 endif()

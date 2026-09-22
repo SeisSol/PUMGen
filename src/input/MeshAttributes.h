@@ -10,6 +10,7 @@
 #include <list>
 #include <string>
 
+#include "sizing/VelocityAwareSettings.h"
 #include "split.h"
 #include "tinyxml2/tinyxml2.h"
 #include "utils/logger.h"
@@ -23,46 +24,6 @@ const double toRadians = Pi / 180.0;
 
 struct Cube {
   double CubeMSize = 0, CubeCenter[3], CubeWidth[3], CubeHeight[3], CubeDepth[3];
-};
-
-struct SimpleCuboid {
-  std::array<double, 3> center;
-  std::array<double, 3> halfSize;
-  std::array<double, 2> cosSinRotationZ;
-  double rotationZ;
-};
-
-struct VelocityRefinementCube {
-  VelocityRefinementCube(SimpleCuboid cuboid, double targetedFrequency,
-                         int bypassFindRegionAndUseGroup)
-      : cuboid(cuboid), targetedFrequency(targetedFrequency),
-        bypassFindRegionAndUseGroup(bypassFindRegionAndUseGroup) {};
-
-  SimpleCuboid cuboid;
-  double targetedFrequency;
-  int bypassFindRegionAndUseGroup;
-};
-
-class VelocityAwareRefinementSettings {
-  public:
-  VelocityAwareRefinementSettings() = default;
-  VelocityAwareRefinementSettings(double elementsPerWaveLength, std::string easiFileName);
-
-  void addRefinementRegion(SimpleCuboid cuboid, double targetedFrequency,
-                           int bypassFindRegionAndUseGroup);
-
-  [[nodiscard]] bool isVelocityAwareRefinementOn() const;
-
-  [[nodiscard]] const std::string& getEasiFileName() const;
-
-  [[nodiscard]] double getElementsPerWaveLength() const;
-
-  [[nodiscard]] const std::vector<VelocityRefinementCube>& getRefinementRegions() const;
-
-  private:
-  double elementsPerWaveLength{};
-  std::string easiFileName;
-  std::vector<VelocityRefinementCube> refinementRegions{};
 };
 
 enum class ElementType { vertex = 0, edge = 1, face = 2, region = 3 };
