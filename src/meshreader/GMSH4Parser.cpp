@@ -10,14 +10,17 @@
 
 namespace puml {
 bool GMSH4Parser::parse_() {
-  errorMsg.clear();
   getNextToken();
 
   const double version = parseMeshFormat();
   if (version < 4.0 || version >= 5.0) {
     char buf[128];
-    sprintf(buf, "Unsupported MSH version %.1lf", version);
+    snprintf(buf, sizeof(buf), "Unsupported MSH version %.1lf", version);
     return logError<bool>(buf);
+  }
+  if (version < 4.1) {
+    return logError<bool>(
+        "MSH 4.0 is not supported; write the mesh as MSH 4.1 (Mesh.MshFileVersion = 4.1)");
   }
 
   bool hasEntities = false;
@@ -37,7 +40,7 @@ bool GMSH4Parser::parse_() {
       hasElements = parseElements();
       break;
     case tndm::GMSHToken::periodic:
-      hasPeriodic = parsePeriodic(version >= 4.1);
+      hasPeriodic = parsePeriodic();
       break;
     default:
       getNextToken();
@@ -45,7 +48,16 @@ bool GMSH4Parser::parse_() {
     }
   }
 
-  return hasEntities && hasNodes && hasElements;
+  if (!hasEntities) {
+    return logError<bool>("Missing $Entities section");
+  }
+  if (!hasNodes) {
+    return logError<bool>("Missing $Nodes section");
+  }
+  if (!hasElements) {
+    return logError<bool>("Missing $Elements section");
+  }
+  return true;
 }
 
 bool GMSH4Parser::parseEntities() {
@@ -238,9 +250,7 @@ bool GMSH4Parser::parseElements() {
   [[maybe_unused]] const std::size_t maxElementTag = expectNonNegativeInt();
   builder->setNumElements(numElements);
 
-  constexpr std::size_t MaxNodes = sizeof(NumNodes) / sizeof(std::size_t);
-  std::array<long, MaxNodes> nodes{};
-  builder->setNumElements(numElements);
+  std::array<long, MaxNodesPerElement> nodes{};
 
   for (std::size_t blockIdx = 0; blockIdx < numBlocks; blockIdx++) {
     getNextToken();
@@ -249,6 +259,11 @@ bool GMSH4Parser::parseElements() {
     const std::size_t entityTag = expectNonNegativeInt();
     getNextToken();
     const std::size_t type = expectNonNegativeInt();
+    if (type < 1 || type > NumTypes || NumNodes[type - 1] == 0) {
+      char buf[128];
+      snprintf(buf, sizeof(buf), "Unknown element type %zu", type);
+      return logErrorAnnotated<bool>(buf);
+    }
     getNextToken();
     const std::size_t numElementsInBlock = expectNonNegativeInt();
     for (std::size_t elementIdx = 0; elementIdx < numElementsInBlock; ++elementIdx) {
@@ -256,7 +271,7 @@ bool GMSH4Parser::parseElements() {
       [[maybe_unused]] const std::size_t id = expectNonNegativeInt();
       for (std::size_t nodeIdx = 0; nodeIdx < NumNodes[type - 1]; nodeIdx++) {
         getNextToken();
-        nodes.at(nodeIdx) = expectNonNegativeInt() - 1;
+        nodes[nodeIdx] = expectNonNegativeInt() - 1;
       }
       std::size_t tag = (type == 2) ? physicalSurfaceIds[entityTag] : physicalVolumeIds[entityTag];
       builder->addElement(type, tag, nodes.data(), NumNodes[type - 1]);
@@ -271,7 +286,7 @@ bool GMSH4Parser::parseElements() {
   return true;
 }
 
-bool GMSH4Parser::parsePeriodic(bool variableAffine) {
+bool GMSH4Parser::parsePeriodic() {
   getNextToken();
   const auto numPeriodic = expectNonNegativeInt();
 
@@ -285,15 +300,8 @@ bool GMSH4Parser::parsePeriodic(bool variableAffine) {
     getNextToken();
     [[maybe_unused]] const std::size_t entityIdentifyId = expectNonNegativeInt();
 
-    // for MSH4.1 vs MSH4.0
-    const auto affineSize = [&]() -> std::size_t {
-      if (variableAffine) {
-        getNextToken();
-        return expectNonNegativeInt();
-      } else {
-        return 16;
-      }
-    }();
+    getNextToken();
+    const std::size_t affineSize = expectNonNegativeInt();
     for (std::size_t i = 0; i < affineSize; ++i) {
       getNextToken();
       [[maybe_unused]] const double affineValue = expectNumber();

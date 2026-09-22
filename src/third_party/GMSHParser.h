@@ -8,6 +8,7 @@
 #include <fstream>
 #include <optional>
 #include <sstream>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 
@@ -15,6 +16,16 @@
 #include "GMSHMeshBuilder.h"
 
 namespace tndm {
+
+namespace detail {
+template <std::size_t N> constexpr std::size_t maxEntry(const std::size_t (&values)[N]) {
+  std::size_t result = 0;
+  for (std::size_t i = 0; i < N; ++i) {
+    result = values[i] > result ? values[i] : result;
+  }
+  return result;
+}
+} // namespace detail
 
 class GMSHParser {
   public:
@@ -149,33 +160,49 @@ class GMSHParser {
       61,   // MSH_PYR_61
       69,   // MSH_PYR_69
   };
+  static constexpr std::size_t NumTypes = sizeof(NumNodes) / sizeof(NumNodes[0]);
+  static constexpr std::size_t MaxNodesPerElement = detail::maxEntry(NumNodes);
 
   explicit GMSHParser(GMSHMeshBuilder* builder) : builder(builder) {};
   [[nodiscard]] std::string_view getErrorMessage() const { return errorMsg; }
 
+  /**
+   * Parses the file; stops at the first error, whose description getErrorMessage() returns.
+   */
   bool parseFile(std::string const& fileName) {
+    errorMsg.clear();
     std::ifstream in(fileName);
     if (!in.is_open()) {
-      return logError<bool>("Unable to open MSH file");
+      errorMsg = "GMSH parser error:\n\tUnable to open MSH file\n";
+      return false;
     }
     lexer.setIStream(&in);
-    return parse_();
+    try {
+      return parse_();
+    } catch (const ParseError&) {
+      return false;
+    } catch (const std::runtime_error& error) {
+      appendAnnotated(error.what());
+      return false;
+    }
   }
 
   protected:
+  /**
+   * Thrown after an error has been recorded in errorMsg.
+   */
+  struct ParseError {};
+
   template <typename T> T logErrorAnnotated(std::string_view msg) {
-    std::stringstream ss;
-    ss << "GMSH parser error in line " << curLoc.line << " in column " << curLoc.col << ":\n";
-    ss << '\t' << msg << '\n';
-    errorMsg += ss.str();
-    return {};
+    appendAnnotated(msg);
+    throw ParseError{};
   }
 
   template <typename T> T logError(std::string_view msg) {
     errorMsg += "GMSH parser error:\n\t";
     errorMsg += msg;
     errorMsg += '\n';
-    return {};
+    throw ParseError{};
   }
 
   GMSHMeshBuilder* builder;
@@ -201,6 +228,14 @@ class GMSHParser {
   virtual bool parse_() = 0;
 
   double parseMeshFormat();
+
+  private:
+  void appendAnnotated(std::string_view msg) {
+    std::stringstream ss;
+    ss << "GMSH parser error in line " << curLoc.line << " in column " << curLoc.col << ":\n";
+    ss << '\t' << msg << '\n';
+    errorMsg += ss.str();
+  }
 };
 } // namespace tndm
 

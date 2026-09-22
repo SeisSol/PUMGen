@@ -16,8 +16,12 @@ double GMSHParser::parseMeshFormat() {
     return logErrorAnnotated<double>("Expected version number");
   }
   getNextToken();
+  if (curTok == GMSHToken::integer && lexer.getInteger() == 1) {
+    return logErrorAnnotated<double>(
+        "Binary MSH files are not supported; write the mesh as ASCII (Mesh.Binary = 0)");
+  }
   if (curTok != GMSHToken::integer || lexer.getInteger() != 0) {
-    return logErrorAnnotated<double>("Expected 0");
+    return logErrorAnnotated<double>("Expected file type 0 (ASCII)");
   }
   getNextToken(); // skip data-size
   getNextToken();

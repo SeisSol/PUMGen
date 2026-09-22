@@ -40,7 +40,7 @@ class GMSH4Parser : public tndm::GMSHParser {
   bool parseEntities();
   bool parseNodes();
   bool parseElements();
-  bool parsePeriodic(bool variableAffine);
+  bool parsePeriodic();
   virtual bool parse_() override;
 };
 

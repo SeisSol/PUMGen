@@ -97,3 +97,17 @@ pumgen_add_test(msh4.layered.compact.np3 RANKS 3 SOURCE msh4 INPUT layered-v41.m
                 REFERENCE layered.puml.h5 ARGS --compactify-datatypes)
 pumgen_add_test(msh2.coarse-o2.compact.np2 RANKS 2 SOURCE msh2 INPUT coarse-o2-v22.msh
                 REFERENCE coarse-o2.puml.h5 ARGS --compactify-datatypes --order=2)
+
+# malformed or unsupported input
+pumgen_add_test(msh4.tiny-truncated RANKS 1 SOURCE msh4 INPUT tiny-truncated-v41.msh
+                EXPECT_ERROR "GMSH parser error")
+pumgen_add_test(msh4.tiny-badnumber RANKS 1 SOURCE msh4 INPUT tiny-badnumber-v41.msh
+                EXPECT_ERROR "Expected number")
+pumgen_add_test(msh4.tiny-unknowntype RANKS 1 SOURCE msh4 INPUT tiny-unknowntype-v41.msh
+                EXPECT_ERROR "Unknown element type 999")
+pumgen_add_test(msh4.tiny-v40 RANKS 1 SOURCE msh4 INPUT tiny-v40.msh
+                EXPECT_ERROR "MSH 4.0 is not supported")
+pumgen_add_test(msh4.coarse-binary RANKS 1 SOURCE msh4 INPUT coarse-binary-v41.msh
+                EXPECT_ERROR "Binary MSH files are not supported")
+pumgen_add_test(msh2.tiny-as-msh4 RANKS 1 SOURCE msh2 INPUT tiny-v41.msh
+                EXPECT_ERROR "Unsupported MSH version 4.1")

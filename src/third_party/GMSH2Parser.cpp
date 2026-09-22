@@ -10,13 +10,12 @@
 namespace tndm {
 
 bool GMSH2Parser::parse_() {
-  errorMsg.clear();
   getNextToken();
 
   double version = parseMeshFormat();
   if (version < 2.0 || version >= 3.0) {
     char buf[128];
-    sprintf(buf, "Unsupported MSH version %.1lf", version);
+    snprintf(buf, sizeof(buf), "Unsupported MSH version %.1lf", version);
     return logError<bool>(buf);
   }
 
@@ -40,7 +39,13 @@ bool GMSH2Parser::parse_() {
     }
   }
 
-  return hasNodes && hasElements;
+  if (!hasNodes) {
+    return logError<bool>("Missing $Nodes section");
+  }
+  if (!hasElements) {
+    return logError<bool>("Missing $Elements section");
+  }
+  return true;
 }
 
 bool GMSH2Parser::parseNodes() {
@@ -56,7 +61,7 @@ bool GMSH2Parser::parseNodes() {
     if (curTok != GMSHToken::integer || lexer.getInteger() < 1 ||
         lexer.getInteger() > numVertices) {
       char buf[128];
-      sprintf(buf, "Expected node-tag with 1 <= node-tag <= %zu", numVertices);
+      snprintf(buf, sizeof(buf), "Expected node-tag with 1 <= node-tag <= %zu", numVertices);
       return logErrorAnnotated<bool>(buf);
     }
     std::size_t id = lexer.getInteger() - 1;
@@ -87,9 +92,7 @@ bool GMSH2Parser::parseElements() {
   }
   const auto numElements = lexer.getInteger();
 
-  constexpr std::size_t MaxNodes = sizeof(NumNodes) / sizeof(std::size_t);
-  long tag{};
-  std::array<long, MaxNodes> nodes;
+  std::array<long, MaxNodesPerElement> nodes{};
 
   builder->setNumElements(numElements);
 
@@ -100,18 +103,23 @@ bool GMSH2Parser::parseElements() {
     }
 
     getNextToken();
-    if (curTok != GMSHToken::integer || lexer.getInteger() < 1 || lexer.getInteger() > MaxNodes) {
+    if (curTok != GMSHToken::integer) {
+      return logErrorAnnotated<bool>("Expected element-type");
+    }
+    const long type = lexer.getInteger();
+    if (type < 1 || type > static_cast<long>(NumTypes) || NumNodes[type - 1] == 0) {
       char buf[128];
-      sprintf(buf, "Expected element-type with 1 <= element-type <= %zu", MaxNodes);
+      snprintf(buf, sizeof(buf), "Unknown element type %li", type);
       return logErrorAnnotated<bool>(buf);
     }
-    long type = lexer.getInteger();
 
     getNextToken();
     if (curTok != GMSHToken::integer || lexer.getInteger() < 0) {
       return logErrorAnnotated<bool>("Expected number of tags");
     }
     long numTags = lexer.getInteger();
+    // the physical tag; elements without tags get 0
+    long tag = 0;
     for (long tagIdx = 0; tagIdx < numTags; ++tagIdx) {
       getNextToken();
       if (curTok != GMSHToken::integer) {
@@ -126,8 +134,8 @@ bool GMSH2Parser::parseElements() {
       getNextToken();
       if (curTok != GMSHToken::integer || lexer.getInteger() < 1) {
         char buf[128];
-        sprintf(buf, "Expected node number > 0 (%zu/%zu for type %li)", nodeIdx + 1,
-                NumNodes[type - 1], type);
+        snprintf(buf, sizeof(buf), "Expected node number > 0 (%zu/%zu for type %li)", nodeIdx + 1,
+                 NumNodes[type - 1], type);
         return logErrorAnnotated<bool>(buf);
       }
       nodes[nodeIdx] = lexer.getInteger() - 1;
