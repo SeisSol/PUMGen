@@ -136,6 +136,58 @@ def write_reference(path, mesh_file, periodic=False):
             out.create_dataset("identify", data=periodic_identification(len(vertices)).astype("<u8"))
 
 
+def read_msh41_ascii(path):
+    """The nodes by tag and the node tags of the three-dimensional elements in the order of the
+    file, read from an ASCII MSH 4.1 file without gmsh."""
+    lines = open(path).read().split("\n")
+    nodes = {}
+    cells = []
+    i = 0
+    while i < len(lines):
+        if lines[i] == "$Nodes":
+            blocks = int(lines[i + 1].split()[0])
+            i += 2
+            for _ in range(blocks):
+                count = int(lines[i].split()[3])
+                tags = [int(lines[i + 1 + k]) for k in range(count)]
+                for k in range(count):
+                    nodes[tags[k]] = [float(x) for x in lines[i + 1 + count + k].split()[:3]]
+                i += 1 + 2 * count
+        elif lines[i] == "$Elements":
+            blocks = int(lines[i + 1].split()[0])
+            i += 2
+            for _ in range(blocks):
+                dim, _, _, count = (int(x) for x in lines[i].split())
+                if dim == 3:
+                    cells.extend([int(x) for x in lines[i + 1 + k].split()[1:]] for k in range(count))
+                i += 1 + count
+        else:
+            i += 1
+    return nodes, cells
+
+
+def write_high_order_reference(path, mesh_file, linear_reference):
+    """Reference of a mesh of order 2 whose vertices are the ones of the linear reference: the
+    other nodes of every cell, in the order of gmsh, with their offsets and the orders."""
+    nodes, cells = read_msh41_ascii(mesh_file)
+    with h5py.File(linear_reference, "r") as linear:
+        connect = linear["connect"][...]
+        datasets = {name: linear[name][...] for name in ("connect", "geometry", "group", "boundary")}
+    # the vertices are the nodes which are vertices of a cell, numbered in the order of their tags;
+    # they have to give the linear reference
+    vertex = {tag: i for i, tag in enumerate(sorted({tag for cell in cells for tag in cell[:4]}))}
+    assert all([vertex[tag] for tag in cell[:4]] == list(connect[c]) for c, cell in enumerate(cells))
+    geometry = [x for cell in cells for tag in cell[4:] for x in nodes[tag]]
+    offsets = np.cumsum([0] + [3 * (len(cell) - 4) for cell in cells])
+    with h5py.File(path, "w") as out:
+        for name, data in datasets.items():
+            out.create_dataset(name, data=data)
+        out.create_dataset("geometry_ho", data=np.array(geometry, dtype="<f8"))
+        out["geometry_ho"].attrs.create("node-ordering", "gmsh", dtype=h5py.string_dtype("ascii"))
+        out.create_dataset("geometry_ho_offsets", data=offsets.astype("<u8"))
+        out.create_dataset("order", data=np.full(len(cells), 2, dtype="u1"))
+
+
 def write_mesh(path, version, binary=False):
     gmsh.option.setNumber("Mesh.MshFileVersion", version)
     gmsh.option.setNumber("Mesh.Binary", 1 if binary else 0)

@@ -9,6 +9,7 @@
 
 #include <cctype>
 #include <cstddef>
+#include <cstdint>
 #include <fstream>
 #include <limits>
 #include <sstream>
@@ -368,12 +369,12 @@ class GambitReader : public MeshReader {
   }
 
   /**
-   * @copydoc MeshReader::readElements(size_t, size_t, size_t*)
+   * @copydoc MeshReader::readElements(size_t, size_t, uint64_t*)
    *
    * @todo Only tetrahedral meshes are supported
    * @todo Support for varying coordinate/vertexid fields
    */
-  void readElements(std::size_t start, std::size_t count, std::size_t* elements) {
+  void readElements(std::size_t start, std::size_t count, std::uint64_t* elements) {
     m_mesh.clear();
 
     m_mesh.seekg(m_elements.seekPosition + start * m_elements.lineSize + m_elements.vertexStart);

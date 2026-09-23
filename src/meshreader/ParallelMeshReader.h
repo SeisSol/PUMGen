@@ -11,6 +11,7 @@
 
 #include <array>
 #include <cstddef>
+#include <cstdint>
 #include <limits>
 #include <vector>
 
@@ -34,9 +35,7 @@ template <class R> class ParallelMeshReader {
   R m_serialReader;
 
   public:
-  constexpr static std::size_t Order = 1;
-  constexpr static std::size_t Dim = 3;
-  constexpr static bool SupportsIdentify = false;
+  constexpr static bool ProvidesLocalMesh = false;
   ParallelMeshReader(MPI_Comm comm = MPI_COMM_WORLD)
       : m_nVertices(0), m_nElements(0), m_nBoundaries(0), m_comm(comm) {
     init();
@@ -101,9 +100,9 @@ template <class R> class ParallelMeshReader {
    *
    * @todo Only tetrahedral meshes are supported
    */
-  virtual void readElements(std::size_t* elements) {
+  virtual void readElements(std::uint64_t* elements) {
     distributeChunks(m_nElements, 4, elements, "elements",
-                     [&](std::size_t start, std::size_t count, std::size_t* buffer) {
+                     [&](std::size_t start, std::size_t count, std::uint64_t* buffer) {
                        m_serialReader.readElements(start, count, buffer);
                      });
   }

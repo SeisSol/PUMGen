@@ -74,12 +74,12 @@ class SimModSuiteApf : public ApfMeshInput {
   bool m_log;
 
   public:
-  SimModSuiteApf(const char* modFile, int boundarySize, const char* cadFile = nullptr,
+  SimModSuiteApf(const char* modFile, const char* cadFile = nullptr,
                  const char* licenseFile = nullptr, const char* meshCaseName = "mesh",
                  const char* analysisCaseName = "analysis", int enforceSize = 0,
                  const char* xmlFile = nullptr, const bool analyseAR = false,
                  const char* logFile = nullptr)
-      : ApfMeshInput(boundarySize) {
+      : ApfMeshInput() {
     // Init SimModSuite
     SimModel_start();
     SimPartitionedMesh_start(nullptr, nullptr);

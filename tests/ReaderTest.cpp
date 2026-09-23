@@ -31,17 +31,18 @@ bool parse(const std::string& file, std::size_t bufferSize, Builder& builder) {
   return true;
 }
 
-template <typename Parser, std::size_t Order> bool check(const std::string& file) {
-  puml::GMSHBuilder<3, Order> reference;
-  puml::GMSHBuilder<3, Order> tiny;
+template <typename Parser> bool check(const std::string& file) {
+  puml::GMSHBuilder reference;
+  puml::GMSHBuilder tiny;
   if (!parse<Parser>(file, puml::MshInput::DefaultBufferSize, reference) ||
       !parse<Parser>(file, TinyBuffer, tiny)) {
     return false;
   }
-  const bool same = reference.vertices == tiny.vertices && reference.elements == tiny.elements &&
-                    reference.groups == tiny.groups && reference.facets == tiny.facets &&
-                    reference.bcs == tiny.bcs && reference.identify == tiny.identify &&
-                    !reference.elements.empty();
+  const bool same = reference.vertices == tiny.vertices && reference.cellNodes == tiny.cellNodes &&
+                    reference.cellTypes == tiny.cellTypes &&
+                    reference.cellOrders == tiny.cellOrders && reference.groups == tiny.groups &&
+                    reference.facets == tiny.facets && reference.bcs == tiny.bcs &&
+                    reference.identify == tiny.identify && !reference.cellTypes.empty();
   std::printf("%s: %s\n", file.c_str(), same ? "ok" : "DIFFERENT");
   return same;
 }
@@ -65,13 +66,13 @@ bool checkSkippedSection(const std::string& fixtures) {
   const std::string file = "reader-test-skipped-section.msh";
   std::ofstream(file, std::ios::binary) << content;
 
-  puml::GMSHBuilder<3, 1> reference;
-  puml::GMSHBuilder<3, 1> skipped;
+  puml::GMSHBuilder reference;
+  puml::GMSHBuilder skipped;
   const bool ok = parse<puml::GMSH4Parser>(fixtures + "/tiny-v41.msh",
                                            puml::MshInput::DefaultBufferSize, reference) &&
                   parse<puml::GMSH4Parser>(file, TinyBuffer, skipped) &&
                   reference.vertices == skipped.vertices &&
-                  reference.elements == skipped.elements && reference.groups == skipped.groups;
+                  reference.cellNodes == skipped.cellNodes && reference.groups == skipped.groups;
   std::remove(file.c_str());
   std::printf("skipped section: %s\n", ok ? "ok" : "DIFFERENT");
   return ok;
@@ -86,17 +87,17 @@ int main(int argc, char** argv) {
   }
   const std::string fixtures = argv[1];
   bool ok = true;
-  ok &= check<puml::GMSH4Parser, 1>(fixtures + "/layered-v41.msh");
-  ok &= check<puml::GMSH2Parser, 1>(fixtures + "/layered-v22.msh");
-  ok &= check<puml::GMSH4Parser, 1>(fixtures + "/periodic-v41.msh");
-  ok &= check<puml::GMSH4Parser, 1>(fixtures + "/periodic-parametric-v41.msh");
-  ok &= check<puml::GMSH4Parser, 2>(fixtures + "/coarse-o2-v41.msh");
-  ok &= check<puml::GMSH2Parser, 2>(fixtures + "/coarse-o2-v22.msh");
-  ok &= check<puml::GMSH4Parser, 1>(fixtures + "/layered-binary-v41.msh");
-  ok &= check<puml::GMSH4Parser, 1>(fixtures + "/periodic-binary-v41.msh");
-  ok &= check<puml::GMSH4Parser, 1>(fixtures + "/coarse-binary-bigendian-v41.msh");
-  ok &= check<puml::GMSH4Parser, 1>(fixtures + "/coarse-binary-size4-v41.msh");
-  ok &= check<puml::GMSH4Parser, 2>(fixtures + "/coarse-o2-binary-v41.msh");
+  ok &= check<puml::GMSH4Parser>(fixtures + "/layered-v41.msh");
+  ok &= check<puml::GMSH2Parser>(fixtures + "/layered-v22.msh");
+  ok &= check<puml::GMSH4Parser>(fixtures + "/periodic-v41.msh");
+  ok &= check<puml::GMSH4Parser>(fixtures + "/periodic-parametric-v41.msh");
+  ok &= check<puml::GMSH4Parser>(fixtures + "/coarse-o2-v41.msh");
+  ok &= check<puml::GMSH2Parser>(fixtures + "/coarse-o2-v22.msh");
+  ok &= check<puml::GMSH4Parser>(fixtures + "/layered-binary-v41.msh");
+  ok &= check<puml::GMSH4Parser>(fixtures + "/periodic-binary-v41.msh");
+  ok &= check<puml::GMSH4Parser>(fixtures + "/coarse-binary-bigendian-v41.msh");
+  ok &= check<puml::GMSH4Parser>(fixtures + "/coarse-binary-size4-v41.msh");
+  ok &= check<puml::GMSH4Parser>(fixtures + "/coarse-o2-binary-v41.msh");
   ok &= checkSkippedSection(fixtures);
   return ok ? 0 : 1;
 }

@@ -10,6 +10,7 @@
 #   REFERENCE     (optional) reference PUML file the output has to match
 #   TOLERANCE     (optional) absolute tolerance for the vertex coordinates
 #   IDENTIFY      (optional) also compare the vertex identification of periodic meshes
+#   HIGHORDER     (optional) also compare the geometry of higher order and the orders
 #   H5DIFF        h5diff executable, required together with REFERENCE
 #   EXPECT_ERROR  (optional) pumgen has to fail with a message matching this regular expression
 #   EXPECT_OUTPUT (optional) the output of a successful run has to match this regular expression
@@ -67,9 +68,12 @@ if(DEFINED REFERENCE)
   if(IDENTIFY)
     list(APPEND datasets identify)
   endif()
+  if(HIGHORDER)
+    list(APPEND datasets geometry_ho geometry_ho_offsets order)
+  endif()
   foreach(dataset ${datasets})
     set(options "")
-    if(dataset STREQUAL "geometry" AND DEFINED TOLERANCE)
+    if(dataset MATCHES "^geometry(_ho)?$" AND DEFINED TOLERANCE)
       set(options -d ${TOLERANCE})
     endif()
     execute_process(

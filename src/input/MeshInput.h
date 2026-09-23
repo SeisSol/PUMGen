@@ -32,7 +32,7 @@ class ApfMeshInput : public FullStorageMeshData {
   protected:
   apf::Mesh2* m_mesh = nullptr;
 
-  ApfMeshInput(int boundarySize) : FullStorageMeshData(boundarySize) {}
+  ApfMeshInput() = default;
 
   public:
   apf::Mesh2* getMesh() { return m_mesh; }

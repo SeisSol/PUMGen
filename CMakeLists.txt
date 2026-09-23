@@ -43,6 +43,7 @@ endif()
 add_library(pumgen-core STATIC
   ${CMAKE_CURRENT_SOURCE_DIR}/src/meshreader/GambitReader.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/mesh/CellType.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/meshreader/GMSHBuilder.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/meshreader/GMSHParser.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/meshreader/GMSH2Parser.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/meshreader/GMSH4Parser.cpp
@@ -50,6 +51,7 @@ add_library(pumgen-core STATIC
   ${CMAKE_CURRENT_SOURCE_DIR}/src/meshreader/Msh4Index.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/meshreader/DistributedGMSHReader.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/input/ParallelVertexFilter.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/helper/BoundaryFormat.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/helper/InsphereCalculator.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/helper/MPIConvenience.cpp
   )
@@ -170,6 +172,19 @@ if(SIMMETRIX)
 endif()
 add_executable(pumgen ${CMAKE_CURRENT_SOURCE_DIR}/src/pumgen.cpp)
 target_link_libraries(pumgen PRIVATE pumgen-core)
+# the version the mesh files name as their generator
+set(PUMGEN_VERSION "unknown")
+find_package(Git QUIET)
+if(GIT_FOUND)
+  execute_process(COMMAND ${GIT_EXECUTABLE} describe --always --dirty
+                  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+                  OUTPUT_VARIABLE PUMGEN_GIT_VERSION OUTPUT_STRIP_TRAILING_WHITESPACE
+                  RESULT_VARIABLE PUMGEN_GIT_RESULT ERROR_QUIET)
+  if(PUMGEN_GIT_RESULT EQUAL 0)
+    set(PUMGEN_VERSION ${PUMGEN_GIT_VERSION})
+  endif()
+endif()
+target_compile_definitions(pumgen PRIVATE PUMGEN_VERSION="${PUMGEN_VERSION}")
 set_target_properties(pumgen PROPERTIES INSTALL_RPATH "${INSTALL_RPATH}")
 install(TARGETS pumgen RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 

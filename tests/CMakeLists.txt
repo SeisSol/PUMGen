@@ -12,11 +12,11 @@ set(PUMGEN_TEST_OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/output)
 file(MAKE_DIRECTORY ${PUMGEN_TEST_OUTPUT})
 
 # pumgen_add_test(<name> RANKS <n> SOURCE <source> INPUT <fixture>
-#                 [REFERENCE <fixture> [TOLERANCE <tolerance>] [IDENTIFY]]
+#                 [REFERENCE <fixture> [TOLERANCE <tolerance>] [IDENTIFY] [HIGHORDER]]
 #                 [EXPECT_OUTPUT <regex>] [EXPECT_ERROR <regex>]
 #                 [OUTPUT <file>] [EXPECT_XDMF <regex>] [ARGS <argument>...])
 function(pumgen_add_test name)
-  cmake_parse_arguments(PARSE_ARGV 1 TEST "IDENTIFY"
+  cmake_parse_arguments(PARSE_ARGV 1 TEST "IDENTIFY;HIGHORDER"
                         "RANKS;SOURCE;INPUT;OUTPUT;REFERENCE;TOLERANCE;EXPECT_OUTPUT;EXPECT_ERROR;EXPECT_XDMF" "ARGS")
   set(output ${PUMGEN_TEST_OUTPUT}/${name}.puml.h5)
   if(DEFINED TEST_OUTPUT)
@@ -59,6 +59,9 @@ function(pumgen_add_test name)
     endif()
     if(TEST_IDENTIFY)
       list(APPEND script_args -DIDENTIFY=ON)
+    endif()
+    if(TEST_HIGHORDER)
+      list(APPEND script_args -DHIGHORDER=ON)
     endif()
   endif()
 
@@ -107,7 +110,7 @@ foreach(ranks 1 2 3 4)
 endforeach()
 pumgen_add_test(msh4.coarse.np2 RANKS 2 SOURCE msh4 INPUT coarse-v41.msh REFERENCE coarse.puml.h5)
 pumgen_add_test(msh2.coarse-o2.np1 RANKS 1 SOURCE msh2 INPUT coarse-o2-v22.msh
-                REFERENCE coarse-o2.puml.h5 ARGS --order=2)
+                REFERENCE coarse-o2.puml.h5 HIGHORDER)
 pumgen_add_test(msh4.tiny.np1 RANKS 1 SOURCE msh4 INPUT tiny-v41.msh REFERENCE tiny.puml.h5)
 pumgen_add_test(msh2.tiny.np1 RANKS 1 SOURCE msh2 INPUT tiny-v22.msh REFERENCE tiny.puml.h5)
 
@@ -124,21 +127,17 @@ pumgen_add_test(msh4.tiny.scaleoffset.np3 RANKS 3 SOURCE msh4 INPUT tiny-v41.msh
                 REFERENCE tiny.puml.h5 ARGS --filter-enable=scaleoffset)
 
 # command line options
-pumgen_add_test(msh2.coarse-o2.shortopt.np1 RANKS 1 SOURCE msh2 INPUT coarse-o2-v22.msh
-                REFERENCE coarse-o2.puml.h5 ARGS -o 2)
 pumgen_add_test(msh4.layered.chunksize.np3 RANKS 3 SOURCE msh4 INPUT layered-v41.msh
                 REFERENCE layered.puml.h5 ARGS --chunksize=4096)
 # a chunk smaller than a row
 pumgen_add_test(msh4.layered.chunksize1.np3 RANKS 3 SOURCE msh4 INPUT layered-v41.msh
                 REFERENCE layered.puml.h5 ARGS --chunksize=1)
-pumgen_add_test(msh4.tiny.order0 RANKS 1 SOURCE msh4 INPUT tiny-v41.msh ARGS --order=0
-                EXPECT_ERROR "mesh order has to be at least 1")
 
 # integer types reduced to the value range
 pumgen_add_test(msh4.layered.compact.np3 RANKS 3 SOURCE msh4 INPUT layered-v41.msh
                 REFERENCE layered.puml.h5 ARGS --compactify-datatypes)
 pumgen_add_test(msh2.coarse-o2.compact.np2 RANKS 2 SOURCE msh2 INPUT coarse-o2-v22.msh
-                REFERENCE coarse-o2.puml.h5 ARGS --compactify-datatypes --order=2)
+                REFERENCE coarse-o2.puml.h5 HIGHORDER ARGS --compactify-datatypes)
 
 # malformed or unsupported input
 pumgen_add_test(msh4.tiny-truncated RANKS 1 SOURCE msh4 INPUT tiny-truncated-v41.msh
@@ -174,14 +173,16 @@ pumgen_add_test(msh2.tiny-duplicate RANKS 1 SOURCE msh2 INPUT tiny-duplicate-v22
 pumgen_add_test(msh2.tiny-badnode RANKS 1 SOURCE msh2 INPUT tiny-badnode-v22.msh
                 EXPECT_ERROR "Unknown node tag")
 
-# higher-order meshes (with the inspheres of the linear mesh) and partitioned files
+# higher-order meshes: the vertices of the cells are the vertices of the linear mesh, the other
+# nodes the geometry of higher order; the inspheres are the ones of the linear mesh. The reference
+# is written by fixtures/generate.py from the node tags in the file.
 foreach(ranks 1 2)
   pumgen_add_test(msh4.coarse-o2.np${ranks} RANKS ${ranks} SOURCE msh4 INPUT coarse-o2-v41.msh
-                  REFERENCE coarse-o2.puml.h5 ARGS --order=2
+                  REFERENCE coarse-o2.puml.h5 HIGHORDER
                   EXPECT_OUTPUT "Minimum insphere found: 0[.]03184[67]")
 endforeach()
 pumgen_add_test(msh2.coarse-o2.np2 RANKS 2 SOURCE msh2 INPUT coarse-o2-v22.msh
-                REFERENCE coarse-o2.puml.h5 ARGS --order=2
+                REFERENCE coarse-o2.puml.h5 HIGHORDER
                 EXPECT_OUTPUT "Minimum insphere found: 0[.]03184[67]")
 pumgen_add_test(msh4.coarse.insphere RANKS 1 SOURCE msh4 INPUT coarse-v41.msh
                 EXPECT_OUTPUT "Minimum insphere found: 0[.]03184[67]")
@@ -200,7 +201,8 @@ foreach(variant binary binary-bigendian binary-size4)
                   REFERENCE coarse.puml.h5 TOLERANCE 1e-12)
 endforeach()
 pumgen_add_test(msh4.coarse-o2-binary.np2 RANKS 2 SOURCE msh4 INPUT coarse-o2-binary-v41.msh
-                REFERENCE coarse-o2.puml.h5 TOLERANCE 1e-12 ARGS --order=2)
+                REFERENCE coarse-o2.puml.h5 TOLERANCE 1e-12 HIGHORDER
+                EXPECT_OUTPUT "higher order, which rank 0 reads")
 pumgen_add_test(msh4.periodic-binary.np2 RANKS 2 SOURCE msh4 INPUT periodic-binary-v41.msh
                 REFERENCE periodic.puml.h5 TOLERANCE 1e-12 IDENTIFY)
 pumgen_add_test(msh4.coarse-binary-truncated RANKS 1 SOURCE msh4
@@ -248,8 +250,9 @@ pumgen_add_test(gambit.nogroups.np3 RANKS 3 SOURCE gambit
 
 # the XDMF file: the cells of a higher-order mesh with their vertices only, the precision of
 # compacted integers, and the file name next to an output in a directory whose name ends in .h5
-pumgen_add_test(msh4.coarse-o2.xdmf RANKS 1 SOURCE msh4 INPUT coarse-o2-v41.msh ARGS --order=2
-                EXPECT_XDMF "HyperSlab. Dimensions=.320 4.[^#]*Dimensions=.320 10.>msh4")
+pumgen_add_test(
+  msh4.coarse-o2.xdmf RANKS 1 SOURCE msh4 INPUT coarse-o2-v41.msh
+  EXPECT_XDMF "Tetrahedron. NumberOfElements=.320.[^#]*Dimensions=.320 4.>[^#]*Name=.order.")
 pumgen_add_test(
   msh4.coarse.compact-xdmf RANKS 2 SOURCE msh4 INPUT coarse-v41.msh ARGS --compactify-datatypes
   EXPECT_XDMF "Precision=.1. Format=.HDF. Dimensions=.320 4.>[^#]*Precision=.8. Format=.HDF. Dimensions=.109 3.")

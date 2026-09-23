@@ -4,14 +4,16 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // SPDX-FileContributor: Sebastian Rettenberger <sebastian.rettenberger@tum.de>
 
-#include "meshreader/GMSHBuilder.h"
 #include <H5Tpublic.h>
 #include <mpi.h>
 
 #include <algorithm>
+#include <array>
 #include <cassert>
 #include <cstddef>
+#include <cstdint>
 #include <cstring>
+#include <ctime>
 #include <fstream>
 #include <functional>
 #include <limits>
@@ -52,8 +54,10 @@
 #include "meshreader/ParallelGMSHReader.h"
 #include "meshreader/ParallelGambitReader.h"
 
+#include "helper/BoundaryFormat.h"
 #include "helper/InsphereCalculator.h"
 #include "helper/IntegerWidth.h"
+#include "mesh/CellType.h"
 
 #ifdef USE_EASI
 #include "sizing/VelocityAwareMeshSize.h"
@@ -250,12 +254,85 @@ void addAttribute(hid_t h5file, const std::string& name, const std::string& valu
   checkH5Err(H5Tclose(attrType));
 }
 
-template <std::size_t Order>
-using SMF2 = SerialMeshFile<puml::ParallelGMSHReader<puml::GMSH2Parser, Order>>;
-template <std::size_t Order>
-using SMF4 = SerialMeshFile<puml::ParallelGMSHReader<puml::GMSH4Parser, Order>>;
-template <std::size_t Order>
-using SMF4Distributed = SerialMeshFile<puml::DistributedGMSHReader<Order>>;
+#ifndef PUMGEN_VERSION
+#define PUMGEN_VERSION "unknown"
+#endif
+
+static void addIntegerAttribute(hid_t object, const std::string& name,
+                                const std::vector<std::int64_t>& values) {
+  const hsize_t count = values.size();
+  hid_t space = checkH5Err(H5Screate_simple(1, &count, nullptr));
+  hid_t attribute =
+      checkH5Err(H5Acreate(object, name.c_str(), H5T_STD_I64LE, space, H5P_DEFAULT, H5P_DEFAULT));
+  checkH5Err(H5Awrite(attribute, H5T_NATIVE_INT64, values.data()));
+  checkH5Err(H5Aclose(attribute));
+  checkH5Err(H5Sclose(space));
+}
+
+/**
+ * A string of fixed length, as VTK expects the Type of a VTKHDF file.
+ */
+static void addFixedStringAttribute(hid_t object, const std::string& name,
+                                    const std::string& value) {
+  hid_t space = checkH5Err(H5Screate(H5S_SCALAR));
+  hid_t type = checkH5Err(H5Tcopy(H5T_C_S1));
+  checkH5Err(H5Tset_size(type, value.size()));
+  checkH5Err(H5Tset_strpad(type, H5T_STR_NULLPAD));
+  hid_t attribute =
+      checkH5Err(H5Acreate(object, name.c_str(), type, space, H5P_DEFAULT, H5P_DEFAULT));
+  checkH5Err(H5Awrite(attribute, type, value.data()));
+  checkH5Err(H5Aclose(attribute));
+  checkH5Err(H5Tclose(type));
+  checkH5Err(H5Sclose(space));
+}
+
+static std::size_t shapeIndex(puml::CellType type) {
+  return static_cast<std::size_t>(&puml::shapeOf(type) - puml::CellShapes.data());
+}
+
+/**
+ * Makes the file a VTKHDF file as well: the group /VTKHDF describes the mesh as an unstructured
+ * grid of a single partition through links to the datasets, so that VTK and ParaView read the file
+ * directly.
+ */
+static void writeVtkHdfView(hid_t h5file, std::uint64_t points, std::uint64_t cells,
+                            std::uint64_t connectivityIds, bool identify, bool highOrder, int rank,
+                            std::size_t chunksize) {
+  hid_t group = checkH5Err(H5Gcreate(h5file, "/VTKHDF", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT));
+  addIntegerAttribute(group, "Version", {1, 0});
+  addFixedStringAttribute(group, "Type", "UnstructuredGrid");
+  checkH5Err(H5Gclose(group));
+
+  const std::array<std::pair<const char*, std::uint64_t>, 3> counts = {
+      {{"VTKHDF/NumberOfPoints", points},
+       {"VTKHDF/NumberOfCells", cells},
+       {"VTKHDF/NumberOfConnectivityIds", connectivityIds}}};
+  for (const auto& [name, count] : counts) {
+    const std::vector<std::int64_t> value{static_cast<std::int64_t>(count)};
+    writeH5Data<std::int64_t>(value, h5file, name, H5T_NATIVE_INT64, H5T_STD_I64LE, chunksize,
+                              rank == 0 ? 1 : 0, 1, false, 0, 0, NoSecondDim);
+  }
+
+  for (const char* name : {"/VTKHDF/CellData", "/VTKHDF/PointData"}) {
+    checkH5Err(
+        H5Gclose(checkH5Err(H5Gcreate(h5file, name, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT))));
+  }
+  const auto link = [&](const char* target, const char* name) {
+    checkH5Err(H5Lcreate_hard(h5file, target, h5file, name, H5P_DEFAULT, H5P_DEFAULT));
+  };
+  link("/geometry", "/VTKHDF/Points");
+  link("/connect", "/VTKHDF/Connectivity");
+  link("/connect_offsets", "/VTKHDF/Offsets");
+  link("/cell_type", "/VTKHDF/Types");
+  link("/group", "/VTKHDF/CellData/group");
+  link("/boundary", "/VTKHDF/CellData/boundary");
+  if (highOrder) {
+    link("/order", "/VTKHDF/CellData/order");
+  }
+  if (identify) {
+    link("/identify", "/VTKHDF/PointData/identify");
+  }
+}
 
 int main(int argc, char* argv[]) {
   int rank = 0;
@@ -293,7 +370,9 @@ int main(int argc, char* argv[]) {
                  false);
   const auto boundarytypes = std::vector<std::string>{"int32", "int64", "i32", "i64", "i32x4"};
   args.addEnumOption("boundarytype", boundarytypes, 0,
-                     "Type for writing out boundary data (default: i32).", false);
+                     "Type for writing out boundary data (default: i32 for cells of at most four "
+                     "faces, one integer per face otherwise; i32x4 is one 32-bit integer per face)",
+                     false);
 
   args.addOption("license", 'l', "License file (only used by SimModSuite)", utils::Args::Required,
                  false);
@@ -317,7 +396,6 @@ int main(int argc, char* argv[]) {
   args.addOption("sim_log", 0, "Create SimModSuite log", utils::Args::Required, false);
   args.addAdditionalOption("input", "Input file (mesh or model)");
   args.addAdditionalOption("output", "Output parallel unstructured mesh file", false);
-  args.addOption("order", 'o', "Mesh order (default: 1)", utils::Args::Required, false);
   const auto gmshReaders = std::vector<std::string>{"auto", "serial"};
   args.addEnumOption("gmsh-reader", gmshReaders, 0,
                      "Reader for msh4 meshes (default: auto, which reads binary MSH 4.1 files "
@@ -370,33 +448,6 @@ int main(int argc, char* argv[]) {
     }
   }
 
-  int boundaryType = args.getArgument("boundarytype", 0);
-  hid_t boundaryDatatype;
-  int faceOffset;
-  int secondShape = NoSecondDim;
-  std::string boundaryFormatAttr = "";
-  std::string secondDimBoundary = "";
-  if (boundaryType == 0 || boundaryType == 2) {
-    boundaryDatatype = H5T_STD_I32LE;
-    faceOffset = 8;
-    secondShape = NoSecondDim;
-    boundaryFormatAttr = "i32";
-    logInfo() << "Using 32-bit integer boundary type conditions, or 8 bit per face (i32).";
-  } else if (boundaryType == 1 || boundaryType == 3) {
-    boundaryDatatype = H5T_STD_I64LE;
-    faceOffset = 16;
-    secondShape = NoSecondDim;
-    boundaryFormatAttr = "i64";
-    logInfo() << "Using 64-bit integer boundary type conditions, or 16 bit per face (i64).";
-  } else if (boundaryType == 4) {
-    boundaryDatatype = H5T_STD_I32LE;
-    secondShape = 4;
-    faceOffset = -1;
-    boundaryFormatAttr = "i32x4";
-    secondDimBoundary = " 4";
-    logInfo() << "Using 32-bit integer per boundary face (i32x4).";
-  }
-
   std::string xdmfFile = outputFile;
   if (utils::StringUtils::endsWith(outputFile, ".puml.h5")) {
     utils::StringUtils::replaceLast(xdmfFile, ".puml.h5", ".xdmf");
@@ -406,42 +457,44 @@ int main(int argc, char* argv[]) {
     xdmfFile.append(".xdmf");
   }
 
-  const auto meshOrder = args.getArgument<int>("order", 1);
-  if (meshOrder < 1) {
-    logError() << "The mesh order has to be at least 1, got" << meshOrder;
-  }
-
   // Create/read the mesh
+  const auto sourceIndex = args.getArgument<int>("source", 0);
   std::unique_ptr<MeshData> meshInput;
-  switch (args.getArgument<int>("source", 0)) {
+  switch (sourceIndex) {
   case 0:
     logInfo() << "Using Gambit mesh";
-    meshInput = std::make_unique<SerialMeshFile<puml::ParallelGambitReader>>(inputFile, faceOffset);
+    meshInput = std::make_unique<SerialMeshFile<puml::ParallelGambitReader>>(inputFile);
     break;
   case 1:
     logInfo() << "Using GMSH mesh format 2 (msh2) mesh";
-    meshInput.reset(puml::makePointer<MeshData, SMF2>(meshOrder, inputFile, faceOffset));
+    meshInput =
+        std::make_unique<SerialMeshFile<puml::ParallelGMSHReader<puml::GMSH2Parser>>>(inputFile);
     break;
   case 2: {
+    // binary MSH 4.1 files of linear cells are read by all ranks
     int distributed = 0;
-    if (rank == 0) {
-      distributed = args.getArgument<int>("gmsh-reader", 0) == 0 && puml::isBinaryMsh4(inputFile);
+    if (rank == 0 && args.getArgument<int>("gmsh-reader", 0) == 0 &&
+        puml::isBinaryMsh4(inputFile)) {
+      distributed = puml::hasHighOrderCells(inputFile) ? 2 : 1;
     }
     MPI_Bcast(&distributed, 1, MPI_INT, 0, MPI_COMM_WORLD);
-    if (distributed != 0) {
+    if (distributed == 1) {
       logInfo() << "Using GMSH mesh format 4 (msh4) mesh, binary, read by all ranks";
-      meshInput.reset(
-          puml::makePointer<MeshData, SMF4Distributed>(meshOrder, inputFile, faceOffset));
+      meshInput = std::make_unique<SerialMeshFile<puml::DistributedGMSHReader>>(inputFile);
     } else {
+      if (distributed == 2) {
+        logInfo() << "The binary msh4 mesh has cells of higher order, which rank 0 reads";
+      }
       logInfo() << "Using GMSH mesh format 4 (msh4) mesh";
-      meshInput.reset(puml::makePointer<MeshData, SMF4>(meshOrder, inputFile, faceOffset));
+      meshInput =
+          std::make_unique<SerialMeshFile<puml::ParallelGMSHReader<puml::GMSH4Parser>>>(inputFile);
     }
     break;
   }
   case 3:
 #ifdef USE_NETCDF
     logInfo() << "Using netCDF mesh";
-    meshInput = std::make_unique<NetCDFMesh>(inputFile, faceOffset);
+    meshInput = std::make_unique<NetCDFMesh>(inputFile);
 #else  // USE_NETCDF
     logError() << "netCDF is not supported in this version";
 #endif // USE_NETCDF
@@ -449,8 +502,7 @@ int main(int argc, char* argv[]) {
   case 4:
     logInfo() << "Using APF native format";
 #ifdef USE_SCOREC
-    meshInput = std::make_unique<ApfNative>(inputFile, faceOffset,
-                                            args.getArgument<const char*>("input", 0L));
+    meshInput = std::make_unique<ApfNative>(inputFile, args.getArgument<const char*>("input", 0L));
     (dynamic_cast<ApfMeshInput*>(meshInput.get()))->generate();
 #else
     logError() << "This version of PUMgen has been compiled without SCOREC. Hence, the APF format "
@@ -462,7 +514,7 @@ int main(int argc, char* argv[]) {
     logInfo() << "Using SimModSuite";
 
     meshInput = std::make_unique<SimModSuite>(
-        inputFile, faceOffset, args.getArgument<const char*>("cad", 0L),
+        inputFile, args.getArgument<const char*>("cad", 0L),
         args.getArgument<const char*>("license", 0L), args.getArgument<const char*>("mesh", "mesh"),
         args.getArgument<const char*>("analysis", "analysis"),
         args.getArgument<int>("enforce-size", 0), args.getArgument<const char*>("xml", 0L),
@@ -477,7 +529,7 @@ int main(int argc, char* argv[]) {
     logInfo() << "Using SimModSuite with APF (deprecated)";
 
     meshInput = std::make_unique<SimModSuiteApf>(
-        inputFile, faceOffset, args.getArgument<const char*>("cad", 0L),
+        inputFile, args.getArgument<const char*>("cad", 0L),
         args.getArgument<const char*>("license", 0L), args.getArgument<const char*>("mesh", "mesh"),
         args.getArgument<const char*>("analysis", "analysis"),
         args.getArgument<int>("enforce-size", 0), args.getArgument<const char*>("xml", 0L),
@@ -497,20 +549,41 @@ int main(int argc, char* argv[]) {
 
   logInfo() << "Parsed mesh successfully, writing output...";
 
-  // Get local/global size
-  std::size_t localSize[2] = {meshInput->cellCount(), meshInput->vertexCount()};
-  std::size_t globalSize[2] = {localSize[0], localSize[1]};
-  MPI_Allreduce(MPI_IN_PLACE, globalSize, 2, tndm::mpi_type_t<std::size_t>(), MPI_SUM,
-                MPI_COMM_WORLD);
+  const std::uint64_t localCells = meshInput->cellCount();
+  const std::uint64_t localVertices = meshInput->vertexCount();
+  std::array<std::uint64_t, 2> globalSize{localCells, localVertices};
+  MPI_Allreduce(MPI_IN_PLACE, globalSize.data(), 2, MPI_UINT64_T, MPI_SUM, MPI_COMM_WORLD);
 
-  logInfo() << "Coordinates in vertex:" << meshInput->vertexSize();
-  logInfo() << "Vertices in cell:" << meshInput->cellSize();
+  // what the whole mesh holds: the kinds of its cells, cells of higher order, identification
+  unsigned kinds = 0;
+  for (const auto type : meshInput->cellTypes()) {
+    kinds |= 1U << shapeIndex(type);
+  }
+  MPI_Allreduce(MPI_IN_PLACE, &kinds, 1, MPI_UNSIGNED, MPI_BOR, MPI_COMM_WORLD);
+  const puml::CellShape* shape = &puml::CellShapes[0];
+  std::size_t kindCount = 0;
+  std::size_t maxFaces = 0;
+  for (std::size_t k = 0; k < puml::CellShapes.size(); ++k) {
+    if ((kinds & (1U << k)) != 0) {
+      shape = &puml::CellShapes[k];
+      ++kindCount;
+      maxFaces = std::max(maxFaces, puml::CellShapes[k].faceCount);
+    }
+  }
+  const bool mixed = kindCount > 1;
+  int highOrder = meshInput->orders().empty() ? 0 : 1;
+  MPI_Allreduce(MPI_IN_PLACE, &highOrder, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
+  int identify = meshInput->hasIdentify() ? 1 : 0;
+  MPI_Allreduce(MPI_IN_PLACE, &identify, 1, MPI_INT, MPI_MAX, MPI_COMM_WORLD);
+
+  logInfo() << "Cells:" << (mixed ? "mixed" : shape->name)
+            << (highOrder != 0 ? "(some of higher order)" : "");
   logInfo() << "Total cell count:" << globalSize[0];
   logInfo() << "Total vertex count:" << globalSize[1];
-  logInfo() << "Vertex identification:" << meshInput->hasIdentify();
+  logInfo() << "Vertex identification:" << identify;
 
-  const CellVertices cellVertices(meshInput->connectivity(), meshInput->geometry(),
-                                  meshInput->cellSize(), MPI_COMM_WORLD);
+  const CellVertices cellVertices(meshInput->cellTypes(), meshInput->connectivity(),
+                                  meshInput->geometry(), MPI_COMM_WORLD);
   double min = std::numeric_limits<double>::infinity();
   {
     const auto inspheres = calculateInsphere(cellVertices);
@@ -540,11 +613,32 @@ int main(int argc, char* argv[]) {
 #endif
   }
 
-  // Get offsets
-  std::size_t offsets[2] = {localSize[0], localSize[1]};
-  MPI_Scan(MPI_IN_PLACE, offsets, 2, tndm::mpi_type_t<std::size_t>(), MPI_SUM, MPI_COMM_WORLD);
-  offsets[0] -= localSize[0];
-  offsets[1] -= localSize[1];
+  // the boundary format: i32 unless given, and one integer per face for cells of more faces than
+  // the packed formats hold
+  int boundaryType = args.getArgument("boundarytype", 0);
+  if (!args.isSet("boundarytype") && maxFaces > 4) {
+    boundaryType = 4;
+  }
+  const std::size_t facesPerCell = std::max<std::size_t>(maxFaces, 4);
+  int bitsPerFace = 0;
+  std::string boundaryFormat;
+  if (boundaryType == 0 || boundaryType == 2) {
+    bitsPerFace = 8;
+    boundaryFormat = "i32";
+    logInfo() << "Using 32-bit integer boundary type conditions, or 8 bit per face (i32).";
+  } else if (boundaryType == 1 || boundaryType == 3) {
+    bitsPerFace = 16;
+    boundaryFormat = "i64";
+    logInfo() << "Using 64-bit integer boundary type conditions, or 16 bit per face (i64).";
+  } else {
+    boundaryFormat = "i32x" + std::to_string(facesPerCell);
+    logInfo() << "Using 32-bit integer per boundary face (" << boundaryFormat << ").";
+  }
+  if (bitsPerFace > 0 && maxFaces > 4) {
+    logError() << "The boundary format" << boundaryFormat
+               << "packs four faces per cell, but the mesh has cells with" << maxFaces
+               << "faces; --boundarytype=i32x4 stores one integer per face.";
+  }
 
   // Create the H5 file
   hid_t h5falist = H5Pcreate(H5P_FILE_ACCESS);
@@ -559,58 +653,165 @@ int main(int argc, char* argv[]) {
   checkH5Err(h5file);
   checkH5Err(H5Pclose(h5falist));
 
-  // Write cells
+  // Write cells: a rectangle for cells of one kind; for several kinds, the layout of a VTKHDF
+  // unstructured grid, a flat connectivity with the offsets of the cells in it and their kinds
   logInfo() << "Writing cells";
-  const auto connectBytes =
-      writeH5Data<uint64_t>(meshInput->connectivity(), h5file, "connect", H5T_NATIVE_UINT64,
-                            H5T_STD_U64LE, chunksize, localSize[0], globalSize[0], reduceInts,
-                            filterEnable, filterChunksize, meshInput->cellSize());
+  const auto& cellTypes = meshInput->cellTypes();
+  std::size_t connectBytes = 0;
+  std::uint64_t connectivityLength = meshInput->connectivity().size();
+  if (mixed) {
+    std::uint64_t first = 0;
+    MPI_Exscan(&connectivityLength, &first, 1, MPI_UINT64_T, MPI_SUM, MPI_COMM_WORLD);
+    if (rank == 0) {
+      first = 0;
+    }
+    std::uint64_t totalLength = connectivityLength;
+    MPI_Allreduce(MPI_IN_PLACE, &totalLength, 1, MPI_UINT64_T, MPI_SUM, MPI_COMM_WORLD);
+    connectBytes = writeH5Data<uint64_t>(
+        meshInput->connectivity(), h5file, "connect", H5T_NATIVE_UINT64, H5T_STD_U64LE, chunksize,
+        connectivityLength, totalLength, reduceInts, filterEnable, filterChunksize, NoSecondDim);
+
+    // the last rank adds the end of the last cell
+    std::vector<std::uint64_t> offsets;
+    offsets.reserve(localCells + 1);
+    for (const auto type : cellTypes) {
+      offsets.push_back(first);
+      first += puml::shapeOf(type).vertexCount;
+    }
+    if (rank == processes - 1) {
+      offsets.push_back(first);
+    }
+    writeH5Data<uint64_t>(offsets, h5file, "connect_offsets", H5T_NATIVE_UINT64, H5T_STD_U64LE,
+                          chunksize, offsets.size(), globalSize[0] + 1, reduceInts, filterEnable,
+                          filterChunksize, NoSecondDim);
+
+    std::vector<std::uint8_t> kindValues(localCells);
+    for (std::size_t cell = 0; cell < localCells; ++cell) {
+      kindValues[cell] = static_cast<std::uint8_t>(cellTypes[cell]);
+    }
+    writeH5Data<std::uint8_t>(kindValues, h5file, "cell_type", H5T_NATIVE_UINT8, H5T_STD_U8LE,
+                              chunksize, localCells, globalSize[0], false, filterEnable,
+                              filterChunksize, NoSecondDim);
+    connectivityLength = totalLength;
+  } else {
+    connectBytes = writeH5Data<uint64_t>(
+        meshInput->connectivity(), h5file, "connect", H5T_NATIVE_UINT64, H5T_STD_U64LE, chunksize,
+        localCells, globalSize[0], reduceInts, filterEnable, filterChunksize, shape->vertexCount);
+  }
 
   // Vertices
   logInfo() << "Writing vertices";
   writeH5Data<double>(meshInput->geometry(), h5file, "geometry", H5T_IEEE_F64LE, H5T_IEEE_F64LE,
-                      chunksize, localSize[1], globalSize[1], reduceInts, filterEnable,
-                      filterChunksize, meshInput->vertexSize());
+                      chunksize, localVertices, globalSize[1], reduceInts, filterEnable,
+                      filterChunksize, 3);
 
   // Group information
-
   logInfo() << "Writing group information";
   const auto groupBytes = writeH5Data<int32_t>(
-      meshInput->group(), h5file, "group", H5T_NATIVE_INT32, H5T_STD_I32LE, chunksize, localSize[0],
+      meshInput->group(), h5file, "group", H5T_NATIVE_INT32, H5T_STD_I32LE, chunksize, localCells,
       globalSize[0], reduceInts, filterEnable, filterChunksize, NoSecondDim);
 
   // Write boundary condition
   logInfo() << "Writing boundary condition";
-  if (secondShape != NoSecondDim) {
-    // TODO: a bit ugly, but it works
-    secondShape = meshInput->vertexSize() + 1;
-  }
+  const auto& faces = meshInput->boundary();
   std::size_t boundaryBytes = 0;
-  if (boundaryFormatAttr == "i32") {
-    boundaryBytes = writeH5Data<int32_t>(
-        meshInput->boundary(), h5file, "boundary", H5T_NATIVE_INT32, boundaryDatatype, chunksize,
-        localSize[0], globalSize[0], reduceInts, filterEnable, filterChunksize, secondShape);
+  if (bitsPerFace > 0) {
+    // the packed bits are written as they are, as signed integers
+    const auto packed = packBoundaries(faces, cellTypes, bitsPerFace);
+    if (bitsPerFace == 8) {
+      boundaryBytes = writeH5Data<int32_t>(packed, h5file, "boundary", H5T_NATIVE_INT32,
+                                           H5T_STD_I32LE, chunksize, localCells, globalSize[0],
+                                           reduceInts, filterEnable, filterChunksize, NoSecondDim);
+    } else {
+      boundaryBytes = writeH5Data<int64_t>(packed, h5file, "boundary", H5T_NATIVE_INT64,
+                                           H5T_STD_I64LE, chunksize, localCells, globalSize[0],
+                                           reduceInts, filterEnable, filterChunksize, NoSecondDim);
+    }
   } else {
-    boundaryBytes = writeH5Data<int64_t>(
-        meshInput->boundary(), h5file, "boundary", H5T_NATIVE_INT64, boundaryDatatype, chunksize,
-        localSize[0], globalSize[0], reduceInts, filterEnable, filterChunksize, secondShape);
+    const auto values = boundariesPerFace(faces, cellTypes, facesPerCell);
+    boundaryBytes = writeH5Data<int32_t>(values, h5file, "boundary", H5T_NATIVE_INT32,
+                                         H5T_STD_I32LE, chunksize, localCells, globalSize[0],
+                                         reduceInts, filterEnable, filterChunksize, facesPerCell);
   }
-
-  addAttribute(h5file, "boundary-format", boundaryFormatAttr);
 
   std::size_t identifyBytes = 0;
-  if (meshInput->hasIdentify()) {
+  if (identify != 0) {
     logInfo() << "Writing vertex topology identification";
     identifyBytes = writeH5Data<uint64_t>(
         meshInput->identify(), h5file, "identify", H5T_NATIVE_UINT64, H5T_STD_U64LE, chunksize,
-        localSize[1], globalSize[1], reduceInts, filterEnable, filterChunksize, NoSecondDim);
-    addAttribute(h5file, "topology-format", "identify-vertex");
-  } else {
-    addAttribute(h5file, "topology-format", "geometric");
+        localVertices, globalSize[1], reduceInts, filterEnable, filterChunksize, NoSecondDim);
   }
 
-  // Writing XDMF file
-  if (rank == 0) {
+  // the nodes of the cells of higher order but their vertices, in the order of gmsh, with the
+  // offsets of the cells in them (in values) and the order of every cell
+  if (highOrder != 0) {
+    logInfo() << "Writing the geometry of higher order";
+    const auto& orders = meshInput->orders();
+    std::uint64_t length = meshInput->highOrderGeometry().size();
+    std::uint64_t first = 0;
+    MPI_Exscan(&length, &first, 1, MPI_UINT64_T, MPI_SUM, MPI_COMM_WORLD);
+    if (rank == 0) {
+      first = 0;
+    }
+    std::uint64_t totalLength = length;
+    MPI_Allreduce(MPI_IN_PLACE, &totalLength, 1, MPI_UINT64_T, MPI_SUM, MPI_COMM_WORLD);
+    writeH5Data<double>(meshInput->highOrderGeometry(), h5file, "geometry_ho", H5T_IEEE_F64LE,
+                        H5T_IEEE_F64LE, chunksize, length, totalLength, false, filterEnable,
+                        filterChunksize, NoSecondDim);
+
+    std::vector<std::uint64_t> offsets;
+    offsets.reserve(localCells + 1);
+    for (std::size_t cell = 0; cell < localCells; ++cell) {
+      offsets.push_back(first);
+      const auto type = cellTypes[cell];
+      first += 3 * (puml::lagrangeNodeCount(type, orders[cell]) - puml::shapeOf(type).vertexCount);
+    }
+    if (rank == processes - 1) {
+      offsets.push_back(first);
+    }
+    writeH5Data<uint64_t>(offsets, h5file, "geometry_ho_offsets", H5T_NATIVE_UINT64, H5T_STD_U64LE,
+                          chunksize, offsets.size(), globalSize[0] + 1, reduceInts, filterEnable,
+                          filterChunksize, NoSecondDim);
+    writeH5Data<std::uint8_t>(orders, h5file, "order", H5T_NATIVE_UINT8, H5T_STD_U8LE, chunksize,
+                              localCells, globalSize[0], false, filterEnable, filterChunksize,
+                              NoSecondDim);
+
+    hid_t dataset = checkH5Err(H5Dopen(h5file, "/geometry_ho", H5P_DEFAULT));
+    addAttribute(dataset, "node-ordering", "gmsh");
+    checkH5Err(H5Dclose(dataset));
+  }
+
+  // what the file holds, how it is laid out, and where it comes from
+  addAttribute(h5file, "boundary-format", boundaryFormat);
+  addAttribute(h5file, "topology-format", identify != 0 ? "identify-vertex" : "geometric");
+  addAttribute(h5file, "cell-type", mixed ? "mixed" : shape->name);
+  addIntegerAttribute(h5file, "format-version", {2, 0});
+  addAttribute(h5file, "generator", std::string("PUMGen ") + PUMGEN_VERSION);
+  {
+    std::string command;
+    for (int i = 0; i < argc; ++i) {
+      command += (i > 0 ? " " : "") + std::string(argv[i]);
+    }
+    addAttribute(h5file, "command", command);
+  }
+  addAttribute(h5file, "source-format", source[static_cast<std::size_t>(sourceIndex)]);
+  {
+    std::array<char, 32> created{};
+    if (rank == 0) {
+      const std::time_t now = std::time(nullptr);
+      std::strftime(created.data(), created.size(), "%Y-%m-%dT%H:%M:%SZ", std::gmtime(&now));
+    }
+    MPI_Bcast(created.data(), static_cast<int>(created.size()), MPI_CHAR, 0, MPI_COMM_WORLD);
+    addAttribute(h5file, "created", created.data());
+  }
+
+  if (mixed) {
+    writeVtkHdfView(h5file, globalSize[1], globalSize[0], connectivityLength, identify != 0,
+                    highOrder != 0, rank, chunksize);
+    logInfo() << "The cells are of several kinds, which XDMF cannot describe; the mesh file is a "
+                 "VTKHDF file as well, which ParaView opens directly";
+  } else if (rank == 0) {
+    // Writing XDMF file
     logInfo() << "Writing XDMF file";
 
     // Strip all pathes from the filename
@@ -621,32 +822,17 @@ int main(int argc, char* argv[]) {
 
     std::ofstream xdmf(xdmfFile.c_str());
 
-    // the cells are shown with their vertices; for higher-order meshes, the other nodes follow
-    // the vertices in the connectivity and are left out
-    const auto cellSize = meshInput->cellSize();
-    std::ostringstream connect;
-    connect << "<DataItem NumberType=\"Int\" Precision=\"" << xdmfPrecision(connectBytes)
-            << "\" Format=\"HDF\" Dimensions=\"" << globalSize[0] << " " << cellSize << "\">"
-            << basename << ":/connect</DataItem>";
-
     xdmf << "<?xml version=\"1.0\" ?>" << std::endl
          << "<!DOCTYPE Xdmf SYSTEM \"Xdmf.dtd\" []>" << std::endl
          << "<Xdmf Version=\"2.0\">" << std::endl
          << " <Domain>" << std::endl
          << "  <Grid Name=\"puml mesh\" GridType=\"Uniform\">" << std::endl
-         << "   <Topology TopologyType=\"Tetrahedron\" NumberOfElements=\"" << globalSize[0]
-         << "\">" << std::endl;
-    if (cellSize == CellVertices::VerticesPerCell) {
-      xdmf << "    " << connect.str() << std::endl;
-    } else {
-      xdmf << "    <DataItem ItemType=\"HyperSlab\" Dimensions=\"" << globalSize[0] << " "
-           << CellVertices::VerticesPerCell << "\" Type=\"HyperSlab\">" << std::endl
-           << "     <DataItem Dimensions=\"3 2\" Format=\"XML\">0 0 1 1 " << globalSize[0] << " "
-           << CellVertices::VerticesPerCell << "</DataItem>" << std::endl
-           << "     " << connect.str() << std::endl
-           << "    </DataItem>" << std::endl;
-    }
-    xdmf << "   </Topology>" << std::endl
+         << "   <Topology TopologyType=\"" << shape->xdmfName << "\" NumberOfElements=\""
+         << globalSize[0] << "\">" << std::endl
+         << "    <DataItem NumberType=\"Int\" Precision=\"" << xdmfPrecision(connectBytes)
+         << "\" Format=\"HDF\" Dimensions=\"" << globalSize[0] << " " << shape->vertexCount << "\">"
+         << basename << ":/connect</DataItem>" << std::endl
+         << "   </Topology>" << std::endl
          << "   <Geometry name=\"geo\" GeometryType=\"XYZ\" NumberOfElements=\"" << globalSize[1]
          << "\">" << std::endl
          << "    <DataItem NumberType=\"Float\" Precision=\"" << sizeof(double)
@@ -660,10 +846,17 @@ int main(int argc, char* argv[]) {
          << "   </Attribute>" << std::endl
          << "   <Attribute Name=\"boundary\" Center=\"Cell\">" << std::endl
          << "    <DataItem NumberType=\"Int\" Precision=\"" << xdmfPrecision(boundaryBytes)
-         << "\" Format=\"HDF\" Dimensions=\"" << globalSize[0] << secondDimBoundary << "\">"
+         << "\" Format=\"HDF\" Dimensions=\"" << globalSize[0]
+         << (bitsPerFace > 0 ? std::string() : " " + std::to_string(facesPerCell)) << "\">"
          << basename << ":/boundary</DataItem>" << std::endl
          << "   </Attribute>" << std::endl;
-    if (meshInput->hasIdentify()) {
+    if (highOrder != 0) {
+      xdmf << "   <Attribute Name=\"order\" Center=\"Cell\">" << std::endl
+           << "    <DataItem NumberType=\"UInt\" Precision=\"1\" Format=\"HDF\" Dimensions=\""
+           << globalSize[0] << "\">" << basename << ":/order</DataItem>" << std::endl
+           << "   </Attribute>" << std::endl;
+    }
+    if (identify != 0) {
       xdmf << "   <Attribute Name=\"identify\" Center=\"Node\">" << std::endl
            << "    <DataItem NumberType=\"Int\" Precision=\"" << xdmfPrecision(identifyBytes)
            << "\" Format=\"HDF\" Dimensions=\"" << globalSize[1] << "\">" << basename

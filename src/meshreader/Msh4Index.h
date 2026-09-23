@@ -31,6 +31,9 @@ struct Msh4ElementBlock {
   std::uint64_t count;
   std::uint64_t offset;
   std::int64_t physical;
+  /** The MSH element type */
+  std::int64_t type;
+  std::uint64_t nodesPerElement;
 };
 
 /**
@@ -45,6 +48,8 @@ struct Msh4Index {
   std::vector<Msh4NodeBlock> nodeBlocks;
   std::vector<Msh4ElementBlock> cellBlocks;
   std::vector<Msh4ElementBlock> facetBlocks;
+  // whether a cell is of an order higher than one
+  bool highOrder = false;
   // pairs of node tags (node, master) from $Periodic
   std::vector<std::pair<std::uint64_t, std::uint64_t>> periodic;
 };
@@ -55,8 +60,7 @@ struct Msh4Index {
  */
 class Msh4Indexer : public GMSH4Parser {
   public:
-  Msh4Indexer(long cellType, long facetType)
-      : GMSH4Parser(nullptr), cellType(cellType), facetType(facetType) {}
+  Msh4Indexer() : GMSH4Parser(nullptr) {}
 
   [[nodiscard]] const Msh4Index& getIndex() const { return index; }
 
@@ -67,8 +71,6 @@ class Msh4Indexer : public GMSH4Parser {
 
   void skipData(std::size_t bytes);
 
-  long cellType;
-  long facetType;
   Msh4Index index;
 };
 
@@ -76,6 +78,12 @@ class Msh4Indexer : public GMSH4Parser {
  * Whether the file is a binary MSH 4.1 file; only reads its header.
  */
 bool isBinaryMsh4(const std::string& fileName);
+
+/**
+ * Whether a binary MSH 4.1 file holds cells of an order higher than one; reads the structure of the
+ * file only. False for a file which cannot be indexed, whose errors the reader then reports.
+ */
+bool hasHighOrderCells(const std::string& fileName);
 
 } // namespace puml
 
