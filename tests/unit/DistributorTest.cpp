@@ -29,3 +29,25 @@ TEST_CASE("The chunks of all ranks cover the items exactly once") {
     }
   }
 }
+
+TEST_CASE("The block ranges of all ranks cover the items exactly once") {
+  for (const std::size_t total : {0, 1, 3, 5, 8, 9, 100}) {
+    for (const int size : {1, 2, 3, 4, 7}) {
+      CAPTURE(total);
+      CAPTURE(size);
+      std::size_t next = 0;
+      for (int rank = 0; rank < size; ++rank) {
+        const auto [first, count] = getBlockRange(total, rank, size);
+        CHECK(count <= getBlockRange(total, 0, size).second);
+        if (count > 0) {
+          CHECK(first == next);
+        }
+        next += count;
+      }
+      CHECK(next == total);
+    }
+  }
+  // five partitions on four ranks: blocks of two, and nothing left for the last rank
+  CHECK(getBlockRange(5, 2, 4) == std::pair<std::size_t, std::size_t>{4, 1});
+  CHECK(getBlockRange(5, 3, 4).second == 0);
+}
