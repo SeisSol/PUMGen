@@ -79,12 +79,6 @@ class Msh4Indexer : public GMSH4Parser {
  */
 bool isBinaryMsh4(const std::string& fileName);
 
-/**
- * Whether a binary MSH 4.1 file holds cells of an order higher than one; reads the structure of the
- * file only. False for a file which cannot be indexed, whose errors the reader then reports.
- */
-bool hasHighOrderCells(const std::string& fileName);
-
 } // namespace puml
 
 #endif // PUMGEN_SRC_MESHREADER_MSH4INDEX_H_

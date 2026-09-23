@@ -132,11 +132,6 @@ void Msh4Indexer::parsePeriodic() {
   expectToken("$EndPeriodic");
 }
 
-bool hasHighOrderCells(const std::string& fileName) {
-  Msh4Indexer indexer;
-  return indexer.parseFile(fileName) && indexer.getIndex().highOrder;
-}
-
 bool isBinaryMsh4(const std::string& fileName) {
   try {
     MshInput input(fileName);

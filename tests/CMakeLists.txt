@@ -203,9 +203,9 @@ foreach(variant binary binary-bigendian binary-size4)
   pumgen_add_test(msh4.coarse-${variant}.np2 RANKS 2 SOURCE msh4 INPUT coarse-${variant}-v41.msh
                   REFERENCE coarse.puml.h5 TOLERANCE 1e-12)
 endforeach()
-pumgen_add_test(msh4.coarse-o2-binary.np2 RANKS 2 SOURCE msh4 INPUT coarse-o2-binary-v41.msh
+pumgen_add_test(msh4.coarse-o2-binary.np3 RANKS 3 SOURCE msh4 INPUT coarse-o2-binary-v41.msh
                 REFERENCE coarse-o2.puml.h5 TOLERANCE 1e-12 HIGHORDER
-                EXPECT_OUTPUT "higher order, which rank 0 reads")
+                EXPECT_OUTPUT "binary, read by all ranks")
 pumgen_add_test(msh4.periodic-binary.np2 RANKS 2 SOURCE msh4 INPUT periodic-binary-v41.msh
                 REFERENCE periodic.puml.h5 TOLERANCE 1e-12 IDENTIFY)
 pumgen_add_test(msh4.coarse-binary-truncated RANKS 1 SOURCE msh4
@@ -329,8 +329,10 @@ foreach(ranks 1 3)
   pumgen_add_test(msh4.mixed-ho.np${ranks} RANKS ${ranks} SOURCE msh4 INPUT mixed-ho-v41.msh
                   REFERENCE mixed-ho.puml.h5 MIXED HIGHORDER)
 endforeach()
-pumgen_add_test(msh4.mixed-ho-binary.np3 RANKS 3 SOURCE msh4 INPUT mixed-ho-binary-v41.msh
-                REFERENCE mixed-ho.puml.h5 MIXED HIGHORDER
-                EXPECT_OUTPUT "higher order, which rank 0 reads")
+foreach(ranks 1 3 4)
+  pumgen_add_test(msh4.mixed-ho-binary.np${ranks} RANKS ${ranks} SOURCE msh4
+                  INPUT mixed-ho-binary-v41.msh REFERENCE mixed-ho.puml.h5 MIXED HIGHORDER
+                  EXPECT_OUTPUT "binary, read by all ranks")
+endforeach()
 pumgen_add_test(msh4.mixed-ho-binary-serial.np2 RANKS 2 SOURCE msh4 INPUT mixed-ho-binary-v41.msh
                 REFERENCE mixed-ho.puml.h5 MIXED HIGHORDER ARGS --gmsh-reader=serial)

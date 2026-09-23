@@ -507,20 +507,17 @@ int main(int argc, char* argv[]) {
         std::make_unique<SerialMeshFile<puml::ParallelGMSHReader<puml::GMSH2Parser>>>(inputFile);
     break;
   case 2: {
-    // binary MSH 4.1 files of linear cells are read by all ranks
+    // binary MSH 4.1 files are read by all ranks
     int distributed = 0;
     if (rank == 0 && args.getArgument<int>("gmsh-reader", 0) == 0 &&
         puml::isBinaryMsh4(inputFile)) {
-      distributed = puml::hasHighOrderCells(inputFile) ? 2 : 1;
+      distributed = 1;
     }
     MPI_Bcast(&distributed, 1, MPI_INT, 0, MPI_COMM_WORLD);
     if (distributed == 1) {
       logInfo() << "Using GMSH mesh format 4 (msh4) mesh, binary, read by all ranks";
       meshInput = std::make_unique<SerialMeshFile<puml::DistributedGMSHReader>>(inputFile);
     } else {
-      if (distributed == 2) {
-        logInfo() << "The binary msh4 mesh has cells of higher order, which rank 0 reads";
-      }
       logInfo() << "Using GMSH mesh format 4 (msh4) mesh";
       meshInput =
           std::make_unique<SerialMeshFile<puml::ParallelGMSHReader<puml::GMSH4Parser>>>(inputFile);
