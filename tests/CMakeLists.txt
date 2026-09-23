@@ -65,6 +65,18 @@ target_link_libraries(pumgen_reader_test PRIVATE pumgen-core)
 add_test(NAME reader.buffer-boundaries COMMAND pumgen_reader_test ${PUMGEN_TEST_FIXTURES})
 set_tests_properties(reader.buffer-boundaries PROPERTIES ENVIRONMENT "ASAN_OPTIONS=detect_leaks=0")
 
+# unit tests; the ones needing more ranks than started with are skipped
+add_executable(pumgen_unit_tests unit/Main.cpp unit/DistributorTest.cpp unit/BoundaryTest.cpp)
+target_include_directories(pumgen_unit_tests SYSTEM PRIVATE ${PROJECT_SOURCE_DIR}/submodules/doctest)
+target_link_libraries(pumgen_unit_tests PRIVATE pumgen-core)
+foreach(ranks 1 3)
+  add_test(NAME unit.np${ranks}
+           COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${ranks} ${MPIEXEC_PREFLAGS}
+                   $<TARGET_FILE:pumgen_unit_tests> ${MPIEXEC_POSTFLAGS})
+  set_tests_properties(unit.np${ranks} PROPERTIES PROCESSORS ${ranks} TIMEOUT 120 ENVIRONMENT
+                                                  "ASAN_OPTIONS=detect_leaks=0")
+endforeach()
+
 # The fixtures are created by fixtures/generate.py; the reference files are computed from the
 # gmsh model directly. The layered mesh has element and vertex counts which do not divide evenly
 # among 3 or 4 ranks.
