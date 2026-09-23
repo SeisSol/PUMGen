@@ -81,6 +81,45 @@ jobs:
           UBSAN_OPTIONS: print_stacktrace=1
         run: ctest --test-dir build --output-on-failure
 
+  read-with-puml:
+    name: read-with-puml
+    runs-on: ubuntu-24.04
+    env:
+      # a branch of PUML2 with the reader of meshes of several kinds of cells
+      PUML_REF: davschneller/puml-rework3
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - uses: actions/checkout@v5
+        with:
+          repository: TUM-I5/PUML2
+          ref: ${{ env.PUML_REF }}
+          path: puml2
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -qq ninja-build openmpi-bin libopenmpi-dev hdf5-tools \
+            libhdf5-openmpi-dev libyaml-cpp-dev
+
+      - name: Configure PUMGen
+        run: >
+          cmake -S . -B build -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DPUML_DIR=${{ github.workspace }}/puml2
+          -DMPIEXEC_PREFLAGS=--oversubscribe
+
+      - name: Build
+        run: cmake --build build
+
+      # the conversions the reading needs run as well
+      - name: Read the converted meshes with PUML
+        run: ctest --test-dir build --output-on-failure -R "^puml[.]"
+
   pre-commit-check:
     runs-on: ubuntu-latest
     steps:

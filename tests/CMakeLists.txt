@@ -346,3 +346,24 @@ pumgen_add_test(msh4.coarse.vtkhdf.np2 RANKS 2 SOURCE msh4 INPUT coarse-v41.msh
                 REFERENCE coarse-vtkhdf.puml.h5 VTKHDF ARGS --vtkhdf)
 pumgen_add_test(msh4.coarse.vtkhdf.compact.np3 RANKS 3 SOURCE msh4 INPUT coarse-v41.msh
                 REFERENCE coarse-vtkhdf.puml.h5 VTKHDF ARGS --vtkhdf --compactify-datatypes)
+
+# PUML reads converted meshes, if a checkout of PUML2 with its reader of meshes of several kinds of
+# cells is given
+set(PUML_DIR "" CACHE PATH "A checkout of PUML2, which then reads the converted meshes in tests")
+if(PUML_DIR)
+  add_executable(pumgen-puml-read puml/ReadWithPuml.cpp)
+  target_include_directories(pumgen-puml-read SYSTEM PRIVATE ${PUML_DIR} ${PUML_DIR}/submodules
+                                                             ${HDF5_INCLUDE_DIRS})
+  target_compile_definitions(pumgen-puml-read PRIVATE USE_MPI)
+  target_link_libraries(pumgen-puml-read PRIVATE ${HDF5_C_LIBRARIES} MPI::MPI_CXX)
+  foreach(case msh4.coarse.np2 msh4.coarse-o2.np2 msh4.mixed.np1 msh4.mixed-binary.np3
+               msh2.mixed.np2 msh4.mixed-ho-binary.np3)
+    set_tests_properties(pumgen.${case} PROPERTIES FIXTURES_SETUP ${case})
+    foreach(ranks 1 3)
+      add_test(NAME puml.${case}.read${ranks}
+               COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${ranks} ${MPIEXEC_PREFLAGS}
+                       $<TARGET_FILE:pumgen-puml-read> ${PUMGEN_TEST_OUTPUT}/${case}.puml.h5)
+      set_tests_properties(puml.${case}.read${ranks} PROPERTIES FIXTURES_REQUIRED ${case})
+    endforeach()
+  endforeach()
+endif()
