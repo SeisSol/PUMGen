@@ -11,6 +11,7 @@
 #   TOLERANCE     (optional) absolute tolerance for the vertex coordinates
 #   IDENTIFY      (optional) also compare the vertex identification of periodic meshes
 #   HIGHORDER     (optional) also compare the geometry of higher order and the orders
+#   MIXED         (optional) also compare the offsets and kinds of the cells, and the VTKHDF view
 #   H5DIFF        h5diff executable, required together with REFERENCE
 #   EXPECT_ERROR  (optional) pumgen has to fail with a message matching this regular expression
 #   EXPECT_OUTPUT (optional) the output of a successful run has to match this regular expression
@@ -71,13 +72,22 @@ if(DEFINED REFERENCE)
   if(HIGHORDER)
     list(APPEND datasets geometry_ho geometry_ho_offsets order)
   endif()
-  foreach(dataset ${datasets})
+  if(MIXED)
+    # the VTKHDF view links the datasets under the names of VTK
+    list(APPEND datasets connect_offsets cell_type VTKHDF/Points=geometry
+         VTKHDF/Connectivity=connect VTKHDF/Offsets=connect_offsets VTKHDF/Types=cell_type)
+  endif()
+  foreach(entry ${datasets})
+    # an entry is a dataset, or a dataset of the output and its dataset in the reference
+    string(REPLACE "=" ";" paths ${entry})
+    list(GET paths 0 dataset)
+    list(GET paths -1 referenceDataset)
     set(options "")
-    if(dataset MATCHES "^geometry(_ho)?$" AND DEFINED TOLERANCE)
+    if(referenceDataset MATCHES "^geometry(_ho)?$" AND DEFINED TOLERANCE)
       set(options -d ${TOLERANCE})
     endif()
     execute_process(
-      COMMAND ${H5DIFF} -n 10 ${options} ${OUTPUT} ${REFERENCE} /${dataset} /${dataset}
+      COMMAND ${H5DIFF} -n 10 ${options} ${OUTPUT} ${REFERENCE} /${dataset} /${referenceDataset}
       RESULT_VARIABLE differs
       OUTPUT_VARIABLE difflog
       ERROR_VARIABLE difflog)

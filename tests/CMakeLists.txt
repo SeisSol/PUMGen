@@ -12,11 +12,11 @@ set(PUMGEN_TEST_OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/output)
 file(MAKE_DIRECTORY ${PUMGEN_TEST_OUTPUT})
 
 # pumgen_add_test(<name> RANKS <n> SOURCE <source> INPUT <fixture>
-#                 [REFERENCE <fixture> [TOLERANCE <tolerance>] [IDENTIFY] [HIGHORDER]]
+#                 [REFERENCE <fixture> [TOLERANCE <tolerance>] [IDENTIFY] [HIGHORDER] [MIXED]]
 #                 [EXPECT_OUTPUT <regex>] [EXPECT_ERROR <regex>]
 #                 [OUTPUT <file>] [EXPECT_XDMF <regex>] [ARGS <argument>...])
 function(pumgen_add_test name)
-  cmake_parse_arguments(PARSE_ARGV 1 TEST "IDENTIFY;HIGHORDER"
+  cmake_parse_arguments(PARSE_ARGV 1 TEST "IDENTIFY;HIGHORDER;MIXED"
                         "RANKS;SOURCE;INPUT;OUTPUT;REFERENCE;TOLERANCE;EXPECT_OUTPUT;EXPECT_ERROR;EXPECT_XDMF" "ARGS")
   set(output ${PUMGEN_TEST_OUTPUT}/${name}.puml.h5)
   if(DEFINED TEST_OUTPUT)
@@ -62,6 +62,9 @@ function(pumgen_add_test name)
     endif()
     if(TEST_HIGHORDER)
       list(APPEND script_args -DHIGHORDER=ON)
+    endif()
+    if(TEST_MIXED)
+      list(APPEND script_args -DMIXED=ON)
     endif()
   endif()
 
@@ -297,3 +300,20 @@ if(NOT EASI)
   pumgen_add_test(msh4.tiny.velocity-check-without-easi RANKS 1 SOURCE msh4 INPUT tiny-v41.msh
                   ARGS --velocity-check=unused.xml EXPECT_ERROR "compiled without easi")
 endif()
+
+# a mesh of all four kinds of cells, in the layout of a VTKHDF unstructured grid; the reference is
+# written by fixtures/generate.py from the cells it builds
+foreach(ranks 1 2 3)
+  pumgen_add_test(msh4.mixed.np${ranks} RANKS ${ranks} SOURCE msh4 INPUT mixed-v41.msh
+                  REFERENCE mixed.puml.h5 MIXED)
+endforeach()
+pumgen_add_test(msh4.mixed-binary.np3 RANKS 3 SOURCE msh4 INPUT mixed-binary-v41.msh
+                REFERENCE mixed.puml.h5 MIXED EXPECT_OUTPUT "binary, read by all ranks")
+pumgen_add_test(msh4.mixed-binary-serial.np2 RANKS 2 SOURCE msh4 INPUT mixed-binary-v41.msh
+                REFERENCE mixed.puml.h5 MIXED ARGS --gmsh-reader=serial)
+pumgen_add_test(msh2.mixed.np2 RANKS 2 SOURCE msh2 INPUT mixed-v22.msh
+                REFERENCE mixed-v22.puml.h5 MIXED)
+pumgen_add_test(msh4.mixed.compact.np2 RANKS 2 SOURCE msh4 INPUT mixed-v41.msh
+                REFERENCE mixed.puml.h5 MIXED ARGS --compactify-datatypes)
+pumgen_add_test(msh4.mixed.packed RANKS 1 SOURCE msh4 INPUT mixed-v41.msh ARGS --boundarytype=i32
+                EXPECT_ERROR "packs four faces per cell")
