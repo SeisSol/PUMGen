@@ -6,6 +6,7 @@
 
 #include <array>
 #include <cstddef>
+#include <string>
 
 namespace puml {
 
@@ -17,6 +18,7 @@ class GMSHMeshBuilder {
   virtual void setNumElements(std::size_t numElements) = 0;
   virtual void addElement(long type, long tag, long* node, std::size_t numNodes) = 0;
   virtual void addVertexLink(std::size_t vertex, std::size_t linkVertex) = 0;
+  virtual void addPhysicalName(int /*dimension*/, long /*tag*/, const std::string& /*name*/) {}
   virtual void postprocess() = 0;
 };
 

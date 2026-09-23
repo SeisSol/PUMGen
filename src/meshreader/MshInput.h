@@ -117,6 +117,11 @@ class MshInput {
   }
 
   /**
+   * Reads a text in double quotes, which ends on its line, and returns it without the quotes.
+   */
+  std::optional<std::string> readQuoted();
+
+  /**
    * Consumes a single line break ("\n" or "\r\n"), as it separates the header line of a binary
    * section from its data.
    */

@@ -5,6 +5,7 @@
 // Parses the fixtures with a tiny read buffer, so that tokens and section markers straddle buffer
 // boundaries, and compares the result with the one of the default buffer.
 
+#include <algorithm>
 #include <cstdio>
 #include <fstream>
 #include <sstream>
@@ -42,7 +43,8 @@ template <typename Parser> bool check(const std::string& file) {
                     reference.cellTypes == tiny.cellTypes &&
                     reference.cellOrders == tiny.cellOrders && reference.groups == tiny.groups &&
                     reference.facets == tiny.facets && reference.bcs == tiny.bcs &&
-                    reference.identify == tiny.identify && !reference.cellTypes.empty();
+                    reference.identify == tiny.identify &&
+                    reference.physicalNames == tiny.physicalNames && !reference.cellTypes.empty();
   std::printf("%s: %s\n", file.c_str(), same ? "ok" : "DIFFERENT");
   return same;
 }
@@ -78,6 +80,18 @@ bool checkSkippedSection(const std::string& fixtures) {
   return ok;
 }
 
+// names in double quotes, with spaces, across the ends of the tiny buffer
+bool checkPhysicalNames(const std::string& file) {
+  puml::GMSHBuilder builder;
+  const bool parsed = parse<puml::GMSH4Parser>(file, TinyBuffer, builder);
+  const puml::PhysicalName surface{2, 101, "free surface"};
+  const bool ok = parsed && builder.physicalNames.size() == 7 &&
+                  std::find(builder.physicalNames.begin(), builder.physicalNames.end(), surface) !=
+                      builder.physicalNames.end();
+  std::printf("physical names: %s\n", ok ? "ok" : "DIFFERENT");
+  return ok;
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -98,6 +112,10 @@ int main(int argc, char** argv) {
   ok &= check<puml::GMSH4Parser>(fixtures + "/coarse-binary-bigendian-v41.msh");
   ok &= check<puml::GMSH4Parser>(fixtures + "/coarse-binary-size4-v41.msh");
   ok &= check<puml::GMSH4Parser>(fixtures + "/coarse-o2-binary-v41.msh");
+  ok &= check<puml::GMSH4Parser>(fixtures + "/mixed-v41.msh");
+  ok &= check<puml::GMSH2Parser>(fixtures + "/mixed-v22.msh");
+  ok &= check<puml::GMSH4Parser>(fixtures + "/mixed-binary-v41.msh");
+  ok &= checkPhysicalNames(fixtures + "/mixed-v41.msh");
   ok &= checkSkippedSection(fixtures);
   return ok ? 0 : 1;
 }

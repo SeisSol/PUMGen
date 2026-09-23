@@ -42,11 +42,14 @@ class GMSHBuilder : public GMSHMeshBuilder {
   std::vector<Face> facets;
   std::vector<int> bcs;
 
+  std::vector<PhysicalName> physicalNames;
+
   void setNumVertices(std::size_t numVertices) override;
   void setVertex(long id, const std::array<double, 3>& x) override;
   void setNumElements(std::size_t numElements) override;
   void addElement(long type, long tag, long* node, std::size_t numNodes) override;
   void addVertexLink(std::size_t vertex, std::size_t linkVertex) override;
+  void addPhysicalName(int dimension, long tag, const std::string& name) override;
   void postprocess() override;
 
   /** Whether a cell is of an order higher than one */
@@ -71,6 +74,7 @@ struct GlobalMesh {
   /** Empty if all cells are linear */
   std::vector<std::uint8_t> orders;
   std::vector<double> highOrderGeometry;
+  std::vector<PhysicalName> physicalNames;
 };
 
 /**

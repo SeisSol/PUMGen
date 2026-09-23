@@ -286,6 +286,42 @@ static void addFixedStringAttribute(hid_t object, const std::string& name,
   checkH5Err(H5Sclose(space));
 }
 
+/**
+ * Names the values of a dataset by the physical groups of a dimension: the attribute ids holds the
+ * values as the dataset holds them, the attribute names their names in the same order.
+ */
+static void addPhysicalNames(hid_t h5file, const char* dataset, int dimension,
+                             const std::vector<puml::PhysicalName>& names, bool boundary) {
+  std::vector<std::int32_t> ids;
+  std::vector<const char*> strings;
+  for (const auto& name : names) {
+    if (name.dimension == dimension) {
+      ids.push_back(
+          static_cast<std::int32_t>(boundary ? puml::boundaryConditionOf(name.tag) : name.tag));
+      strings.push_back(name.name.c_str());
+    }
+  }
+  if (ids.empty()) {
+    return;
+  }
+  hid_t data = checkH5Err(H5Dopen(h5file, dataset, H5P_DEFAULT));
+  const hsize_t count = ids.size();
+  hid_t space = checkH5Err(H5Screate_simple(1, &count, nullptr));
+  hid_t idAttribute =
+      checkH5Err(H5Acreate(data, "ids", H5T_STD_I32LE, space, H5P_DEFAULT, H5P_DEFAULT));
+  checkH5Err(H5Awrite(idAttribute, H5T_NATIVE_INT32, ids.data()));
+  checkH5Err(H5Aclose(idAttribute));
+  hid_t type = checkH5Err(H5Tcopy(H5T_C_S1));
+  checkH5Err(H5Tset_size(type, H5T_VARIABLE));
+  checkH5Err(H5Tset_cset(type, H5T_CSET_UTF8));
+  hid_t nameAttribute = checkH5Err(H5Acreate(data, "names", type, space, H5P_DEFAULT, H5P_DEFAULT));
+  checkH5Err(H5Awrite(nameAttribute, type, strings.data()));
+  checkH5Err(H5Aclose(nameAttribute));
+  checkH5Err(H5Tclose(type));
+  checkH5Err(H5Sclose(space));
+  checkH5Err(H5Dclose(data));
+}
+
 static std::size_t shapeIndex(puml::CellType type) {
   return static_cast<std::size_t>(&puml::shapeOf(type) - puml::CellShapes.data());
 }
@@ -733,6 +769,10 @@ int main(int argc, char* argv[]) {
                                          H5T_STD_I32LE, chunksize, localCells, globalSize[0],
                                          reduceInts, filterEnable, filterChunksize, facesPerCell);
   }
+
+  // the names of the groups and boundary conditions, where the source has them
+  addPhysicalNames(h5file, "/group", 3, meshInput->physicalNames(), false);
+  addPhysicalNames(h5file, "/boundary", 2, meshInput->physicalNames(), true);
 
   std::size_t identifyBytes = 0;
   if (identify != 0) {

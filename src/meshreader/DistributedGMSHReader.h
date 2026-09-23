@@ -130,7 +130,6 @@ constexpr std::uint64_t Piece = std::uint64_t{1} << 20;
 class DistributedGMSHReader {
   public:
   constexpr static bool ProvidesLocalMesh = true;
-  constexpr static long BoundaryConditionOffset = 100;
 
   explicit DistributedGMSHReader(MPI_Comm comm = MPI_COMM_WORLD) : comm(comm) {
     MPI_Comm_rank(comm, &rank);
@@ -208,6 +207,7 @@ class DistributedGMSHReader {
         logError() << meshFile << std::endl << indexer.getErrorMessage();
       }
       index = indexer.getIndex();
+      local.physicalNames = indexer.getPhysicalNames();
       if (index.highOrder) {
         logError() << "Cells of higher order cannot be read with all ranks";
       }
@@ -221,6 +221,7 @@ class DistributedGMSHReader {
     index.firstNodeTag = scalars[2];
     index.numNodes = scalars[3];
     hasIdentify = scalars[4] != 0;
+    broadcastPhysicalNames(local.physicalNames, 0, comm);
     broadcastVector(index.nodeBlocks);
     broadcastVector(index.cellBlocks);
     broadcastVector(index.facetBlocks);
@@ -420,9 +421,7 @@ class DistributedGMSHReader {
     for (const auto& answersFrom : distributed::exchange(replies, comm)) {
       for (const auto& reply : answersFrom) {
         if (reply.bc != NoMatch) {
-          const auto bc =
-              reply.bc >= BoundaryConditionOffset ? reply.bc - BoundaryConditionOffset : reply.bc;
-          local.boundaries[reply.localFace] = static_cast<int>(bc);
+          local.boundaries[reply.localFace] = static_cast<int>(boundaryConditionOf(reply.bc));
         }
       }
     }

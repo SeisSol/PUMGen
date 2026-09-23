@@ -17,16 +17,6 @@
 namespace puml {
 
 namespace {
-/**
- * Boundary conditions in SeisSol used to start at 100, e.g. 101 = free surface. In the hdf5 format
- * one starts counting from 0, e.g. 1 = free surface. In order to be compatible with legacy gmsh
- * scripts, 100 is subtracted from a boundary condition larger than or equal to 100.
- */
-int adjustBoundaryCondition(int bc) {
-  constexpr int BoundaryConditionOffset = 100;
-  return bc >= BoundaryConditionOffset ? bc - BoundaryConditionOffset : bc;
-}
-
 template <typename T> void release(std::vector<T>& values) { std::vector<T>().swap(values); }
 
 std::size_t nodesOf(CellType type, std::uint8_t order) { return lagrangeNodeCount(type, order); }
@@ -88,6 +78,10 @@ void GMSHBuilder::addVertexLink(std::size_t vertex, std::size_t linkVertex) {
   // needed in case we parse periodic before we parse the vertex/node section
   resizeIdentifyIfNeeded(vertex + 1);
   identify[vertex] = linkVertex;
+}
+
+void GMSHBuilder::addPhysicalName(int dimension, long tag, const std::string& name) {
+  physicalNames.push_back({dimension, tag, name});
 }
 
 void GMSHBuilder::postprocess() {
@@ -239,7 +233,7 @@ GlobalMesh prepareMesh(GMSHBuilder& builder) {
         if (match + 1 != byVertices.end() && builder.facets[*(match + 1)] == face) {
           logError() << "A face of an element exists multiple times in the surface mesh.";
         }
-        mesh.boundaries[cellFaces + f] = adjustBoundaryCondition(builder.bcs[*match]);
+        mesh.boundaries[cellFaces + f] = static_cast<int>(boundaryConditionOf(builder.bcs[*match]));
       }
     }
     release(builder.facets);
@@ -274,6 +268,7 @@ GlobalMesh prepareMesh(GMSHBuilder& builder) {
   }
   mesh.cellTypes = std::move(builder.cellTypes);
   mesh.groups = std::move(builder.groups);
+  mesh.physicalNames = std::move(builder.physicalNames);
   return mesh;
 }
 
@@ -369,8 +364,11 @@ LocalMesh distributeMesh(GlobalMesh& mesh, MPI_Comm comm) {
     local.identify = std::move(mesh.identify);
     local.orders = std::move(mesh.orders);
     local.highOrderGeometry = std::move(mesh.highOrderGeometry);
+    local.physicalNames = std::move(mesh.physicalNames);
     return local;
   }
+  broadcastPhysicalNames(mesh.physicalNames, 0, comm);
+  local.physicalNames = std::move(mesh.physicalNames);
 
   std::vector<std::size_t> vertexCounts;
   std::vector<std::size_t> faceCounts;

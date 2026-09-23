@@ -1,6 +1,16 @@
 $MeshFormat
 2.2 0 8
 $EndMeshFormat
+$PhysicalNames
+7
+2 101 "free surface"
+2 103 "front"
+2 105 "absorbing"
+3 1 "hexahedron"
+3 2 "pyramids"
+3 3 "wedges"
+3 4 "tetrahedra"
+$EndPhysicalNames
 $Nodes
 21
 1 0 0 0

@@ -486,6 +486,8 @@ FACES = {
 MSH_TYPES = {"tet": 4, "hex": 5, "wedge": 6, "pyramid": 7}
 FACE_TYPES = {3: 2, 4: 3}
 VTK_TYPES = {"tet": 10, "hex": 12, "wedge": 13, "pyramid": 14}
+VOLUME_NAMES = {1: "hexahedron", 2: "pyramids", 3: "wedges", 4: "tetrahedra"}
+SURFACE_NAMES = {1: "free surface", 3: "front", 5: "absorbing"}
 
 
 def mixed_cells():
@@ -558,10 +560,10 @@ def generate_mixed():
     gmsh.model.add("mixed")
     for group in (1, 2, 3, 4):
         gmsh.model.addDiscreteEntity(3, group)
-        gmsh.model.addPhysicalGroup(3, [group], group)
+        gmsh.model.addPhysicalGroup(3, [group], group, name=VOLUME_NAMES[group])
     for bc in (1, 3, 5):
         gmsh.model.addDiscreteEntity(2, bc)
-        gmsh.model.addPhysicalGroup(2, [bc], 100 + bc)
+        gmsh.model.addPhysicalGroup(2, [bc], 100 + bc, name=SURFACE_NAMES[bc])
     gmsh.model.mesh.addNodes(3, 1, list(range(1, len(points) + 1)), [x for p in points for x in p])
     tag = 1
     for kind, nodes, group in cells:
@@ -580,8 +582,30 @@ def generate_mixed():
     # the references, with the cells in the order of the files: gmsh writes the MSH 2.2 file by
     # element type
     _, order = read_msh41_ascii("mixed-v41.msh")
-    write_mixed_reference("mixed.puml.h5", points, cells, boundary, order)
-    write_mixed_reference("mixed-v22.puml.h5", points, cells, boundary, read_msh22_cells("mixed-v22.msh"))
+    write_mixed_reference("mixed.puml.h5", points, cells, boundary, order, read_physical_names("mixed-v41.msh"))
+    write_mixed_reference(
+        "mixed-v22.puml.h5", points, cells, boundary, read_msh22_cells("mixed-v22.msh"), read_physical_names("mixed-v22.msh")
+    )
+
+
+def read_physical_names(path):
+    """The names of the physical groups of an ASCII MSH file, in its order, as (dimension, tag, name)."""
+    lines = open(path).read().split("\n")
+    first = lines.index("$PhysicalNames") + 2
+    names = []
+    for line in lines[first : first + int(lines[first - 1])]:
+        dimension, tag, name = line.split(" ", 2)
+        names.append((int(dimension), int(tag), name.strip().strip('"')))
+    return names
+
+
+def add_names(dataset, names, dimension, boundary):
+    """The attributes naming the values of a dataset: ids, as the dataset holds them, and names."""
+    chosen = [(tag, name) for dim, tag, name in names if dim == dimension]
+    if chosen:
+        ids = [tag - 100 if boundary and tag >= 100 else tag for tag, _ in chosen]
+        dataset.attrs.create("ids", np.array(ids, dtype="<i4"))
+        dataset.attrs.create("names", [name for _, name in chosen], dtype=h5py.string_dtype("utf-8"))
 
 
 def read_msh22_cells(path):
@@ -596,7 +620,7 @@ def read_msh22_cells(path):
     return cells
 
 
-def write_mixed_reference(path, points, cells, boundary, order):
+def write_mixed_reference(path, points, cells, boundary, order, names):
     by_nodes = {tuple(n + 1 for n in nodes): (kind, nodes, group) for kind, nodes, group in cells}
     ordered = [by_nodes[tuple(tags)] for tags in order]
     faces = np.zeros((len(ordered), 6), dtype="<i4")
@@ -612,6 +636,8 @@ def write_mixed_reference(path, points, cells, boundary, order):
         out.create_dataset("geometry", data=np.array(points, dtype="<f8"))
         out.create_dataset("group", data=np.array([group for _, _, group in ordered], dtype="<i4"))
         out.create_dataset("boundary", data=faces)
+        add_names(out["group"], names, 3, False)
+        add_names(out["boundary"], names, 2, True)
 
 
 def main():

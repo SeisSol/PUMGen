@@ -11,6 +11,7 @@
 #include <vector>
 
 #include "mesh/CellType.h"
+#include "mesh/PhysicalName.h"
 
 /**
  * The part of a mesh one rank holds: a contiguous range of the cells and a contiguous range of the
@@ -35,6 +36,8 @@ struct LocalMesh {
    * after the other; how many a cell has follows from its kind and order
    */
   std::vector<double> highOrderGeometry;
+  /** The names of the groups and boundary conditions, the same on all ranks */
+  std::vector<puml::PhysicalName> physicalNames;
 };
 
 /**
@@ -56,6 +59,7 @@ class MeshData {
   [[nodiscard]] virtual bool hasIdentify() const = 0;
   [[nodiscard]] virtual const std::vector<std::uint8_t>& orders() const = 0;
   [[nodiscard]] virtual const std::vector<double>& highOrderGeometry() const = 0;
+  [[nodiscard]] virtual const std::vector<puml::PhysicalName>& physicalNames() const = 0;
 };
 
 class FullStorageMeshData : public MeshData {
@@ -78,6 +82,9 @@ class FullStorageMeshData : public MeshData {
   [[nodiscard]] const std::vector<double>& highOrderGeometry() const override {
     return highOrderGeometryData;
   }
+  [[nodiscard]] const std::vector<puml::PhysicalName>& physicalNames() const override {
+    return physicalNameData;
+  }
 
   protected:
   static constexpr std::size_t TetrahedronFaces = 4;
@@ -93,6 +100,7 @@ class FullStorageMeshData : public MeshData {
   std::vector<std::uint64_t> identifyData;
   std::vector<std::uint8_t> orderData;
   std::vector<double> highOrderGeometryData;
+  std::vector<puml::PhysicalName> physicalNameData;
 
   /**
    * Sets the boundary condition of a face of a mesh of tetrahedra.
@@ -133,6 +141,7 @@ class FullStorageMeshData : public MeshData {
     identifyData = std::move(mesh.identify);
     orderData = std::move(mesh.orders);
     highOrderGeometryData = std::move(mesh.highOrderGeometry);
+    physicalNameData = std::move(mesh.physicalNames);
   }
 };
 

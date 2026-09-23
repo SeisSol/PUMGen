@@ -9,9 +9,11 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "GMSHMeshBuilder.h"
 #include "MshInput.h"
+#include "mesh/PhysicalName.h"
 
 namespace puml {
 
@@ -185,6 +187,11 @@ class GMSHParser {
 
   [[nodiscard]] std::string_view getErrorMessage() const { return errorMsg; }
 
+  /**
+   * The names of the physical groups the file gives, in its order.
+   */
+  [[nodiscard]] const std::vector<PhysicalName>& getPhysicalNames() const { return physicalNames; }
+
   protected:
   struct MeshFormat {
     double version;
@@ -250,12 +257,18 @@ class GMSHParser {
    */
   void skipSection(std::string_view section);
 
+  /**
+   * Reads the $PhysicalNames section, which all versions share, and hands the names to the builder.
+   */
+  void parsePhysicalNames();
+
   virtual void parse_() = 0;
 
   GMSHMeshBuilder* builder;
   std::unique_ptr<MshInput> input;
   // errors in binary data are located by byte offset instead of line and column
   bool binaryData = false;
+  std::vector<PhysicalName> physicalNames;
 
   private:
   std::size_t bufferSize;
