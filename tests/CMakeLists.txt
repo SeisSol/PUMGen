@@ -13,11 +13,15 @@ file(MAKE_DIRECTORY ${PUMGEN_TEST_OUTPUT})
 
 # pumgen_add_test(<name> RANKS <n> SOURCE <source> INPUT <fixture>
 #                 [REFERENCE <fixture> [TOLERANCE <tolerance>] [IDENTIFY]]
-#                 [EXPECT_OUTPUT <regex>] [EXPECT_ERROR <regex>] [ARGS <argument>...])
+#                 [EXPECT_OUTPUT <regex>] [EXPECT_ERROR <regex>]
+#                 [OUTPUT <file>] [EXPECT_XDMF <regex>] [ARGS <argument>...])
 function(pumgen_add_test name)
   cmake_parse_arguments(PARSE_ARGV 1 TEST "IDENTIFY"
-                        "RANKS;SOURCE;INPUT;REFERENCE;TOLERANCE;EXPECT_OUTPUT;EXPECT_ERROR" "ARGS")
+                        "RANKS;SOURCE;INPUT;OUTPUT;REFERENCE;TOLERANCE;EXPECT_OUTPUT;EXPECT_ERROR;EXPECT_XDMF" "ARGS")
   set(output ${PUMGEN_TEST_OUTPUT}/${name}.puml.h5)
+  if(DEFINED TEST_OUTPUT)
+    set(output ${TEST_OUTPUT})
+  endif()
   if(DEFINED TEST_EXPECT_ERROR AND TEST_RANKS EQUAL 1)
     # started as MPI singleton, since mpiexec may drop the output of a process ending with
     # MPI_Abort
@@ -41,6 +45,9 @@ function(pumgen_add_test name)
   set(script_args -DCOMMAND=${command} -DOUTPUT=${output})
   if(DEFINED TEST_EXPECT_OUTPUT)
     list(APPEND script_args "-DEXPECT_OUTPUT=${TEST_EXPECT_OUTPUT}")
+  endif()
+  if(DEFINED TEST_EXPECT_XDMF)
+    list(APPEND script_args "-DEXPECT_XDMF=${TEST_EXPECT_XDMF}")
   endif()
   if(DEFINED TEST_EXPECT_ERROR)
     list(APPEND script_args "-DEXPECT_ERROR=${TEST_EXPECT_ERROR}")
@@ -237,6 +244,17 @@ file(WRITE ${PUMGEN_TEST_OUTPUT}/layered-nogroups.neu "${gambit}")
 pumgen_add_test(gambit.nogroups.np3 RANKS 3 SOURCE gambit
                 INPUT ${PUMGEN_TEST_OUTPUT}/layered-nogroups.neu
                 EXPECT_OUTPUT "1597 elements belong to no group and get group 0")
+
+# the XDMF file: the cells of a higher-order mesh with their vertices only, the precision of
+# compacted integers, and the file name next to an output in a directory whose name ends in .h5
+pumgen_add_test(msh4.coarse-o2.xdmf RANKS 1 SOURCE msh4 INPUT coarse-o2-v41.msh ARGS --order=2
+                EXPECT_XDMF "HyperSlab. Dimensions=.320 4.[^#]*Dimensions=.320 10.>msh4")
+pumgen_add_test(
+  msh4.coarse.compact-xdmf RANKS 2 SOURCE msh4 INPUT coarse-v41.msh ARGS --compactify-datatypes
+  EXPECT_XDMF "Precision=.1. Format=.HDF. Dimensions=.320 4.>[^#]*Precision=.8. Format=.HDF. Dimensions=.109 3.")
+file(MAKE_DIRECTORY ${PUMGEN_TEST_OUTPUT}/directory.h5)
+pumgen_add_test(msh4.tiny.xdmf-path RANKS 1 SOURCE msh4 INPUT tiny-v41.msh
+                OUTPUT ${PUMGEN_TEST_OUTPUT}/directory.h5/tiny.puml.h5 EXPECT_XDMF "tiny.puml.h5:/connect")
 
 # a face of the surface mesh given twice
 pumgen_add_test(msh2.tiny-duplicateface RANKS 1 SOURCE msh2 INPUT tiny-duplicateface-v22.msh

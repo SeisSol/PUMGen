@@ -16,6 +16,7 @@
 #include <functional>
 #include <limits>
 #include <memory>
+#include <sstream>
 #include <string>
 
 #include <hdf5.h>
@@ -80,6 +81,18 @@ static int ilog(std::size_t value, int expbase = 1) {
 constexpr std::size_t NoSecondDim = 0;
 
 /**
+ * The precision to declare in XDMF for integers of the given size: XDMF knows 1, 2, 4 and 8 bytes,
+ * and HDF5 widens the sizes in between which the compaction may choose.
+ */
+static std::size_t xdmfPrecision(std::size_t bytes) {
+  std::size_t precision = 1;
+  while (precision < bytes) {
+    precision *= 2;
+  }
+  return precision;
+}
+
+/**
  * The smallest size in bytes of an integer type with the given signedness which holds all values
  * of the (distributed) data. Data with negative values is not reduced.
  */
@@ -106,11 +119,15 @@ static std::size_t requiredIntegerBytes(const F& data, std::size_t count, bool i
   return std::max(static_cast<std::size_t>(1), (bits + 7) / 8);
 }
 
+/**
+ * Writes a (distributed) dataset; returns the size of its values in the file.
+ */
 template <typename T, typename F>
-static void writeH5Data(const F& handler, hid_t h5file, const std::string& name, void* mesh,
-                        int meshdim, hid_t h5memtype, hid_t h5outtype, std::size_t chunk,
-                        std::size_t localSize, std::size_t globalSize, bool reduceInts,
-                        int filterEnable, std::size_t filterChunksize, std::size_t secondDim) {
+static std::size_t writeH5Data(const F& handler, hid_t h5file, const std::string& name, void* mesh,
+                               int meshdim, hid_t h5memtype, hid_t h5outtype, std::size_t chunk,
+                               std::size_t localSize, std::size_t globalSize, bool reduceInts,
+                               int filterEnable, std::size_t filterChunksize,
+                               std::size_t secondDim) {
   const std::size_t secondSize = std::max(secondDim, static_cast<std::size_t>(1));
   const std::size_t dimensions = secondDim == 0 ? 1 : 2;
   // at least one row per round, however small the chunk is
@@ -200,6 +217,7 @@ static void writeH5Data(const F& handler, hid_t h5file, const std::string& name,
     written += count[0];
   }
 
+  const std::size_t valueBytes = H5Tget_size(h5type);
   if (filterEnable > 0) {
     checkH5Err(H5Pclose(h5filter));
   }
@@ -210,6 +228,7 @@ static void writeH5Data(const F& handler, hid_t h5file, const std::string& name,
   checkH5Err(H5Sclose(h5memspace));
   checkH5Err(H5Dclose(h5data));
   checkH5Err(H5Pclose(h5dxlist));
+  return valueBytes;
 }
 
 void addAttribute(hid_t h5file, const std::string& name, const std::string& value) {
@@ -347,28 +366,24 @@ int main(int argc, char* argv[]) {
   int faceOffset;
   int secondShape = NoSecondDim;
   std::string boundaryFormatAttr = "";
-  int boundaryPrecision = 0;
   std::string secondDimBoundary = "";
   if (boundaryType == 0 || boundaryType == 2) {
     boundaryDatatype = H5T_STD_I32LE;
     faceOffset = 8;
     secondShape = NoSecondDim;
     boundaryFormatAttr = "i32";
-    boundaryPrecision = 4;
     logInfo() << "Using 32-bit integer boundary type conditions, or 8 bit per face (i32).";
   } else if (boundaryType == 1 || boundaryType == 3) {
     boundaryDatatype = H5T_STD_I64LE;
     faceOffset = 16;
     secondShape = NoSecondDim;
     boundaryFormatAttr = "i64";
-    boundaryPrecision = 8;
     logInfo() << "Using 64-bit integer boundary type conditions, or 16 bit per face (i64).";
   } else if (boundaryType == 4) {
     boundaryDatatype = H5T_STD_I32LE;
     secondShape = 4;
     faceOffset = -1;
     boundaryFormatAttr = "i32x4";
-    boundaryPrecision = 4;
     secondDimBoundary = " 4";
     logInfo() << "Using 32-bit integer per boundary face (i32x4).";
   }
@@ -376,8 +391,7 @@ int main(int argc, char* argv[]) {
   std::string xdmfFile = outputFile;
   if (utils::StringUtils::endsWith(outputFile, ".puml.h5")) {
     utils::StringUtils::replaceLast(xdmfFile, ".puml.h5", ".xdmf");
-  }
-  if (utils::StringUtils::endsWith(outputFile, ".h5")) {
+  } else if (utils::StringUtils::endsWith(outputFile, ".h5")) {
     utils::StringUtils::replaceLast(xdmfFile, ".h5", ".xdmf");
   } else {
     xdmfFile.append(".xdmf");
@@ -533,11 +547,11 @@ int main(int argc, char* argv[]) {
   checkH5Err(H5Pclose(h5falist));
 
   // Write cells
-  std::size_t connectBytesPerData = 8;
   logInfo() << "Writing cells";
-  writeH5Data<uint64_t>(meshInput->connectivity(), h5file, "connect", mesh, 3, H5T_NATIVE_UINT64,
-                        H5T_STD_U64LE, chunksize, localSize[0], globalSize[0], reduceInts,
-                        filterEnable, filterChunksize, meshInput->cellSize());
+  const auto connectBytes = writeH5Data<uint64_t>(
+      meshInput->connectivity(), h5file, "connect", mesh, 3, H5T_NATIVE_UINT64, H5T_STD_U64LE,
+      chunksize, localSize[0], globalSize[0], reduceInts, filterEnable, filterChunksize,
+      meshInput->cellSize());
 
   // Vertices
   logInfo() << "Writing vertices";
@@ -547,11 +561,10 @@ int main(int argc, char* argv[]) {
 
   // Group information
 
-  std::size_t groupBytesPerData = 4;
   logInfo() << "Writing group information";
-  writeH5Data<int32_t>(meshInput->group(), h5file, "group", mesh, 3, H5T_NATIVE_INT32,
-                       H5T_STD_I32LE, chunksize, localSize[0], globalSize[0], reduceInts,
-                       filterEnable, filterChunksize, NoSecondDim);
+  const auto groupBytes = writeH5Data<int32_t>(
+      meshInput->group(), h5file, "group", mesh, 3, H5T_NATIVE_INT32, H5T_STD_I32LE, chunksize,
+      localSize[0], globalSize[0], reduceInts, filterEnable, filterChunksize, NoSecondDim);
 
   // Write boundary condition
   logInfo() << "Writing boundary condition";
@@ -559,23 +572,28 @@ int main(int argc, char* argv[]) {
     // TODO: a bit ugly, but it works
     secondShape = meshInput->vertexSize() + 1;
   }
+  std::size_t boundaryBytes = 0;
   if (boundaryFormatAttr == "i32") {
-    writeH5Data<int32_t>(meshInput->boundary(), h5file, "boundary", mesh, 3, H5T_NATIVE_INT32,
-                         boundaryDatatype, chunksize, localSize[0], globalSize[0], reduceInts,
-                         filterEnable, filterChunksize, secondShape);
+    boundaryBytes =
+        writeH5Data<int32_t>(meshInput->boundary(), h5file, "boundary", mesh, 3, H5T_NATIVE_INT32,
+                             boundaryDatatype, chunksize, localSize[0], globalSize[0], reduceInts,
+                             filterEnable, filterChunksize, secondShape);
   } else {
-    writeH5Data<int64_t>(meshInput->boundary(), h5file, "boundary", mesh, 3, H5T_NATIVE_INT64,
-                         boundaryDatatype, chunksize, localSize[0], globalSize[0], reduceInts,
-                         filterEnable, filterChunksize, secondShape);
+    boundaryBytes =
+        writeH5Data<int64_t>(meshInput->boundary(), h5file, "boundary", mesh, 3, H5T_NATIVE_INT64,
+                             boundaryDatatype, chunksize, localSize[0], globalSize[0], reduceInts,
+                             filterEnable, filterChunksize, secondShape);
   }
 
   addAttribute(h5file, "boundary-format", boundaryFormatAttr);
 
+  std::size_t identifyBytes = 0;
   if (meshInput->hasIdentify()) {
     logInfo() << "Writing vertex topology identification";
-    writeH5Data<uint64_t>(meshInput->identify(), h5file, "identify", mesh, 0, H5T_NATIVE_UINT64,
-                          H5T_STD_U64LE, chunksize, localSize[1], globalSize[1], reduceInts,
-                          filterEnable, filterChunksize, NoSecondDim);
+    identifyBytes =
+        writeH5Data<uint64_t>(meshInput->identify(), h5file, "identify", mesh, 0, H5T_NATIVE_UINT64,
+                              H5T_STD_U64LE, chunksize, localSize[1], globalSize[1], reduceInts,
+                              filterEnable, filterChunksize, NoSecondDim);
     addAttribute(h5file, "topology-format", "identify-vertex");
   } else {
     addAttribute(h5file, "topology-format", "geometric");
@@ -593,21 +611,32 @@ int main(int argc, char* argv[]) {
 
     std::ofstream xdmf(xdmfFile.c_str());
 
+    // the cells are shown with their vertices; for higher-order meshes, the other nodes follow
+    // the vertices in the connectivity and are left out
+    const auto cellSize = meshInput->cellSize();
+    std::ostringstream connect;
+    connect << "<DataItem NumberType=\"Int\" Precision=\"" << xdmfPrecision(connectBytes)
+            << "\" Format=\"HDF\" Dimensions=\"" << globalSize[0] << " " << cellSize << "\">"
+            << basename << ":/connect</DataItem>";
+
     xdmf << "<?xml version=\"1.0\" ?>" << std::endl
          << "<!DOCTYPE Xdmf SYSTEM \"Xdmf.dtd\" []>" << std::endl
          << "<Xdmf Version=\"2.0\">" << std::endl
          << " <Domain>" << std::endl
          << "  <Grid Name=\"puml mesh\" GridType=\"Uniform\">" << std::endl
          << "   <Topology TopologyType=\"Tetrahedron\" NumberOfElements=\"" << globalSize[0]
-         << "\">"
-         << std::endl
-         // This should be UInt but for some reason this does not work with
-         // binary data
-         << "    <DataItem NumberType=\"Int\" Precision=\"" << connectBytesPerData
-         << "\" Format=\"HDF\" "
-            "Dimensions=\""
-         << globalSize[0] << " 4\">" << basename << ":/connect</DataItem>" << std::endl
-         << "   </Topology>" << std::endl
+         << "\">" << std::endl;
+    if (cellSize == CellVertices::VerticesPerCell) {
+      xdmf << "    " << connect.str() << std::endl;
+    } else {
+      xdmf << "    <DataItem ItemType=\"HyperSlab\" Dimensions=\"" << globalSize[0] << " "
+           << CellVertices::VerticesPerCell << "\" Type=\"HyperSlab\">" << std::endl
+           << "     <DataItem Dimensions=\"3 2\" Format=\"XML\">0 0 1 1 " << globalSize[0] << " "
+           << CellVertices::VerticesPerCell << "</DataItem>" << std::endl
+           << "     " << connect.str() << std::endl
+           << "    </DataItem>" << std::endl;
+    }
+    xdmf << "   </Topology>" << std::endl
          << "   <Geometry name=\"geo\" GeometryType=\"XYZ\" NumberOfElements=\"" << globalSize[1]
          << "\">" << std::endl
          << "    <DataItem NumberType=\"Float\" Precision=\"" << sizeof(double)
@@ -615,20 +644,20 @@ int main(int argc, char* argv[]) {
          << ":/geometry</DataItem>" << std::endl
          << "   </Geometry>" << std::endl
          << "   <Attribute Name=\"group\" Center=\"Cell\">" << std::endl
-         << "    <DataItem  NumberType=\"Int\" Precision=\"" << groupBytesPerData
-         << "\" Format=\"HDF\" "
-            "Dimensions=\""
-         << globalSize[0] << "\">" << basename << ":/group</DataItem>" << std::endl
+         << "    <DataItem  NumberType=\"Int\" Precision=\"" << xdmfPrecision(groupBytes)
+         << "\" Format=\"HDF\" Dimensions=\"" << globalSize[0] << "\">" << basename
+         << ":/group</DataItem>" << std::endl
          << "   </Attribute>" << std::endl
          << "   <Attribute Name=\"boundary\" Center=\"Cell\">" << std::endl
-         << "    <DataItem NumberType=\"Int\" Precision=\"" << boundaryPrecision
+         << "    <DataItem NumberType=\"Int\" Precision=\"" << xdmfPrecision(boundaryBytes)
          << "\" Format=\"HDF\" Dimensions=\"" << globalSize[0] << secondDimBoundary << "\">"
          << basename << ":/boundary</DataItem>" << std::endl
          << "   </Attribute>" << std::endl;
     if (meshInput->hasIdentify()) {
       xdmf << "   <Attribute Name=\"identify\" Center=\"Node\">" << std::endl
-           << "    <DataItem NumberType=\"Int\" Precision=\"8\" Format=\"HDF\" Dimensions=\""
-           << globalSize[1] << "\">" << basename << ":/identify</DataItem>" << std::endl
+           << "    <DataItem NumberType=\"Int\" Precision=\"" << xdmfPrecision(identifyBytes)
+           << "\" Format=\"HDF\" Dimensions=\"" << globalSize[1] << "\">" << basename
+           << ":/identify</DataItem>" << std::endl
            << "   </Attribute>" << std::endl;
     }
     xdmf << "  </Grid>" << std::endl << " </Domain>" << std::endl << "</Xdmf>" << std::endl;

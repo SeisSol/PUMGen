@@ -13,6 +13,7 @@
 #   H5DIFF        h5diff executable, required together with REFERENCE
 #   EXPECT_ERROR  (optional) pumgen has to fail with a message matching this regular expression
 #   EXPECT_OUTPUT (optional) the output of a successful run has to match this regular expression
+#   EXPECT_XDMF   (optional) the XDMF file next to the output has to match this regular expression
 
 string(REPLACE "|" ";" command "${COMMAND}")
 file(REMOVE "${OUTPUT}")
@@ -41,6 +42,23 @@ endif()
 
 if(DEFINED EXPECT_OUTPUT AND NOT log MATCHES "${EXPECT_OUTPUT}")
   message(FATAL_ERROR "The output does not match \"${EXPECT_OUTPUT}\"")
+endif()
+
+if(DEFINED EXPECT_XDMF)
+  if(OUTPUT MATCHES "[.]puml[.]h5$")
+    string(REGEX REPLACE "[.]puml[.]h5$" ".xdmf" xdmf "${OUTPUT}")
+  elseif(OUTPUT MATCHES "[.]h5$")
+    string(REGEX REPLACE "[.]h5$" ".xdmf" xdmf "${OUTPUT}")
+  else()
+    set(xdmf "${OUTPUT}.xdmf")
+  endif()
+  if(NOT EXISTS "${xdmf}")
+    message(FATAL_ERROR "${xdmf} was not written")
+  endif()
+  file(READ "${xdmf}" content)
+  if(NOT content MATCHES "${EXPECT_XDMF}")
+    message(FATAL_ERROR "${xdmf} does not match \"${EXPECT_XDMF}\":\n${content}")
+  endif()
 endif()
 
 if(DEFINED REFERENCE)
