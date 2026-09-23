@@ -359,6 +359,32 @@ def generate_periodic():
     write_reference("periodic.puml.h5", "periodic-v41.msh", periodic=True)
 
 
+def generate_periodic_tiny():
+    """A periodic cube of as few vertices as gmsh makes, to be converted on more ranks than it has
+    vertices."""
+    gmsh.clear()
+    gmsh.model.add("periodic-tiny")
+    gmsh.model.occ.addBox(0, 0, 0, 1, 1, 1)
+    gmsh.model.occ.synchronize()
+    translation = [1, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
+    left = [tag for _, tag in gmsh.model.getEntitiesInBoundingBox(-TOL, -TOL, -TOL, TOL, 1 + TOL, 1 + TOL, 2)]
+    right = [tag for _, tag in gmsh.model.getEntitiesInBoundingBox(1 - TOL, -TOL, -TOL, 1 + TOL, 1 + TOL, 1 + TOL, 2)]
+    gmsh.model.mesh.setPeriodic(2, right, left, translation)
+    gmsh.model.addPhysicalGroup(3, [1], 1)
+    others = [tag for _, tag in gmsh.model.getEntities(2) if tag not in left + right]
+    gmsh.model.addPhysicalGroup(2, others, FREE_SURFACE)
+    # the eight corners only
+    for _, curve in gmsh.model.getEntities(1):
+        gmsh.model.mesh.setTransfiniteCurve(curve, 2)
+    for _, surface in gmsh.model.getEntities(2):
+        gmsh.model.mesh.setTransfiniteSurface(surface)
+    gmsh.model.mesh.setTransfiniteVolume(1)
+    gmsh.model.mesh.generate(3)
+    write_mesh("periodic-tiny-v41.msh", 4.1)
+    write_mesh("periodic-tiny-binary-v41.msh", 4.1, binary=True)
+    write_reference("periodic-tiny.puml.h5", "periodic-tiny-v41.msh", periodic=True)
+
+
 TINY_V41 = """$MeshFormat
 4.1 0 8
 $EndMeshFormat
@@ -596,6 +622,7 @@ def main():
     generate_layered()
     generate_coarse()
     generate_periodic()
+    generate_periodic_tiny()
     generate_tiny()
     generate_mixed()
     gmsh.finalize()

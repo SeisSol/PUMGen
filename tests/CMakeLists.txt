@@ -317,3 +317,9 @@ pumgen_add_test(msh4.mixed.compact.np2 RANKS 2 SOURCE msh4 INPUT mixed-v41.msh
                 REFERENCE mixed.puml.h5 MIXED ARGS --compactify-datatypes)
 pumgen_add_test(msh4.mixed.packed RANKS 1 SOURCE msh4 INPUT mixed-v41.msh ARGS --boundarytype=i32
                 EXPECT_ERROR "packs four faces per cell")
+
+# more ranks than vertices: the ranks without vertices take part in writing the identification
+foreach(input periodic-tiny periodic-tiny-binary)
+  pumgen_add_test(msh4.${input}.np9 RANKS 9 SOURCE msh4 INPUT ${input}-v41.msh
+                  REFERENCE periodic-tiny.puml.h5 IDENTIFY)
+endforeach()
