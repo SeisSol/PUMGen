@@ -52,6 +52,7 @@
 #include "meshreader/ParallelGambitReader.h"
 
 #include "helper/InsphereCalculator.h"
+#include "helper/IntegerWidth.h"
 
 #ifdef USE_EASI
 #include "sizing/VelocityAwareMeshSize.h"
@@ -94,7 +95,8 @@ static std::size_t xdmfPrecision(std::size_t bytes) {
 
 /**
  * The smallest size in bytes of an integer type with the given signedness which holds all values
- * of the (distributed) data. Data with negative values is not reduced.
+ * of the (distributed) data, among the sizes of 1, 2, 4 and 8 bytes. Data with negative values is
+ * not reduced.
  */
 template <typename F>
 static std::size_t requiredIntegerBytes(const F& data, std::size_t count, bool isSigned) {
@@ -115,8 +117,7 @@ static std::size_t requiredIntegerBytes(const F& data, std::size_t count, bool i
   if (negative != 0) {
     return sizeof(ValueT);
   }
-  const std::size_t bits = ilog(largest) + (isSigned ? 1 : 0);
-  return std::max(static_cast<std::size_t>(1), (bits + 7) / 8);
+  return compactIntegerBytes(ilog(largest) + (isSigned ? 1 : 0));
 }
 
 /**
@@ -166,8 +167,6 @@ writeH5Data(const F& handler, hid_t h5file, const std::string& name, hid_t h5mem
       if (bytes < H5Tget_size(h5outtype)) {
         h5type = checkH5Err(H5Tcopy(h5outtype));
         checkH5Err(H5Tset_size(h5type, bytes));
-        checkH5Err(H5Tcommit(h5file, (std::string("/") + name + std::string("Type")).c_str(),
-                             h5type, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT));
       }
     }
   }

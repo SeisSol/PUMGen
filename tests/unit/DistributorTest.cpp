@@ -7,6 +7,7 @@
 #include <cstddef>
 
 #include "helper/Distributor.h"
+#include "helper/IntegerWidth.h"
 
 TEST_CASE("The chunks of all ranks cover the items exactly once") {
   for (const std::size_t total : {0, 1, 2, 3, 7, 64, 1000, 1597}) {
@@ -50,4 +51,14 @@ TEST_CASE("The block ranges of all ranks cover the items exactly once") {
   // five partitions on four ranks: blocks of two, and nothing left for the last rank
   CHECK(getBlockRange(5, 2, 4) == std::pair<std::size_t, std::size_t>{4, 1});
   CHECK(getBlockRange(5, 3, 4).second == 0);
+}
+
+TEST_CASE("Compacted integers have 1, 2, 4 or 8 bytes") {
+  CHECK(compactIntegerBytes(0) == 1);
+  CHECK(compactIntegerBytes(8) == 1);
+  CHECK(compactIntegerBytes(9) == 2);
+  CHECK(compactIntegerBytes(17) == 4);
+  CHECK(compactIntegerBytes(25) == 4);
+  CHECK(compactIntegerBytes(33) == 8);
+  CHECK(compactIntegerBytes(64) == 8);
 }
