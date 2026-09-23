@@ -77,7 +77,7 @@ set_tests_properties(reader.buffer-boundaries PROPERTIES ENVIRONMENT "ASAN_OPTIO
 
 # unit tests; the ones needing more ranks than started with are skipped
 add_executable(pumgen_unit_tests unit/Main.cpp unit/DistributorTest.cpp unit/BoundaryTest.cpp
-                                 unit/VertexFilterTest.cpp)
+                                 unit/VertexFilterTest.cpp unit/GMSHTypesTest.cpp)
 target_include_directories(pumgen_unit_tests SYSTEM PRIVATE ${PROJECT_SOURCE_DIR}/submodules/doctest)
 target_link_libraries(pumgen_unit_tests PRIVATE pumgen-core)
 foreach(ranks 1 3)

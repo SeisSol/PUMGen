@@ -30,136 +30,145 @@ template <std::size_t N> constexpr std::size_t maxEntry(const std::size_t (&valu
  */
 class GMSHParser {
   public:
-  // Look-up table from gmsh type to number of nodes
+  // Look-up table from gmsh type to number of nodes; 0 for the type numbers gmsh does not define
   static constexpr std::size_t NumNodes[] = {
-      2,    // MSH_LIN_2
-      3,    // MSH_TRI_3
-      4,    // MSH_QUA_4
-      4,    // MSH_TET_4
-      8,    // MSH_HEX_8
-      6,    // MSH_PRI_6
-      5,    // MSH_PYR_5
-      3,    // MSH_LIN_3
-      6,    // MSH_TRI_6
-      9,    // MSH_QUA_9
-      10,   // MSH_TET_10
-      27,   // MSH_HEX_27
-      18,   // MSH_PRI_18
-      14,   // MSH_PYR_14
-      1,    // MSH_PNT
-      8,    // MSH_QUA_8
-      20,   // MSH_HEX_20
-      15,   // MSH_PRI_15
-      13,   // MSH_PYR_13
-      9,    // MSH_TRI_9
-      10,   // MSH_TRI_10
-      12,   // MSH_TRI_12
-      15,   // MSH_TRI_15
-      15,   // MSH_TRI_15I
-      21,   // MSH_TRI_21
-      4,    // MSH_LIN_4
-      5,    // MSH_LIN_5
-      6,    // MSH_LIN_6
-      20,   // MSH_TET_20
-      35,   // MSH_TET_35
-      56,   // MSH_TET_56
-      22,   // MSH_TET_22
-      28,   // MSH_TET_28
-      0,    // MSH_POLYG_
-      0,    // MSH_POLYH_
-      16,   // MSH_QUA_16
-      25,   // MSH_QUA_25
-      36,   // MSH_QUA_36
-      12,   // MSH_QUA_12
-      16,   // MSH_QUA_16I
-      20,   // MSH_QUA_20
-      28,   // MSH_TRI_28
-      36,   // MSH_TRI_36
-      45,   // MSH_TRI_45
-      55,   // MSH_TRI_55
-      66,   // MSH_TRI_66
-      49,   // MSH_QUA_49
-      64,   // MSH_QUA_64
-      81,   // MSH_QUA_81
-      100,  // MSH_QUA_100
-      121,  // MSH_QUA_121
-      18,   // MSH_TRI_18
-      21,   // MSH_TRI_21I
-      24,   // MSH_TRI_24
-      27,   // MSH_TRI_27
-      30,   // MSH_TRI_30
-      24,   // MSH_QUA_24
-      28,   // MSH_QUA_28
-      32,   // MSH_QUA_32
-      36,   // MSH_QUA_36I
-      40,   // MSH_QUA_40
-      7,    // MSH_LIN_7
-      8,    // MSH_LIN_8
-      9,    // MSH_LIN_9
-      10,   // MSH_LIN_10
-      11,   // MSH_LIN_11
-      0,    // MSH_LIN_B
-      0,    // MSH_TRI_B
-      0,    // MSH_POLYG_B
-      0,    // MSH_LIN_C
-      84,   // MSH_TET_84
-      120,  // MSH_TET_120
-      165,  // MSH_TET_165
-      220,  // MSH_TET_220
-      286,  // MSH_TET_286
-      34,   // MSH_TET_34
-      40,   // MSH_TET_40
-      46,   // MSH_TET_46
-      52,   // MSH_TET_52
-      58,   // MSH_TET_58
-      1,    // MSH_LIN_1
-      1,    // MSH_TRI_1
-      1,    // MSH_QUA_1
-      1,    // MSH_TET_1
-      1,    // MSH_HEX_1
-      1,    // MSH_PRI_1
-      40,   // MSH_PRI_40
-      75,   // MSH_PRI_75
-      64,   // MSH_HEX_64
-      125,  // MSH_HEX_125
-      216,  // MSH_HEX_216
-      343,  // MSH_HEX_343
-      512,  // MSH_HEX_512
-      729,  // MSH_HEX_729
-      1000, // MSH_HEX_1000
-      32,   // MSH_HEX_32
-      44,   // MSH_HEX_44
-      56,   // MSH_HEX_56
-      68,   // MSH_HEX_68
-      80,   // MSH_HEX_80
-      92,   // MSH_HEX_92
-      104,  // MSH_HEX_104
-      126,  // MSH_PRI_126
-      196,  // MSH_PRI_196
-      288,  // MSH_PRI_288
-      405,  // MSH_PRI_405
-      550,  // MSH_PRI_550
-      24,   // MSH_PRI_24
-      33,   // MSH_PRI_33
-      42,   // MSH_PRI_42
-      51,   // MSH_PRI_51
-      60,   // MSH_PRI_60
-      69,   // MSH_PRI_69
-      78,   // MSH_PRI_78
-      30,   // MSH_PYR_30
-      55,   // MSH_PYR_55
-      91,   // MSH_PYR_91
-      140,  // MSH_PYR_140
-      204,  // MSH_PYR_204
-      285,  // MSH_PYR_285
-      385,  // MSH_PYR_385
-      21,   // MSH_PYR_21
-      29,   // MSH_PYR_29
-      37,   // MSH_PYR_37
-      45,   // MSH_PYR_45
-      53,   // MSH_PYR_53
-      61,   // MSH_PYR_61
-      69,   // MSH_PYR_69
+      2,    // 1: Line 2
+      3,    // 2: Triangle 3
+      4,    // 3: Quadrilateral 4
+      4,    // 4: Tetrahedron 4
+      8,    // 5: Hexahedron 8
+      6,    // 6: Prism 6
+      5,    // 7: Pyramid 5
+      3,    // 8: Line 3
+      6,    // 9: Triangle 6
+      9,    // 10: Quadrilateral 9
+      10,   // 11: Tetrahedron 10
+      27,   // 12: Hexahedron 27
+      18,   // 13: Prism 18
+      14,   // 14: Pyramid 14
+      1,    // 15: Point
+      8,    // 16: Quadrilateral 8
+      20,   // 17: Hexahedron 20
+      15,   // 18: Prism 15
+      13,   // 19: Pyramid 13
+      9,    // 20: Triangle 9
+      10,   // 21: Triangle 10
+      12,   // 22: Triangle 12
+      15,   // 23: Triangle 15
+      15,   // 24: Triangle 15I
+      21,   // 25: Triangle 21
+      4,    // 26: Line 4
+      5,    // 27: Line 5
+      6,    // 28: Line 6
+      20,   // 29: Tetrahedron 20
+      35,   // 30: Tetrahedron 35
+      56,   // 31: Tetrahedron 56
+      22,   // 32: Tetrahedron 22
+      28,   // 33: Tetrahedron 28
+      0,    // 34: Polygon
+      0,    // 35: Polyhedron
+      16,   // 36: Quadrilateral 16
+      25,   // 37: Quadrilateral 25
+      36,   // 38: Quadrilateral 36
+      12,   // 39: Quadrilateral 12
+      16,   // 40: Quadrilateral 16I
+      20,   // 41: Quadrilateral 20
+      28,   // 42: Triangle 28
+      36,   // 43: Triangle 36
+      45,   // 44: Triangle 45
+      55,   // 45: Triangle 55
+      66,   // 46: Triangle 66
+      49,   // 47: Quadrilateral 49
+      64,   // 48: Quadrilateral 64
+      81,   // 49: Quadrilateral 81
+      100,  // 50: Quadrilateral 100
+      121,  // 51: Quadrilateral 121
+      18,   // 52: Triangle 18
+      21,   // 53: Triangle 21I
+      24,   // 54: Triangle 24
+      27,   // 55: Triangle 27
+      30,   // 56: Triangle 30
+      24,   // 57: Quadrilateral 24
+      28,   // 58: Quadrilateral 28
+      32,   // 59: Quadrilateral 32
+      36,   // 60: Quadrilateral 36I
+      40,   // 61: Quadrilateral 40
+      7,    // 62: Line 7
+      8,    // 63: Line 8
+      9,    // 64: Line 9
+      10,   // 65: Line 10
+      11,   // 66: Line 11
+      0,    // 67: undefined
+      0,    // 68: undefined
+      0,    // 69: Polygon Border
+      0,    // 70: undefined
+      84,   // 71: Tetrahedron 84
+      120,  // 72: Tetrahedron 120
+      165,  // 73: Tetrahedron 165
+      220,  // 74: Tetrahedron 220
+      286,  // 75: Tetrahedron 286
+      0,    // 76: undefined
+      0,    // 77: undefined
+      0,    // 78: undefined
+      34,   // 79: Tetrahedron 34
+      40,   // 80: Tetrahedron 40
+      46,   // 81: Tetrahedron 46
+      52,   // 82: Tetrahedron 52
+      58,   // 83: Tetrahedron 58
+      1,    // 84: Line 1
+      1,    // 85: Triangle 1
+      1,    // 86: Quadrilateral 1
+      1,    // 87: Tetrahedron 1
+      1,    // 88: Hexahedron 1
+      1,    // 89: Prism 1
+      40,   // 90: Prism 40
+      75,   // 91: Prism 75
+      64,   // 92: Hexahedron 64
+      125,  // 93: Hexahedron 125
+      216,  // 94: Hexahedron 216
+      343,  // 95: Hexahedron 343
+      512,  // 96: Hexahedron 512
+      729,  // 97: Hexahedron 729
+      1000, // 98: Hexahedron 1000
+      32,   // 99: Hexahedron 32
+      44,   // 100: Hexahedron 44
+      56,   // 101: Hexahedron 56
+      68,   // 102: Hexahedron 68
+      80,   // 103: Hexahedron 80
+      92,   // 104: Hexahedron 92
+      104,  // 105: Hexahedron 104
+      0,    // 106: undefined
+      0,    // 107: undefined
+      0,    // 108: undefined
+      0,    // 109: undefined
+      0,    // 110: undefined
+      0,    // 111: undefined
+      0,    // 112: undefined
+      0,    // 113: undefined
+      0,    // 114: undefined
+      0,    // 115: undefined
+      0,    // 116: undefined
+      0,    // 117: undefined
+      30,   // 118: Pyramid 30
+      55,   // 119: Pyramid 55
+      91,   // 120: Pyramid 91
+      140,  // 121: Pyramid 140
+      204,  // 122: Pyramid 204
+      285,  // 123: Pyramid 285
+      385,  // 124: Pyramid 385
+      21,   // 125: Pyramid 21
+      29,   // 126: Pyramid 29
+      37,   // 127: Pyramid 37
+      45,   // 128: Pyramid 45
+      53,   // 129: Pyramid 53
+      61,   // 130: Pyramid 61
+      69,   // 131: Pyramid 69
+      1,    // 132: Pyramid 1
+      0,    // 133: Point Xfem
+      0,    // 134: Line Xfem
+      0,    // 135: Triangle Xfem
+      0,    // 136: Tetrahedron Xfem
+      16,   // 137: Tetrahedron 16
   };
   static constexpr std::size_t NumTypes = sizeof(NumNodes) / sizeof(NumNodes[0]);
   static constexpr std::size_t MaxNodesPerElement = detail::maxEntry(NumNodes);
