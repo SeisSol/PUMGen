@@ -123,11 +123,10 @@ static std::size_t requiredIntegerBytes(const F& data, std::size_t count, bool i
  * Writes a (distributed) dataset; returns the size of its values in the file.
  */
 template <typename T, typename F>
-static std::size_t writeH5Data(const F& handler, hid_t h5file, const std::string& name, void* mesh,
-                               int meshdim, hid_t h5memtype, hid_t h5outtype, std::size_t chunk,
-                               std::size_t localSize, std::size_t globalSize, bool reduceInts,
-                               int filterEnable, std::size_t filterChunksize,
-                               std::size_t secondDim) {
+static std::size_t
+writeH5Data(const F& handler, hid_t h5file, const std::string& name, hid_t h5memtype,
+            hid_t h5outtype, std::size_t chunk, std::size_t localSize, std::size_t globalSize,
+            bool reduceInts, int filterEnable, std::size_t filterChunksize, std::size_t secondDim) {
   const std::size_t secondSize = std::max(secondDim, static_cast<std::size_t>(1));
   const std::size_t dimensions = secondDim == 0 ? 1 : 2;
   // at least one row per round, however small the chunk is
@@ -322,8 +321,11 @@ int main(int argc, char* argv[]) {
                  "VelocityAwareMeshing element of a mesh attributes file (XML)",
                  utils::Args::Required, false);
 
-  if (args.parse(argc, argv, rank == 0) != utils::Args::Success)
-    return 1;
+  const auto parsed = args.parse(argc, argv, rank == 0);
+  if (parsed != utils::Args::Success) {
+    MPI_Finalize();
+    return parsed == utils::Args::Help ? 0 : 1;
+  }
 
   const char* inputFile = args.getAdditionalArgument<const char*>("input");
 
@@ -403,15 +405,15 @@ int main(int argc, char* argv[]) {
   }
 
   // Create/read the mesh
-  MeshData* meshInput = nullptr;
+  std::unique_ptr<MeshData> meshInput;
   switch (args.getArgument<int>("source", 0)) {
   case 0:
     logInfo() << "Using Gambit mesh";
-    meshInput = new SerialMeshFile<puml::ParallelGambitReader>(inputFile, faceOffset);
+    meshInput = std::make_unique<SerialMeshFile<puml::ParallelGambitReader>>(inputFile, faceOffset);
     break;
   case 1:
     logInfo() << "Using GMSH mesh format 2 (msh2) mesh";
-    meshInput = puml::makePointer<MeshData, SMF2>(meshOrder, inputFile, faceOffset);
+    meshInput.reset(puml::makePointer<MeshData, SMF2>(meshOrder, inputFile, faceOffset));
     break;
   case 2: {
     int distributed = 0;
@@ -421,17 +423,18 @@ int main(int argc, char* argv[]) {
     MPI_Bcast(&distributed, 1, MPI_INT, 0, MPI_COMM_WORLD);
     if (distributed != 0) {
       logInfo() << "Using GMSH mesh format 4 (msh4) mesh, binary, read by all ranks";
-      meshInput = puml::makePointer<MeshData, SMF4Distributed>(meshOrder, inputFile, faceOffset);
+      meshInput.reset(
+          puml::makePointer<MeshData, SMF4Distributed>(meshOrder, inputFile, faceOffset));
     } else {
       logInfo() << "Using GMSH mesh format 4 (msh4) mesh";
-      meshInput = puml::makePointer<MeshData, SMF4>(meshOrder, inputFile, faceOffset);
+      meshInput.reset(puml::makePointer<MeshData, SMF4>(meshOrder, inputFile, faceOffset));
     }
     break;
   }
   case 3:
 #ifdef USE_NETCDF
     logInfo() << "Using netCDF mesh";
-    meshInput = new NetCDFMesh(inputFile, faceOffset);
+    meshInput = std::make_unique<NetCDFMesh>(inputFile, faceOffset);
 #else  // USE_NETCDF
     logError() << "netCDF is not supported in this version";
 #endif // USE_NETCDF
@@ -439,8 +442,9 @@ int main(int argc, char* argv[]) {
   case 4:
     logInfo() << "Using APF native format";
 #ifdef USE_SCOREC
-    meshInput = new ApfNative(inputFile, faceOffset, args.getArgument<const char*>("input", 0L));
-    (dynamic_cast<ApfMeshInput*>(meshInput))->generate();
+    meshInput = std::make_unique<ApfNative>(inputFile, faceOffset,
+                                            args.getArgument<const char*>("input", 0L));
+    (dynamic_cast<ApfMeshInput*>(meshInput.get()))->generate();
 #else
     logError() << "This version of PUMgen has been compiled without SCOREC. Hence, the APF format "
                   "is not available.";
@@ -450,7 +454,7 @@ int main(int argc, char* argv[]) {
 #ifdef USE_SIMMOD
     logInfo() << "Using SimModSuite";
 
-    meshInput = new SimModSuite(
+    meshInput = std::make_unique<SimModSuite>(
         inputFile, faceOffset, args.getArgument<const char*>("cad", 0L),
         args.getArgument<const char*>("license", 0L), args.getArgument<const char*>("mesh", "mesh"),
         args.getArgument<const char*>("analysis", "analysis"),
@@ -465,13 +469,13 @@ int main(int argc, char* argv[]) {
 #ifdef USE_SCOREC
     logInfo() << "Using SimModSuite with APF (deprecated)";
 
-    meshInput = new SimModSuiteApf(
+    meshInput = std::make_unique<SimModSuiteApf>(
         inputFile, faceOffset, args.getArgument<const char*>("cad", 0L),
         args.getArgument<const char*>("license", 0L), args.getArgument<const char*>("mesh", "mesh"),
         args.getArgument<const char*>("analysis", "analysis"),
         args.getArgument<int>("enforce-size", 0), args.getArgument<const char*>("xml", 0L),
         args.isSet("analyseAR"), args.getArgument<const char*>("sim_log", 0L));
-    (dynamic_cast<ApfMeshInput*>(meshInput))->generate();
+    (dynamic_cast<ApfMeshInput*>(meshInput.get()))->generate();
 #else
     logError() << "This version of PUMgen has been compiled without SCOREC. Hence, this reader for "
                   "the SimModSuite is not available here.";
@@ -485,8 +489,6 @@ int main(int argc, char* argv[]) {
   }
 
   logInfo() << "Parsed mesh successfully, writing output...";
-
-  void* mesh = nullptr;
 
   // Get local/global size
   std::size_t localSize[2] = {meshInput->cellCount(), meshInput->vertexCount()};
@@ -548,23 +550,23 @@ int main(int argc, char* argv[]) {
 
   // Write cells
   logInfo() << "Writing cells";
-  const auto connectBytes = writeH5Data<uint64_t>(
-      meshInput->connectivity(), h5file, "connect", mesh, 3, H5T_NATIVE_UINT64, H5T_STD_U64LE,
-      chunksize, localSize[0], globalSize[0], reduceInts, filterEnable, filterChunksize,
-      meshInput->cellSize());
+  const auto connectBytes =
+      writeH5Data<uint64_t>(meshInput->connectivity(), h5file, "connect", H5T_NATIVE_UINT64,
+                            H5T_STD_U64LE, chunksize, localSize[0], globalSize[0], reduceInts,
+                            filterEnable, filterChunksize, meshInput->cellSize());
 
   // Vertices
   logInfo() << "Writing vertices";
-  writeH5Data<double>(meshInput->geometry(), h5file, "geometry", mesh, 0, H5T_IEEE_F64LE,
-                      H5T_IEEE_F64LE, chunksize, localSize[1], globalSize[1], reduceInts,
-                      filterEnable, filterChunksize, meshInput->vertexSize());
+  writeH5Data<double>(meshInput->geometry(), h5file, "geometry", H5T_IEEE_F64LE, H5T_IEEE_F64LE,
+                      chunksize, localSize[1], globalSize[1], reduceInts, filterEnable,
+                      filterChunksize, meshInput->vertexSize());
 
   // Group information
 
   logInfo() << "Writing group information";
   const auto groupBytes = writeH5Data<int32_t>(
-      meshInput->group(), h5file, "group", mesh, 3, H5T_NATIVE_INT32, H5T_STD_I32LE, chunksize,
-      localSize[0], globalSize[0], reduceInts, filterEnable, filterChunksize, NoSecondDim);
+      meshInput->group(), h5file, "group", H5T_NATIVE_INT32, H5T_STD_I32LE, chunksize, localSize[0],
+      globalSize[0], reduceInts, filterEnable, filterChunksize, NoSecondDim);
 
   // Write boundary condition
   logInfo() << "Writing boundary condition";
@@ -574,15 +576,13 @@ int main(int argc, char* argv[]) {
   }
   std::size_t boundaryBytes = 0;
   if (boundaryFormatAttr == "i32") {
-    boundaryBytes =
-        writeH5Data<int32_t>(meshInput->boundary(), h5file, "boundary", mesh, 3, H5T_NATIVE_INT32,
-                             boundaryDatatype, chunksize, localSize[0], globalSize[0], reduceInts,
-                             filterEnable, filterChunksize, secondShape);
+    boundaryBytes = writeH5Data<int32_t>(
+        meshInput->boundary(), h5file, "boundary", H5T_NATIVE_INT32, boundaryDatatype, chunksize,
+        localSize[0], globalSize[0], reduceInts, filterEnable, filterChunksize, secondShape);
   } else {
-    boundaryBytes =
-        writeH5Data<int64_t>(meshInput->boundary(), h5file, "boundary", mesh, 3, H5T_NATIVE_INT64,
-                             boundaryDatatype, chunksize, localSize[0], globalSize[0], reduceInts,
-                             filterEnable, filterChunksize, secondShape);
+    boundaryBytes = writeH5Data<int64_t>(
+        meshInput->boundary(), h5file, "boundary", H5T_NATIVE_INT64, boundaryDatatype, chunksize,
+        localSize[0], globalSize[0], reduceInts, filterEnable, filterChunksize, secondShape);
   }
 
   addAttribute(h5file, "boundary-format", boundaryFormatAttr);
@@ -590,10 +590,9 @@ int main(int argc, char* argv[]) {
   std::size_t identifyBytes = 0;
   if (meshInput->hasIdentify()) {
     logInfo() << "Writing vertex topology identification";
-    identifyBytes =
-        writeH5Data<uint64_t>(meshInput->identify(), h5file, "identify", mesh, 0, H5T_NATIVE_UINT64,
-                              H5T_STD_U64LE, chunksize, localSize[1], globalSize[1], reduceInts,
-                              filterEnable, filterChunksize, NoSecondDim);
+    identifyBytes = writeH5Data<uint64_t>(
+        meshInput->identify(), h5file, "identify", H5T_NATIVE_UINT64, H5T_STD_U64LE, chunksize,
+        localSize[1], globalSize[1], reduceInts, filterEnable, filterChunksize, NoSecondDim);
     addAttribute(h5file, "topology-format", "identify-vertex");
   } else {
     addAttribute(h5file, "topology-format", "geometric");
@@ -665,7 +664,7 @@ int main(int argc, char* argv[]) {
 
   checkH5Err(H5Fclose(h5file));
 
-  delete meshInput;
+  meshInput.reset();
 
   logInfo() << "Finished successfully";
 
