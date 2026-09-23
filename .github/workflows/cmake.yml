@@ -85,7 +85,7 @@ jobs:
     name: read-with-puml
     runs-on: ubuntu-24.04
     env:
-      # a branch of PUML2 with the reader of meshes of several kinds of cells
+      # a branch of PUML2 which reads meshes of several kinds of cells and walks down from them
       PUML_REF: davschneller/puml-rework3
 
     steps:

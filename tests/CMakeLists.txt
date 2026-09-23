@@ -347,8 +347,8 @@ pumgen_add_test(msh4.coarse.vtkhdf.np2 RANKS 2 SOURCE msh4 INPUT coarse-v41.msh
 pumgen_add_test(msh4.coarse.vtkhdf.compact.np3 RANKS 3 SOURCE msh4 INPUT coarse-v41.msh
                 REFERENCE coarse-vtkhdf.puml.h5 VTKHDF ARGS --vtkhdf --compactify-datatypes)
 
-# PUML reads converted meshes, if a checkout of PUML2 with its reader of meshes of several kinds of
-# cells is given
+# PUML reads converted meshes, if a checkout of PUML2 is given which reads meshes of several kinds
+# of cells and walks down from them
 set(PUML_DIR "" CACHE PATH "A checkout of PUML2, which then reads the converted meshes in tests")
 if(PUML_DIR)
   add_executable(pumgen-puml-read puml/ReadWithPuml.cpp)

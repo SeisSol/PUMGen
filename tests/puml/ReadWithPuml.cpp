@@ -4,8 +4,10 @@
 
 // Reads a mesh file of PUMGen with PUML and checks what PUML makes of it against the file: the
 // numbers of cells, vertices, faces and faces on the surface, which are counted in the file from
-// the faces of the cells, and the Euler characteristic of a mesh of a ball. Every face on the
-// surface has to have a boundary condition in the file.
+// the faces of the cells, and the Euler characteristic of a mesh of a ball. Walking down from
+// every cell, the cell has to be of the kind the file gives it, the face on each of its sides has
+// to have the vertices the file gives that side, and a face on the surface has to have a boundary
+// condition at that side in the file.
 
 #include <hdf5.h>
 #include <mpi.h>
@@ -20,6 +22,7 @@
 #include <vector>
 
 #include "CellType.h"
+#include "Downward.h"
 #include "Hdf5Reader.h"
 #include "PUML.h"
 #include "Upward.h"
@@ -76,7 +79,7 @@ template <typename T> std::vector<T> readAll(hid_t file, const char* name, hid_t
 
 constexpr std::size_t MaxFaces = 6;
 
-// the faces of the cells by their VTK cell types, as PUML and PUMGen number them
+// the faces of the cells by their VTK cell types, as PUMGen numbers them
 const std::map<int, std::vector<std::vector<std::size_t>>> Faces = {
     {10, {{1, 0, 2}, {0, 1, 3}, {1, 2, 3}, {2, 0, 3}}},
     {12, {{0, 4, 7, 3}, {1, 2, 6, 5}, {0, 1, 5, 4}, {3, 7, 6, 2}, {0, 3, 2, 1}, {4, 5, 6, 7}}},
@@ -86,28 +89,42 @@ const std::map<int, std::size_t> VertexCounts = {{10, 4}, {12, 8}, {13, 6}, {14,
 const std::map<std::string, int> KindsByName = {
     {"tetrahedron", 10}, {"hexahedron", 12}, {"wedge", 13}, {"pyramid", 14}};
 
-struct FileCounts {
+/** What the file holds, read with HDF5 alone */
+struct FileMesh {
   long cells = 0;
   long vertices = 0;
   long faces = 0;
   long surface = 0;
-  long surfaceWithoutCondition = 0;
-  bool mixed = false;
   std::string cellType;
+  std::vector<int> kinds;
+  std::vector<std::uint64_t> offsets;
+  std::vector<std::uint64_t> connect;
+  /** The boundary condition of every side, MaxFaces per cell */
+  std::vector<std::int64_t> boundary;
+
+  /** The vertices the file gives a side of a cell, sorted */
+  [[nodiscard]] std::vector<std::uint64_t> side(std::size_t cell, std::size_t face) const {
+    std::vector<std::uint64_t> sideVertices;
+    for (const auto vertex : Faces.at(kinds[cell])[face]) {
+      sideVertices.push_back(connect[offsets[cell] + vertex]);
+    }
+    std::sort(sideVertices.begin(), sideVertices.end());
+    return sideVertices;
+  }
 };
 
-FileCounts readFile(const std::string& path) {
+FileMesh readFile(const std::string& path) {
   const hid_t file = H5Fopen(path.c_str(), H5F_ACC_RDONLY, H5P_DEFAULT);
-  FileCounts counts;
-  counts.mixed = H5Lexists(file, "/connect_offsets", H5P_DEFAULT) > 0;
-  counts.cells = static_cast<long>(counts.mixed ? extent(file, "/connect_offsets")[0] - 1
-                                                : extent(file, "/connect")[0]);
-  counts.vertices = static_cast<long>(extent(file, "/geometry")[0]);
-  counts.cellType = stringAttribute(file, "cell-type");
+  FileMesh mesh;
+  const bool mixed = H5Lexists(file, "/connect_offsets", H5P_DEFAULT) > 0;
+  mesh.cells = static_cast<long>(mixed ? extent(file, "/connect_offsets")[0] - 1
+                                       : extent(file, "/connect")[0]);
+  mesh.vertices = static_cast<long>(extent(file, "/geometry")[0]);
+  mesh.cellType = stringAttribute(file, "cell-type");
 
   // the boundary conditions, packed into one integer per cell or one integer per face
   const auto format = stringAttribute(file, "boundary-format");
-  std::vector<std::int64_t> boundary(static_cast<std::size_t>(counts.cells) * MaxFaces, 0);
+  mesh.boundary.assign(static_cast<std::size_t>(mesh.cells) * MaxFaces, 0);
   if (format == "i32" || format == "i64") {
     const int bits = format == "i32" ? 8 : 16;
     const std::uint64_t mask = (std::uint64_t{1} << bits) - 1;
@@ -116,7 +133,7 @@ FileCounts readFile(const std::string& path) {
       const auto packed = format == "i32" ? static_cast<std::uint32_t>(values[cell])
                                           : static_cast<std::uint64_t>(values[cell]);
       for (std::size_t face = 0; face < 4; ++face) {
-        boundary[cell * MaxFaces + face] =
+        mesh.boundary[cell * MaxFaces + face] =
             static_cast<std::int64_t>((packed >> (face * bits)) & mask);
       }
     }
@@ -124,48 +141,43 @@ FileCounts readFile(const std::string& path) {
     const auto columns = extent(file, "/boundary")[1];
     const auto values = readAll<std::int32_t>(file, "/boundary", H5T_NATIVE_INT32);
     for (std::size_t i = 0; i < values.size(); ++i) {
-      boundary[(i / columns) * MaxFaces + i % columns] = values[i];
+      mesh.boundary[(i / columns) * MaxFaces + i % columns] = values[i];
     }
   }
 
   // the cells: their kinds and where their vertices begin in the connectivity
-  const auto connect = readAll<std::uint64_t>(file, "/connect", H5T_NATIVE_UINT64);
-  std::vector<int> kinds(static_cast<std::size_t>(counts.cells));
-  std::vector<std::uint64_t> offsets(kinds.size() + 1);
-  if (counts.mixed) {
+  mesh.connect = readAll<std::uint64_t>(file, "/connect", H5T_NATIVE_UINT64);
+  mesh.kinds.resize(static_cast<std::size_t>(mesh.cells));
+  if (mixed) {
     const auto types = readAll<std::uint8_t>(file, "/cell_type", H5T_NATIVE_UINT8);
-    std::copy(types.begin(), types.end(), kinds.begin());
-    offsets = readAll<std::uint64_t>(file, "/connect_offsets", H5T_NATIVE_UINT64);
+    std::copy(types.begin(), types.end(), mesh.kinds.begin());
+    mesh.offsets = readAll<std::uint64_t>(file, "/connect_offsets", H5T_NATIVE_UINT64);
   } else {
-    std::fill(kinds.begin(), kinds.end(), KindsByName.at(counts.cellType));
-    for (std::size_t cell = 0; cell <= kinds.size(); ++cell) {
-      offsets[cell] = cell * VertexCounts.at(KindsByName.at(counts.cellType));
+    const int kind = KindsByName.at(mesh.cellType);
+    std::fill(mesh.kinds.begin(), mesh.kinds.end(), kind);
+    mesh.offsets.resize(mesh.kinds.size() + 1);
+    for (std::size_t cell = 0; cell < mesh.offsets.size(); ++cell) {
+      mesh.offsets[cell] = cell * VertexCounts.at(kind);
     }
   }
   H5Fclose(file);
 
-  // every face by its sorted vertices, with the faces of the cells which have it
-  std::map<std::array<std::uint64_t, 4>, std::vector<std::size_t>> faces;
-  for (std::size_t cell = 0; cell < kinds.size(); ++cell) {
-    const auto& cellFaces = Faces.at(kinds[cell]);
-    for (std::size_t f = 0; f < cellFaces.size(); ++f) {
+  // every face by its sorted vertices, and how many sides of cells it is
+  std::map<std::array<std::uint64_t, 4>, int> faces;
+  for (std::size_t cell = 0; cell < mesh.kinds.size(); ++cell) {
+    for (std::size_t f = 0; f < Faces.at(mesh.kinds[cell]).size(); ++f) {
+      const auto sideVertices = mesh.side(cell, f);
       std::array<std::uint64_t, 4> key{};
       key.fill(std::numeric_limits<std::uint64_t>::max());
-      for (std::size_t k = 0; k < cellFaces[f].size(); ++k) {
-        key[k] = connect[offsets[cell] + cellFaces[f][k]];
-      }
-      std::sort(key.begin(), key.end());
-      faces[key].push_back(cell * MaxFaces + f);
+      std::copy(sideVertices.begin(), sideVertices.end(), key.begin());
+      ++faces[key];
     }
   }
-  counts.faces = static_cast<long>(faces.size());
+  mesh.faces = static_cast<long>(faces.size());
   for (const auto& entry : faces) {
-    if (entry.second.size() == 1) {
-      ++counts.surface;
-      counts.surfaceWithoutCondition += boundary[entry.second[0]] == 0 ? 1 : 0;
-    }
+    mesh.surface += entry.second == 1 ? 1 : 0;
   }
-  return counts;
+  return mesh;
 }
 
 } // namespace
@@ -205,28 +217,52 @@ int main(int argc, char** argv) {
     const long vertices = globalSum(owned(puml.vertices(), rank));
     const long faces = globalSum(owned(puml.faces(), rank));
     const long edges = globalSum(owned(puml.edges(), rank));
-
-    // the faces of a single cell lie on the surface
-    long surface = 0;
-    for (const auto& face : puml.faces()) {
-      std::array<PUML::LocalId, 2> adjacent{};
-      PUML::Upward::cells(puml, face, adjacent.data());
-      if (adjacent[0] != PUML::InvalidLocalId && adjacent[1] == PUML::InvalidLocalId &&
-          face.shared().empty()) {
-        ++surface;
-      }
-    }
-    surface = globalSum(surface);
     const long euler = vertices - edges + faces - cells;
 
-    ok = cells == file.cells && vertices == file.vertices && faces == file.faces &&
-         surface == file.surface && file.surfaceWithoutCondition == 0 && euler == 1;
+    // down from every cell, side by side; a face of a single cell lies on the surface
+    long otherKinds = 0;
+    long otherSides = 0;
+    long surface = 0;
+    long withoutCondition = 0;
+    for (const auto& cell : puml.cells()) {
+      const auto gid = static_cast<std::size_t>(cell.gid());
+      if (static_cast<int>(cell.type()) != file.kinds[gid]) {
+        ++otherKinds;
+        continue;
+      }
+      const auto cellFaces = PUML::Downward::faces(puml, cell);
+      for (std::size_t f = 0; f < Faces.at(file.kinds[gid]).size(); ++f) {
+        const auto& face = puml.faces()[cellFaces[f]];
+        const auto [faceVertices, count] = PUML::Downward::vertices(puml, face);
+        std::vector<std::uint64_t> side;
+        for (unsigned int k = 0; k < count; ++k) {
+          side.push_back(puml.vertices()[faceVertices[k]].gid());
+        }
+        std::sort(side.begin(), side.end());
+        otherSides += side != file.side(gid, f) ? 1 : 0;
+
+        std::array<PUML::LocalId, 2> adjacent{};
+        PUML::Upward::cells(puml, face, adjacent.data());
+        if (adjacent[1] == PUML::InvalidLocalId && face.shared().empty()) {
+          ++surface;
+          withoutCondition += file.boundary[gid * MaxFaces + f] == 0 ? 1 : 0;
+        }
+      }
+    }
+    otherKinds = globalSum(otherKinds);
+    otherSides = globalSum(otherSides);
+    surface = globalSum(surface);
+    withoutCondition = globalSum(withoutCondition);
+
+    ok = cells == file.cells && vertices == file.vertices && faces == file.faces && euler == 1 &&
+         otherKinds == 0 && otherSides == 0 && surface == file.surface && withoutCondition == 0;
     if (rank == 0) {
-      std::printf("%s: cells %ld (file %ld), vertices %ld (file %ld), faces %ld (file %ld), on the "
-                  "surface %ld (file %ld, without a boundary condition %ld), edges %ld, Euler "
-                  "characteristic %ld: %s\n",
+      std::printf("%s: cells %ld (file %ld), vertices %ld (file %ld), faces %ld (file %ld), edges "
+                  "%ld, Euler characteristic %ld; cells of another kind %ld, sides of other "
+                  "vertices %ld; on the surface %ld (file %ld, without a boundary condition "
+                  "%ld): %s\n",
                   path.c_str(), cells, file.cells, vertices, file.vertices, faces, file.faces,
-                  surface, file.surface, file.surfaceWithoutCondition, edges, euler,
+                  edges, euler, otherKinds, otherSides, surface, file.surface, withoutCondition,
                   ok ? "ok" : "WRONG");
     }
   }
