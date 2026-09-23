@@ -14,6 +14,7 @@
 #include <cassert>
 #include <cstdint>
 #include <cstring>
+#include <limits>
 #include <numeric>
 #include <vector>
 
@@ -102,6 +103,11 @@ public:
 #endif
 #endif
     for (int i = 0; i < BUCKETS_PER_RANK - 1; i++) {
+      if (numVertices == 0) {
+        // a rank without vertices proposes splitters behind those of all other ranks
+        localSplitters[i] = std::numeric_limits<double>::max();
+        continue;
+      }
       unsigned long vrtxIndex = static_cast<unsigned long>(i) *
                                 static_cast<unsigned long>(numVertices) /
                                 static_cast<unsigned long>(BUCKETS_PER_RANK - 1);
