@@ -322,6 +322,17 @@ class GambitReader : public MeshReader {
 
   std::size_t nElements() const { return m_elements.nLines; }
 
+  /**
+   * @return Number of entries of all element groups; each element should be in exactly one group
+   */
+  std::size_t nGroupedElements() const {
+    std::size_t count = 0;
+    for (const auto& group : m_groups) {
+      count += group.nLines;
+    }
+    return count;
+  }
+
   std::size_t nBoundaries() const {
     std::size_t count = 0;
     for (const auto& boundary : m_boundaries) {
@@ -428,25 +439,6 @@ class GambitReader : public MeshReader {
   }
 
   /**
-   * Reads all groups numbers.
-   * In contrast to readGroups(size_t, size_t, ElementGroup*) it
-   * returns the group numbers sorted according to the elements.
-   */
-  void readGroups(int* groups) {
-    logInfo() << "Reading group information";
-
-    std::vector<ElementGroup> map(nElements());
-    readGroups(0, nElements(), map.data());
-
-#ifdef _OPENMP
-#pragma omp parallel for schedule(static)
-#endif
-    for (std::size_t i = 0; i < nElements(); i++) {
-      groups[map[i].element] = map[i].group;
-    }
-  }
-
-  /**
    * Reads boundaries from start to start+count from the file and stores them in
    * <code>boundaries</code>.
    *
@@ -520,27 +512,6 @@ class GambitReader : public MeshReader {
       boundaries[i].type = section->type;
 
       ++start; // Line in the current section
-    }
-  }
-
-  /**
-   * Reads all boundaries.
-   *
-   * @param Boundary condition for all faces. The caller is responsible
-   *  for allocation the memory (<code>nElements()*4</code>). Only the faces
-   *  for which boundary conditions are available are modified.
-   *
-   * @todo Only tetrahedral meshes are supported
-   */
-  void readBoundaries(int* boundaries) {
-    logInfo() << "Reading boundary conditions";
-
-    std::size_t nBnds = nBoundaries();
-    std::vector<GambitBoundaryFace> faces(nBnds);
-    readBoundaries(0, nBnds, faces.data());
-
-    for (std::size_t i = 0; i < nBnds; i++) {
-      boundaries[faces[i].element * 4 + faces[i].face] = faces[i].type;
     }
   }
 };

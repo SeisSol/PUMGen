@@ -31,8 +31,11 @@ function(pumgen_add_test name)
         $<TARGET_FILE:pumgen>
         ${MPIEXEC_POSTFLAGS})
   endif()
-  list(APPEND command -s ${TEST_SOURCE} ${TEST_ARGS} ${PUMGEN_TEST_FIXTURES}/${TEST_INPUT}
-       ${output})
+  set(input ${TEST_INPUT})
+  if(NOT IS_ABSOLUTE ${input})
+    set(input ${PUMGEN_TEST_FIXTURES}/${input})
+  endif()
+  list(APPEND command -s ${TEST_SOURCE} ${TEST_ARGS} ${input} ${output})
   string(REPLACE ";" "|" command "${command}")
 
   set(script_args -DCOMMAND=${command} -DOUTPUT=${output})
@@ -211,6 +214,26 @@ pumgen_add_test(msh4.tiny-binary-badnode RANKS 1 SOURCE msh4 INPUT tiny-binary-b
                 EXPECT_ERROR "Unknown node tag 9")
 pumgen_add_test(msh4.tiny-binary-sparse RANKS 1 SOURCE msh4 INPUT tiny-binary-sparse-v41.msh
                 EXPECT_ERROR "Non-contiguous node tags are not supported")
+
+# a Gambit mesh whose elements are in no group, derived from the layered one
+file(READ ${PUMGEN_TEST_FIXTURES}/layered.neu gambit)
+string(REPLACE "      1597         2         3" "      1597         0         3" gambit "${gambit}")
+while(TRUE)
+  string(FIND "${gambit}" "       ELEMENT GROUP" begin)
+  if(begin EQUAL -1)
+    break()
+  endif()
+  string(SUBSTRING "${gambit}" ${begin} -1 tail)
+  string(FIND "${tail}" "ENDOFSECTION\n" length)
+  math(EXPR end "${begin} + ${length} + 13")
+  string(SUBSTRING "${gambit}" 0 ${begin} head)
+  string(SUBSTRING "${gambit}" ${end} -1 rest)
+  set(gambit "${head}${rest}")
+endwhile()
+file(WRITE ${PUMGEN_TEST_OUTPUT}/layered-nogroups.neu "${gambit}")
+pumgen_add_test(gambit.nogroups.np3 RANKS 3 SOURCE gambit
+                INPUT ${PUMGEN_TEST_OUTPUT}/layered-nogroups.neu
+                EXPECT_OUTPUT "1597 elements belong to no group and get group 0")
 
 # a face of the surface mesh given twice
 pumgen_add_test(msh2.tiny-duplicateface RANKS 1 SOURCE msh2 INPUT tiny-duplicateface-v22.msh
