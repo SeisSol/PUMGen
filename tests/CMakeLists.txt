@@ -60,15 +60,8 @@ function(pumgen_add_test name)
 endfunction()
 
 # the GMSH parsers with a tiny read buffer
-add_executable(
-  pumgen_reader_test
-  ReaderTest.cpp ${PROJECT_SOURCE_DIR}/src/meshreader/MshInput.cpp
-  ${PROJECT_SOURCE_DIR}/src/meshreader/GMSHParser.cpp
-  ${PROJECT_SOURCE_DIR}/src/meshreader/GMSH2Parser.cpp
-  ${PROJECT_SOURCE_DIR}/src/meshreader/GMSH4Parser.cpp)
-target_include_directories(pumgen_reader_test PRIVATE ${PROJECT_SOURCE_DIR}/src
-                                                      ${PROJECT_SOURCE_DIR}/submodules)
-target_compile_definitions(pumgen_reader_test PRIVATE LOG_LEVEL=${LOG_LEVEL})
+add_executable(pumgen_reader_test ReaderTest.cpp)
+target_link_libraries(pumgen_reader_test PRIVATE pumgen-core)
 add_test(NAME reader.buffer-boundaries COMMAND pumgen_reader_test ${PUMGEN_TEST_FIXTURES})
 set_tests_properties(reader.buffer-boundaries PROPERTIES ENVIRONMENT "ASAN_OPTIONS=detect_leaks=0")
 
