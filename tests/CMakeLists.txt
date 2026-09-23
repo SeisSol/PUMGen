@@ -323,3 +323,14 @@ foreach(input periodic-tiny periodic-tiny-binary)
   pumgen_add_test(msh4.${input}.np9 RANKS 9 SOURCE msh4 INPUT ${input}-v41.msh
                   REFERENCE periodic-tiny.puml.h5 IDENTIFY)
 endforeach()
+
+# cells of several kinds and orders: the hexahedron and the wedges of order 2, the others linear
+foreach(ranks 1 3)
+  pumgen_add_test(msh4.mixed-ho.np${ranks} RANKS ${ranks} SOURCE msh4 INPUT mixed-ho-v41.msh
+                  REFERENCE mixed-ho.puml.h5 MIXED HIGHORDER)
+endforeach()
+pumgen_add_test(msh4.mixed-ho-binary.np3 RANKS 3 SOURCE msh4 INPUT mixed-ho-binary-v41.msh
+                REFERENCE mixed-ho.puml.h5 MIXED HIGHORDER
+                EXPECT_OUTPUT "higher order, which rank 0 reads")
+pumgen_add_test(msh4.mixed-ho-binary-serial.np2 RANKS 2 SOURCE msh4 INPUT mixed-ho-binary-v41.msh
+                REFERENCE mixed-ho.puml.h5 MIXED HIGHORDER ARGS --gmsh-reader=serial)

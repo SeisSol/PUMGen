@@ -553,11 +553,10 @@ def bc_of(face, points):
     return 5
 
 
-def generate_mixed():
-    points, cells = mixed_cells()
-    boundary = boundary_faces(cells)
+def build_mixed_model(points, cells, boundary, name):
+    """The gmsh model of the cells: one volume per group, one surface per boundary condition."""
     gmsh.clear()
-    gmsh.model.add("mixed")
+    gmsh.model.add(name)
     for group in (1, 2, 3, 4):
         gmsh.model.addDiscreteEntity(3, group)
         gmsh.model.addPhysicalGroup(3, [group], group, name=VOLUME_NAMES[group])
@@ -569,12 +568,23 @@ def generate_mixed():
     for kind, nodes, group in cells:
         gmsh.model.mesh.addElementsByType(group, MSH_TYPES[kind], [tag], [n + 1 for n in nodes])
         tag += 1
+    add_boundary_faces(points, cells, boundary, tag)
+
+
+def add_boundary_faces(points, cells, boundary, tag, tag_of=None):
     for face in sorted(boundary):
         # the vertices of a face in the cyclic order of the cell that has it
         cyclic = next([nodes[v] for v in f] for kind, nodes, _ in cells for f in FACES[kind]
                       if tuple(sorted(nodes[v] for v in f)) == face)
-        gmsh.model.mesh.addElementsByType(bc_of(face, points), FACE_TYPES[len(face)], [tag], [n + 1 for n in cyclic])
+        node_tags = [tag_of[n] if tag_of else n + 1 for n in cyclic]
+        gmsh.model.mesh.addElementsByType(bc_of(face, points), FACE_TYPES[len(face)], [tag], node_tags)
         tag += 1
+
+
+def generate_mixed():
+    points, cells = mixed_cells()
+    boundary = boundary_faces(cells)
+    build_mixed_model(points, cells, boundary, "mixed")
     write_mesh("mixed-v41.msh", 4.1)
     write_mesh("mixed-binary-v41.msh", 4.1, binary=True)
     write_mesh("mixed-v22.msh", 2.2)
@@ -640,6 +650,100 @@ def write_mixed_reference(path, points, cells, boundary, order, names):
         add_names(out["boundary"], names, 2, True)
 
 
+QUADRATIC_TYPES = {"tet": 11, "hex": 12, "wedge": 13, "pyramid": 14}
+KINDS_OF_TYPES = {4: ("tet", 1), 11: ("tet", 2), 5: ("hex", 1), 12: ("hex", 2), 6: ("wedge", 1),
+                  13: ("wedge", 2), 7: ("pyramid", 1), 14: ("pyramid", 2)}
+VERTEX_COUNTS = {"tet": 4, "hex": 8, "wedge": 6, "pyramid": 5}
+
+
+def read_msh41_cells(path):
+    """The nodes by tag and the three-dimensional elements of an ASCII MSH 4.1 file in its order,
+    as (element type, entity, node tags), read without gmsh."""
+    lines = open(path).read().split("\n")
+    nodes, _ = read_msh41_ascii(path)
+    cells = []
+    i = lines.index("$Elements") + 1
+    blocks = int(lines[i].split()[0])
+    i += 1
+    for _ in range(blocks):
+        dim, entity, element_type, count = (int(x) for x in lines[i].split())
+        if dim == 3:
+            cells.extend((element_type, entity, [int(x) for x in lines[i + 1 + k].split()[1:]]) for k in range(count))
+        i += 1 + count
+    return nodes, cells
+
+
+def generate_mixed_high_order():
+    """The mesh of all kinds of cells, with the hexahedron and the wedges of order 2 and the pyramids
+    and tetrahedra linear: cells of several kinds and orders. gmsh places the nodes of order 2."""
+    points, cells = mixed_cells()
+    boundary = boundary_faces(cells)
+    build_mixed_model(points, cells, boundary, "mixed-high-order")
+    gmsh.model.mesh.setOrder(2)
+    # gmsh numbers the nodes and elements anew; the vertices are found by their coordinates
+    tags, coordinates, _ = gmsh.model.mesh.getNodes()
+    tag_at = {tuple(np.round(coordinates[3 * i : 3 * i + 3], 12)): int(tags[i]) for i in range(len(tags))}
+    tag_of = [tag_at[tuple(np.round(p, 12))] for p in points]
+    index_of = {tag: i for i, tag in enumerate(tag_of)}
+    vertex_counts = {10: 4, 27: 8, 18: 6, 14: 5}
+    quadratic = {}
+    for _, entity in gmsh.model.getEntities(3):
+        _, elements, nodes = gmsh.model.mesh.getElements(3, entity)
+        count = len(nodes[0]) // len(elements[0])
+        for k in range(len(elements[0])):
+            element = [int(n) for n in nodes[0][k * count : (k + 1) * count]]
+            quadratic[tuple(sorted(element[: vertex_counts[count]]))] = element
+
+    gmsh.clear()
+    gmsh.model.add("mixed-high-order")
+    for group in (1, 2, 3, 4):
+        gmsh.model.addDiscreteEntity(3, group)
+        gmsh.model.addPhysicalGroup(3, [group], group, name=VOLUME_NAMES[group])
+    for bc in (1, 3, 5):
+        gmsh.model.addDiscreteEntity(2, bc)
+        gmsh.model.addPhysicalGroup(2, [bc], 100 + bc, name=SURFACE_NAMES[bc])
+    gmsh.model.mesh.addNodes(3, 1, list(tags), list(coordinates))
+    for tag, (kind, nodes, group) in enumerate(cells, start=1):
+        element = quadratic[tuple(sorted(tag_of[n] for n in nodes))]
+        # the vertices keep their order
+        assert element[: len(nodes)] == [tag_of[n] for n in nodes]
+        if group in (1, 3):
+            gmsh.model.mesh.addElementsByType(group, QUADRATIC_TYPES[kind], [tag], element)
+        else:
+            gmsh.model.mesh.addElementsByType(group, MSH_TYPES[kind], [tag], element[: len(nodes)])
+    add_boundary_faces(points, cells, boundary, len(cells) + 1, tag_of)
+    write_mesh("mixed-ho-v41.msh", 4.1)
+    write_mesh("mixed-ho-binary-v41.msh", 4.1, binary=True)
+
+    # the reference from the file: the vertices are the nodes which are a vertex of a cell, in the
+    # order of their tags; the other nodes of a cell of order 2 are its geometry of higher order
+    nodes, elements = read_msh41_cells("mixed-ho-v41.msh")
+    kinds = [KINDS_OF_TYPES[element_type] for element_type, _, _ in elements]
+    corners = [element[2][: VERTEX_COUNTS[kind]] for element, (kind, _) in zip(elements, kinds)]
+    vertex = {tag: i for i, tag in enumerate(sorted({tag for tags in corners for tag in tags}))}
+    faces = np.zeros((len(elements), 6), dtype="<i4")
+    for c, ((kind, _), tags) in enumerate(zip(kinds, corners)):
+        for f, face in enumerate(FACES[kind]):
+            key = tuple(sorted(index_of[tags[v]] for v in face))
+            if key in boundary:
+                faces[c, f] = bc_of(key, points)
+    high_order = [[x for tag in element[2][VERTEX_COUNTS[kind] :] for x in nodes[tag]] for element, (kind, _) in zip(elements, kinds)]
+    with h5py.File("mixed-ho.puml.h5", "w") as out:
+        out.create_dataset("connect", data=np.array([vertex[tag] for tags in corners for tag in tags], dtype="<u8"))
+        out.create_dataset("connect_offsets", data=np.cumsum([0] + [len(tags) for tags in corners]).astype("<u8"))
+        out.create_dataset("cell_type", data=np.array([VTK_TYPES[kind] for kind, _ in kinds], dtype="u1"))
+        out.create_dataset("geometry", data=np.array([nodes[tag] for tag in sorted(vertex)], dtype="<f8"))
+        out.create_dataset("group", data=np.array([entity for _, entity, _ in elements], dtype="<i4"))
+        out.create_dataset("boundary", data=faces)
+        names = read_physical_names("mixed-ho-v41.msh")
+        add_names(out["group"], names, 3, False)
+        add_names(out["boundary"], names, 2, True)
+        out.create_dataset("geometry_ho", data=np.array([x for values in high_order for x in values], dtype="<f8"))
+        out["geometry_ho"].attrs.create("node-ordering", "gmsh", dtype=h5py.string_dtype("ascii"))
+        out.create_dataset("geometry_ho_offsets", data=np.cumsum([0] + [len(values) for values in high_order]).astype("<u8"))
+        out.create_dataset("order", data=np.array([order for _, order in kinds], dtype="u1"))
+
+
 def main():
     gmsh.initialize()
     gmsh.option.setNumber("General.Terminal", 0)
@@ -651,6 +755,7 @@ def main():
     generate_periodic_tiny()
     generate_tiny()
     generate_mixed()
+    generate_mixed_high_order()
     gmsh.finalize()
 
 
