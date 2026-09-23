@@ -322,6 +322,29 @@ static void addPhysicalNames(hid_t h5file, const char* dataset, int dimension,
   checkH5Err(H5Dclose(data));
 }
 
+/**
+ * The connectivity of the VTKHDF view of a rectangular /connect: a virtual dataset, which reads the
+ * rectangle one row after the other, so that the vertices are not stored twice.
+ */
+static void writeVirtualConnectivity(hid_t h5file, std::uint64_t cells, std::uint64_t width) {
+  hid_t source = checkH5Err(H5Dopen(h5file, "/connect", H5P_DEFAULT));
+  hid_t type = checkH5Err(H5Dget_type(source));
+  checkH5Err(H5Dclose(source));
+  const std::array<hsize_t, 2> rectangle{cells, width};
+  const hsize_t count = cells * width;
+  hid_t sourceSpace = checkH5Err(H5Screate_simple(2, rectangle.data(), nullptr));
+  hid_t space = checkH5Err(H5Screate_simple(1, &count, nullptr));
+  hid_t properties = checkH5Err(H5Pcreate(H5P_DATASET_CREATE));
+  checkH5Err(H5Pset_virtual(properties, space, ".", "/connect", sourceSpace));
+  hid_t data = checkH5Err(
+      H5Dcreate(h5file, "/VTKHDF/Connectivity", type, space, H5P_DEFAULT, properties, H5P_DEFAULT));
+  checkH5Err(H5Dclose(data));
+  checkH5Err(H5Pclose(properties));
+  checkH5Err(H5Sclose(space));
+  checkH5Err(H5Sclose(sourceSpace));
+  checkH5Err(H5Tclose(type));
+}
+
 static std::size_t shapeIndex(puml::CellType type) {
   return static_cast<std::size_t>(&puml::shapeOf(type) - puml::CellShapes.data());
 }
@@ -329,11 +352,12 @@ static std::size_t shapeIndex(puml::CellType type) {
 /**
  * Makes the file a VTKHDF file as well: the group /VTKHDF describes the mesh as an unstructured
  * grid of a single partition through links to the datasets, so that VTK and ParaView read the file
- * directly.
+ * directly. The cells are linked for a mesh laid out as a VTKHDF grid already; otherwise, the
+ * caller adds them.
  */
 static void writeVtkHdfView(hid_t h5file, std::uint64_t points, std::uint64_t cells,
                             std::uint64_t connectivityIds, bool identify, bool highOrder, int rank,
-                            std::size_t chunksize) {
+                            std::size_t chunksize, bool linkCells) {
   hid_t group = checkH5Err(H5Gcreate(h5file, "/VTKHDF", H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT));
   addIntegerAttribute(group, "Version", {1, 0});
   addFixedStringAttribute(group, "Type", "UnstructuredGrid");
@@ -357,9 +381,11 @@ static void writeVtkHdfView(hid_t h5file, std::uint64_t points, std::uint64_t ce
     checkH5Err(H5Lcreate_hard(h5file, target, h5file, name, H5P_DEFAULT, H5P_DEFAULT));
   };
   link("/geometry", "/VTKHDF/Points");
-  link("/connect", "/VTKHDF/Connectivity");
-  link("/connect_offsets", "/VTKHDF/Offsets");
-  link("/cell_type", "/VTKHDF/Types");
+  if (linkCells) {
+    link("/connect", "/VTKHDF/Connectivity");
+    link("/connect_offsets", "/VTKHDF/Offsets");
+    link("/cell_type", "/VTKHDF/Types");
+  }
   link("/group", "/VTKHDF/CellData/group");
   link("/boundary", "/VTKHDF/CellData/boundary");
   if (highOrder) {
@@ -402,6 +428,10 @@ int main(int argc, char* argv[]) {
                      "Apply HDF5 filters (i.e. compression). Disabled by default.", false);
   args.addOption("filter-chunksize", 0, "Chunksize for filters (default=4096).",
                  utils::Args::Required, false);
+  args.addOption("vtkhdf", 0,
+                 "Make the mesh file a VTKHDF file as well, which VTK and ParaView open directly, "
+                 "also for cells of one kind; the file then needs HDF5 1.10 to be read",
+                 utils::Args::No, false);
   args.addOption("chunksize", 0, "Chunksize for writing (default=1 GiB).", utils::Args::Required,
                  false);
   const auto boundarytypes = std::vector<std::string>{"int32", "int64", "i32", "i64", "i32x4"};
@@ -676,8 +706,14 @@ int main(int argc, char* argv[]) {
   // Create the H5 file
   hid_t h5falist = H5Pcreate(H5P_FILE_ACCESS);
   checkH5Err(h5falist);
-#ifdef H5F_LIBVER_V18
-  checkH5Err(H5Pset_libver_bounds(h5falist, H5F_LIBVER_V18, H5F_LIBVER_V18));
+  // the VTKHDF view of cells of one kind needs a virtual dataset, which HDF5 1.10 brought
+  const bool virtualView = args.isSet("vtkhdf") && !mixed;
+#if defined(H5F_LIBVER_V18) && defined(H5F_LIBVER_V110)
+  if (virtualView) {
+    checkH5Err(H5Pset_libver_bounds(h5falist, H5F_LIBVER_V110, H5F_LIBVER_LATEST));
+  } else {
+    checkH5Err(H5Pset_libver_bounds(h5falist, H5F_LIBVER_V18, H5F_LIBVER_V18));
+  }
 #else
   checkH5Err(H5Pset_libver_bounds(h5falist, H5F_LIBVER_LATEST, H5F_LIBVER_LATEST));
 #endif
@@ -844,10 +880,35 @@ int main(int argc, char* argv[]) {
 
   if (mixed) {
     writeVtkHdfView(h5file, globalSize[1], globalSize[0], connectivityLength, identify != 0,
-                    highOrder != 0, rank, chunksize);
+                    highOrder != 0, rank, chunksize, true);
     logInfo() << "The cells are of several kinds, which XDMF cannot describe; the mesh file is a "
                  "VTKHDF file as well, which ParaView opens directly";
-  } else if (rank == 0) {
+  } else if (virtualView) {
+    logInfo() << "Writing the VTKHDF view";
+    const std::uint64_t width = shape->vertexCount;
+    writeVtkHdfView(h5file, globalSize[1], globalSize[0], globalSize[0] * width, identify != 0,
+                    highOrder != 0, rank, chunksize, false);
+    writeVirtualConnectivity(h5file, globalSize[0], width);
+
+    // every cell has as many vertices, and all are of the same kind
+    std::uint64_t firstCell = 0;
+    MPI_Exscan(&localCells, &firstCell, 1, MPI_UINT64_T, MPI_SUM, MPI_COMM_WORLD);
+    if (rank == 0) {
+      firstCell = 0;
+    }
+    std::vector<std::uint64_t> offsets(localCells + (rank == processes - 1 ? 1 : 0));
+    for (std::size_t i = 0; i < offsets.size(); ++i) {
+      offsets[i] = (firstCell + i) * width;
+    }
+    writeH5Data<uint64_t>(offsets, h5file, "VTKHDF/Offsets", H5T_NATIVE_UINT64, H5T_STD_U64LE,
+                          chunksize, offsets.size(), globalSize[0] + 1, reduceInts, filterEnable,
+                          filterChunksize, NoSecondDim);
+    const std::vector<std::uint8_t> kindValues(localCells, static_cast<std::uint8_t>(shape->type));
+    writeH5Data<std::uint8_t>(kindValues, h5file, "VTKHDF/Types", H5T_NATIVE_UINT8, H5T_STD_U8LE,
+                              chunksize, localCells, globalSize[0], false, filterEnable,
+                              filterChunksize, NoSecondDim);
+  }
+  if (!mixed && rank == 0) {
     // Writing XDMF file
     logInfo() << "Writing XDMF file";
 

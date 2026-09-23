@@ -12,11 +12,11 @@ set(PUMGEN_TEST_OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/output)
 file(MAKE_DIRECTORY ${PUMGEN_TEST_OUTPUT})
 
 # pumgen_add_test(<name> RANKS <n> SOURCE <source> INPUT <fixture>
-#                 [REFERENCE <fixture> [TOLERANCE <tolerance>] [IDENTIFY] [HIGHORDER] [MIXED]]
+#                 [REFERENCE <fixture> [TOLERANCE <tolerance>] [IDENTIFY] [HIGHORDER] [MIXED] [VTKHDF]]
 #                 [EXPECT_OUTPUT <regex>] [EXPECT_ERROR <regex>]
 #                 [OUTPUT <file>] [EXPECT_XDMF <regex>] [ARGS <argument>...])
 function(pumgen_add_test name)
-  cmake_parse_arguments(PARSE_ARGV 1 TEST "IDENTIFY;HIGHORDER;MIXED"
+  cmake_parse_arguments(PARSE_ARGV 1 TEST "IDENTIFY;HIGHORDER;MIXED;VTKHDF"
                         "RANKS;SOURCE;INPUT;OUTPUT;REFERENCE;TOLERANCE;EXPECT_OUTPUT;EXPECT_ERROR;EXPECT_XDMF" "ARGS")
   set(output ${PUMGEN_TEST_OUTPUT}/${name}.puml.h5)
   if(DEFINED TEST_OUTPUT)
@@ -65,6 +65,9 @@ function(pumgen_add_test name)
     endif()
     if(TEST_MIXED)
       list(APPEND script_args -DMIXED=ON)
+    endif()
+    if(TEST_VTKHDF)
+      list(APPEND script_args -DVTKHDF=ON)
     endif()
   endif()
 
@@ -336,3 +339,10 @@ foreach(ranks 1 3 4)
 endforeach()
 pumgen_add_test(msh4.mixed-ho-binary-serial.np2 RANKS 2 SOURCE msh4 INPUT mixed-ho-binary-v41.msh
                 REFERENCE mixed-ho.puml.h5 MIXED HIGHORDER ARGS --gmsh-reader=serial)
+
+# the VTKHDF view of cells of one kind, with a virtual connectivity; the reference adds the view,
+# written by fixtures/generate.py
+pumgen_add_test(msh4.coarse.vtkhdf.np2 RANKS 2 SOURCE msh4 INPUT coarse-v41.msh
+                REFERENCE coarse-vtkhdf.puml.h5 VTKHDF ARGS --vtkhdf)
+pumgen_add_test(msh4.coarse.vtkhdf.compact.np3 RANKS 3 SOURCE msh4 INPUT coarse-v41.msh
+                REFERENCE coarse-vtkhdf.puml.h5 VTKHDF ARGS --vtkhdf --compactify-datatypes)

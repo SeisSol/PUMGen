@@ -744,6 +744,17 @@ def generate_mixed_high_order():
         out.create_dataset("order", data=np.array([order for _, order in kinds], dtype="u1"))
 
 
+def write_vtkhdf_reference(path, linear_reference):
+    """Reference of the VTKHDF view of a mesh of tetrahedra: its datasets and the view's cells."""
+    with h5py.File(linear_reference, "r") as linear, h5py.File(path, "w") as out:
+        for name in ("connect", "geometry", "group", "boundary"):
+            out.create_dataset(name, data=linear[name][...])
+        connect = linear["connect"][...]
+        out.create_dataset("VTKHDF/Connectivity", data=connect.reshape(-1))
+        out.create_dataset("VTKHDF/Offsets", data=(np.arange(len(connect) + 1) * connect.shape[1]).astype("<u8"))
+        out.create_dataset("VTKHDF/Types", data=np.full(len(connect), VTK_TYPES["tet"], dtype="u1"))
+
+
 def main():
     gmsh.initialize()
     gmsh.option.setNumber("General.Terminal", 0)
@@ -751,6 +762,7 @@ def main():
     gmsh.option.setNumber("Mesh.Algorithm3D", 1)
     generate_layered()
     generate_coarse()
+    write_vtkhdf_reference("coarse-vtkhdf.puml.h5", "coarse.puml.h5")
     generate_periodic()
     generate_periodic_tiny()
     generate_tiny()

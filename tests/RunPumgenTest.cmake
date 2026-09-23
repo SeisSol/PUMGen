@@ -12,6 +12,7 @@
 #   IDENTIFY      (optional) also compare the vertex identification of periodic meshes
 #   HIGHORDER     (optional) also compare the geometry of higher order and the orders
 #   MIXED         (optional) also compare the offsets and kinds of the cells, and the VTKHDF view
+#   VTKHDF        (optional) also compare the VTKHDF view of a mesh of cells of one kind
 #   H5DIFF        h5diff executable, required together with REFERENCE
 #   EXPECT_ERROR  (optional) pumgen has to fail with a message matching this regular expression
 #   EXPECT_OUTPUT (optional) the output of a successful run has to match this regular expression
@@ -71,6 +72,10 @@ if(DEFINED REFERENCE)
   endif()
   if(HIGHORDER)
     list(APPEND datasets geometry_ho geometry_ho_offsets order)
+  endif()
+  if(VTKHDF)
+    # the view of a rectangular connect: a virtual connectivity and the offsets and kinds
+    list(APPEND datasets VTKHDF/Points=geometry VTKHDF/Connectivity VTKHDF/Offsets VTKHDF/Types)
   endif()
   if(MIXED)
     # the VTKHDF view links the datasets under the names of VTK
