@@ -18,6 +18,7 @@
 #include <memory>
 #include <sstream>
 #include <string>
+#include <type_traits>
 
 #include <hdf5.h>
 
@@ -133,7 +134,9 @@ writeH5Data(const F& handler, hid_t h5file, const std::string& name, hid_t h5mem
   // at least one row per round, however small the chunk is
   const std::size_t chunkSize = std::max<std::size_t>(1, chunk / secondSize / sizeof(T));
   const std::size_t bufferSize = std::min(localSize, chunkSize);
-  std::vector<T> data(secondSize * bufferSize);
+  // data of the memory type is written from where it is, other data is converted round by round
+  constexpr bool Direct = std::is_same_v<typename F::value_type, T>;
+  std::vector<T> data(Direct ? 0 : secondSize * bufferSize);
 
   std::size_t rounds = (localSize + chunkSize - 1) / chunkSize;
 
@@ -198,7 +201,12 @@ writeH5Data(const F& handler, hid_t h5file, const std::string& name, hid_t h5mem
     start[0] = offset + written;
     count[0] = std::min(localSize - written, bufferSize);
 
-    std::copy_n(handler.begin() + written * secondSize, count[0] * secondSize, data.begin());
+    const T* source = data.data();
+    if constexpr (Direct) {
+      source = handler.data() + written * secondSize;
+    } else {
+      std::copy_n(handler.begin() + written * secondSize, count[0] * secondSize, data.begin());
+    }
 
     if (count[0] > 0) {
       checkH5Err(
@@ -210,7 +218,7 @@ writeH5Data(const F& handler, hid_t h5file, const std::string& name, hid_t h5mem
       checkH5Err(H5Sselect_none(h5space));
     }
 
-    checkH5Err(H5Dwrite(h5data, h5memtype, h5memspace, h5space, h5dxlist, data.data()));
+    checkH5Err(H5Dwrite(h5data, h5memtype, h5memspace, h5space, h5dxlist, source));
 
     written += count[0];
   }
@@ -503,9 +511,13 @@ int main(int argc, char* argv[]) {
 
   const CellVertices cellVertices(meshInput->connectivity(), meshInput->geometry(),
                                   meshInput->cellSize(), MPI_COMM_WORLD);
-  auto inspheres = calculateInsphere(cellVertices);
-  double min = inspheres.empty() ? std::numeric_limits<double>::infinity()
-                                 : *std::min_element(inspheres.begin(), inspheres.end());
+  double min = std::numeric_limits<double>::infinity();
+  {
+    const auto inspheres = calculateInsphere(cellVertices);
+    if (!inspheres.empty()) {
+      min = *std::min_element(inspheres.begin(), inspheres.end());
+    }
+  }
   MPI_Reduce((rank == 0 ? MPI_IN_PLACE : &min), &min, 1, MPI_DOUBLE, MPI_MIN, 0, MPI_COMM_WORLD);
   logInfo() << "Minimum insphere found:" << min;
 
