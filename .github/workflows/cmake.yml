@@ -4,40 +4,82 @@
 
 name: CMake
 
-on: [push]
+on:
+  push:
+  pull_request:
 
 jobs:
-  # Build pumgen in Release and Debug version
   build-pumgen:
-    runs-on: ubuntu-latest
+    name: ${{ matrix.name }}
+    runs-on: ubuntu-24.04
 
     strategy:
       fail-fast: false
       matrix:
-        build_type: ["Release", "Debug"]
+        include:
+          - name: gcc-release
+            cc: gcc
+            cxx: g++
+            build_type: Release
+          - name: gcc-debug-sanitizers
+            cc: gcc
+            cxx: g++
+            build_type: Debug
+            sanitizers: address,undefined
+          - name: clang-debug-sanitizers
+            cc: clang
+            cxx: clang++
+            build_type: Debug
+            sanitizers: address,undefined
+          # the velocity-aware sizing and its tests
+          - name: gcc-release-easi
+            cc: gcc
+            cxx: g++
+            build_type: Release
+            easi: true
 
     steps:
       - uses: actions/checkout@v5
+        with:
+          submodules: recursive
 
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -qq g++ openmpi-bin openmpi-common libopenmpi-dev hdf5-tools libhdf5-openmpi-dev libnetcdf-dev
+          sudo apt-get install -qq ninja-build clang libomp-dev openmpi-bin libopenmpi-dev \
+            hdf5-tools libhdf5-openmpi-dev libyaml-cpp-dev
+
+      - name: Install easi
+        if: matrix.easi
+        run: |
+          git clone --filter=blob:none https://github.com/SeisSol/easi.git ${{ runner.temp }}/easi
+          git -C ${{ runner.temp }}/easi checkout f668a64afa61191d8c9ae4e6adf47aecd2529e00
+          cmake -S ${{ runner.temp }}/easi -B ${{ runner.temp }}/easi/build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=${{ runner.temp }}/opt \
+            -DASAGI=OFF -DLUA=OFF -DIMPALAJIT=OFF -DTESTING=OFF
+          cmake --build ${{ runner.temp }}/easi/build
+          cmake --install ${{ runner.temp }}/easi/build
 
       - name: Configure PUMGen
-        working-directory: ${{ github.workspace }}
-        run: |
-          git submodule update --init --recursive
-          mkdir build_${{ matrix.build_type}} && cd build_${{ matrix.build_type}}
-          cmake .. -DCMAKE_PREFIX_PATH=${{ runner.workspace }}/opt -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} -DMPIEXEC_PREFLAGS=--oversubscribe
+        env:
+          CC: ${{ matrix.cc }}
+          CXX: ${{ matrix.cxx }}
+        run: >
+          cmake -S . -B build -G Ninja
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+          -DSANITIZERS=${{ matrix.sanitizers }}
+          -DCMAKE_CXX_FLAGS=${{ matrix.sanitizers && '-fno-sanitize-recover=undefined' || '' }}
+          -DEASI=${{ matrix.easi && 'ON' || 'OFF' }}
+          -DCMAKE_PREFIX_PATH=${{ runner.temp }}/opt
+          -DMPIEXEC_PREFLAGS=--oversubscribe
 
       - name: Build
-        working-directory: ${{ github.workspace }}/build_${{ matrix.build_type }}
-        run: cmake --build .
+        run: cmake --build build
 
       - name: Test
-        working-directory: ${{ github.workspace }}/build_${{ matrix.build_type }}
-        run: ctest --output-on-failure
+        env:
+          UBSAN_OPTIONS: print_stacktrace=1
+        run: ctest --test-dir build --output-on-failure
 
   pre-commit-check:
     runs-on: ubuntu-latest
