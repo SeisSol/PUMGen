@@ -137,18 +137,18 @@ class GMSHParser {
       80,   // 103: Hexahedron 80
       92,   // 104: Hexahedron 92
       104,  // 105: Hexahedron 104
-      0,    // 106: undefined
-      0,    // 107: undefined
-      0,    // 108: undefined
-      0,    // 109: undefined
-      0,    // 110: undefined
-      0,    // 111: undefined
-      0,    // 112: undefined
-      0,    // 113: undefined
-      0,    // 114: undefined
-      0,    // 115: undefined
-      0,    // 116: undefined
-      0,    // 117: undefined
+      126,  // 106: Prism 126
+      196,  // 107: Prism 196
+      288,  // 108: Prism 288
+      405,  // 109: Prism 405
+      550,  // 110: Prism 550
+      24,   // 111: Prism 24
+      33,   // 112: Prism 33
+      42,   // 113: Prism 42
+      51,   // 114: Prism 51
+      60,   // 115: Prism 60
+      69,   // 116: Prism 69
+      78,   // 117: Prism 78
       30,   // 118: Pyramid 30
       55,   // 119: Pyramid 55
       91,   // 120: Pyramid 91

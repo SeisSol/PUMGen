@@ -26,5 +26,6 @@ TEST_CASE("The node counts of the MSH element types are the ones of gmsh") {
   CHECK(nodesOf(92) == 64);   // hexahedron of order 3
   CHECK(nodesOf(98) == 1000); // hexahedron of order 9
   CHECK(nodesOf(118) == 30);  // pyramid of order 3
+  CHECK(nodesOf(106) == 126); // prism of order 5, which gmsh defines but cannot report
   CHECK(nodesOf(131) == 69);  // incomplete pyramid of order 6
 }
