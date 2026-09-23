@@ -113,7 +113,8 @@ static void writeH5Data(const F& handler, hid_t h5file, const std::string& name,
                         int filterEnable, std::size_t filterChunksize, std::size_t secondDim) {
   const std::size_t secondSize = std::max(secondDim, static_cast<std::size_t>(1));
   const std::size_t dimensions = secondDim == 0 ? 1 : 2;
-  const std::size_t chunkSize = chunk / secondSize / sizeof(T);
+  // at least one row per round, however small the chunk is
+  const std::size_t chunkSize = std::max<std::size_t>(1, chunk / secondSize / sizeof(T));
   const std::size_t bufferSize = std::min(localSize, chunkSize);
   std::vector<T> data(secondSize * bufferSize);
 
