@@ -42,6 +42,7 @@ endif()
 # Everything but the command line driver lives in a library, which the tests link as well.
 add_library(pumgen-core STATIC
   ${CMAKE_CURRENT_SOURCE_DIR}/src/meshreader/GambitReader.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/mesh/CellType.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/meshreader/GMSHParser.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/meshreader/GMSH2Parser.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/meshreader/GMSH4Parser.cpp
