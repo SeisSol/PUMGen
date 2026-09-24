@@ -12,9 +12,19 @@
 
 #include "MPIConvenience.h"
 
-CellVertices::CellVertices(const std::vector<std::size_t>& connectivity,
-                           const std::vector<double>& geometry, std::size_t cellSize, MPI_Comm comm)
-    : connectivity(connectivity), geometry(geometry), cellSize(cellSize) {
+CellVertices::CellVertices(const std::vector<puml::CellType>& cellTypes,
+                           const std::vector<std::uint64_t>& connectivity,
+                           const std::vector<double>& geometry, MPI_Comm comm)
+    : cellTypes(cellTypes), connectivity(connectivity), geometry(geometry) {
+  if (!cellTypes.empty() &&
+      std::any_of(cellTypes.begin(), cellTypes.end(),
+                  [&](puml::CellType type) { return type != cellTypes.front(); })) {
+    firstVertex.resize(cellTypes.size() + 1, 0);
+    for (std::size_t cell = 0; cell < cellTypes.size(); ++cell) {
+      firstVertex[cell + 1] = firstVertex[cell] + puml::shapeOf(cellTypes[cell]).vertexCount;
+    }
+  }
+
   int commsize;
   MPI_Comm_size(comm, &commsize);
   MPI_Comm_rank(comm, &commrank);
@@ -41,9 +51,6 @@ CellVertices::CellVertices(const std::vector<std::size_t>& connectivity,
   outidxmap.resize(commsize);
 
   for (std::size_t node = 0; node < connectivity.size(); ++node) {
-    if (node % cellSize >= VerticesPerCell) {
-      continue;
-    }
     const auto vertex = connectivity[node];
     auto itPosition = std::upper_bound(vertexDist.begin(), vertexDist.end(), vertex);
     auto position = std::distance(vertexDist.begin(), itPosition) - 1;
@@ -107,11 +114,13 @@ CellVertices::CellVertices(const std::vector<std::size_t>& connectivity,
   MPI_Type_free(&vertexType);
 }
 
-std::array<std::array<double, 3>, CellVertices::VerticesPerCell>
+std::array<std::array<double, 3>, puml::MaxCellVertices>
 CellVertices::operator()(std::size_t cell) const {
-  std::array<std::array<double, 3>, VerticesPerCell> vertices;
-  for (std::size_t j = 0; j < VerticesPerCell; ++j) {
-    auto vertex = connectivity[cell * cellSize + j];
+  std::array<std::array<double, 3>, puml::MaxCellVertices> vertices{};
+  const auto count = puml::shapeOf(cellTypes[cell]).vertexCount;
+  const auto first = firstVertex.empty() ? cell * count : firstVertex[cell];
+  for (std::size_t j = 0; j < count; ++j) {
+    auto vertex = connectivity[first + j];
     auto itPosition = std::upper_bound(vertexDist.begin(), vertexDist.end(), vertex);
     auto position = std::distance(vertexDist.begin(), itPosition) - 1;
     auto localVertex = vertex - vertexDist[position];
@@ -133,45 +142,37 @@ std::vector<double> calculateInsphere(const CellVertices& cells) {
   std::vector<double> inspheres(cells.numCells());
 
   for (std::size_t i = 0; i < cells.numCells(); ++i) {
+    const auto& shape = puml::shapeOf(cells.type(i));
     const auto vertices = cells(i);
-    double a11 = vertices[1][0] - vertices[0][0];
-    double a12 = vertices[1][1] - vertices[0][1];
-    double a13 = vertices[1][2] - vertices[0][2];
-    double a21 = vertices[2][0] - vertices[0][0];
-    double a22 = vertices[2][1] - vertices[0][1];
-    double a23 = vertices[2][2] - vertices[0][2];
-    double a31 = vertices[3][0] - vertices[0][0];
-    double a32 = vertices[3][1] - vertices[0][1];
-    double a33 = vertices[3][2] - vertices[0][2];
-    double b11 = vertices[2][0] - vertices[1][0];
-    double b12 = vertices[2][1] - vertices[1][1];
-    double b13 = vertices[2][2] - vertices[1][2];
-    double b21 = vertices[3][0] - vertices[1][0];
-    double b22 = vertices[3][1] - vertices[1][1];
-    double b23 = vertices[3][2] - vertices[1][2];
-    double det = a11 * a22 * a33 + a12 * a23 * a31 + a13 * a21 * a32 - a13 * a22 * a31 -
-                 a12 * a21 * a33 - a11 * a23 * a32;
-    double gram = std::abs(det);
+    std::array<double, 3> center{};
+    for (std::size_t v = 0; v < shape.vertexCount; ++v) {
+      for (int d = 0; d < 3; ++d) {
+        center[d] += vertices[v][d] / static_cast<double>(shape.vertexCount);
+      }
+    }
 
-    double a1a2x1 = a12 * a23 - a13 * a22;
-    double a1a2x2 = a13 * a21 - a11 * a23;
-    double a1a2x3 = a11 * a22 - a12 * a21;
-    double a1a3x1 = a12 * a33 - a13 * a32;
-    double a1a3x2 = a13 * a31 - a11 * a33;
-    double a1a3x3 = a11 * a32 - a12 * a31;
-    double a2a3x1 = a22 * a33 - a23 * a32;
-    double a2a3x2 = a23 * a31 - a21 * a33;
-    double a2a3x3 = a21 * a32 - a22 * a31;
-    double b1b2x1 = b12 * b23 - b13 * b22;
-    double b1b2x2 = b13 * b21 - b11 * b23;
-    double b1b2x3 = b11 * b22 - b12 * b21;
+    // the faces split into triangles; the volume adds up the pyramids from the centre to them
+    double volume = 0;
+    double area = 0;
+    for (std::size_t f = 0; f < shape.faceCount; ++f) {
+      const auto& face = shape.faceVertices[f];
+      const auto& a = vertices[face[0]];
+      for (std::size_t t = 1; t + 1 < shape.faceVertexCount[f]; ++t) {
+        const auto& b = vertices[face[t]];
+        const auto& c = vertices[face[t + 1]];
+        const std::array<double, 3> u{b[0] - a[0], b[1] - a[1], b[2] - a[2]};
+        const std::array<double, 3> w{c[0] - a[0], c[1] - a[1], c[2] - a[2]};
+        const std::array<double, 3> normal{u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2],
+                                           u[0] * w[1] - u[1] * w[0]};
+        area +=
+            std::sqrt(normal[0] * normal[0] + normal[1] * normal[1] + normal[2] * normal[2]) / 2;
+        volume += (normal[0] * (a[0] - center[0]) + normal[1] * (a[1] - center[1]) +
+                   normal[2] * (a[2] - center[2])) /
+                  6;
+      }
+    }
 
-    double faces = std::sqrt(a1a2x1 * a1a2x1 + a1a2x2 * a1a2x2 + a1a2x3 * a1a2x3) +
-                   std::sqrt(a1a3x1 * a1a3x1 + a1a3x2 * a1a3x2 + a1a3x3 * a1a3x3) +
-                   std::sqrt(a2a3x1 * a2a3x1 + a2a3x2 * a2a3x2 + a2a3x3 * a2a3x3) +
-                   std::sqrt(b1b2x1 * b1b2x1 + b1b2x2 * b1b2x2 + b1b2x3 * b1b2x3);
-
-    inspheres[i] = gram / faces;
+    inspheres[i] = 3 * std::abs(volume) / area;
   }
 
   return inspheres;

@@ -3,6 +3,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 #include "Msh4Index.h"
 
+#include "mesh/CellType.h"
+
 #include <cstdio>
 #include <string>
 
@@ -83,11 +85,19 @@ void Msh4Indexer::parseElements() {
     }
     const std::size_t count = readSize();
     const Msh4ElementBlock block{count, input->offset(),
-                                 count > 0 ? physicalTag(dim, entityTag) : 0};
+                                 count > 0 ? physicalTag(dim, entityTag) : 0, type,
+                                 NumNodes[type - 1]};
     skipData(count * (1 + NumNodes[type - 1]) * dataSize);
-    if (count > 0 && type == cellType) {
+    const auto element = gmshElementType(type);
+    if (count > 0 && element.kind == GmshElementType::Kind::Cell) {
+      if (!element.complete) {
+        failAt(typeOffset, "Element type " + std::to_string(type) + " is a " +
+                               shapeOf(element.cellType).name +
+                               " without all nodes of a Lagrange cell, which is not supported");
+      }
+      index.highOrder = index.highOrder || element.order > 1;
       index.cellBlocks.push_back(block);
-    } else if (count > 0 && type == facetType) {
+    } else if (count > 0 && element.kind == GmshElementType::Kind::Face) {
       index.facetBlocks.push_back(block);
     }
   }

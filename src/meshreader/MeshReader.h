@@ -7,6 +7,7 @@
 #ifndef PUMGEN_SRC_MESHREADER_MESHREADER_H_
 #define PUMGEN_SRC_MESHREADER_MESHREADER_H_
 
+#include <cstdint>
 #include <fstream>
 
 #include "utils/logger.h"
@@ -74,14 +75,14 @@ class MeshReader {
    * responsible for allocating the buffer. The Size of the buffer must be
    * count*vertices_per_element.
    */
-  virtual void readElements(std::size_t start, std::size_t count, std::size_t* elements) = 0;
+  virtual void readElements(std::size_t start, std::size_t count, std::uint64_t* elements) = 0;
 
   /**
    * Reads all elements
    *
-   * @see readElements(size_t, size_t, size_t*)
+   * @see readElements(size_t, size_t, uint64_t*)
    */
-  void readElements(std::size_t* elements) {
+  void readElements(std::uint64_t* elements) {
     logInfo() << "Reading elements";
     readElements(0, nElements(), elements);
   }

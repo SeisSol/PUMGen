@@ -38,8 +38,19 @@ class ParallelGambitReader : public ParallelMeshReader<GambitReader> {
    * This is a collective operation.
    */
   void readGroups(int* groups) {
+    std::size_t numEntries = 0;
+    if (m_rank == 0) {
+      numEntries = m_serialReader.nGroupedElements();
+      if (numEntries < nElements()) {
+        logWarning() << nElements() - numEntries << "elements belong to no group and get group 0";
+      } else if (numEntries > nElements()) {
+        logWarning() << "The groups list" << numEntries - nElements()
+                     << "elements more than the mesh has; an element listed in several groups "
+                        "gets the last of them";
+      }
+    }
     scatterToElementOwners<ElementGroup>(
-        nElements(), 1, groups, "group information",
+        numEntries, 1, groups, "group information",
         [&](std::size_t start, std::size_t count, ElementGroup* entries) {
           m_serialReader.readGroups(start, count, entries);
         },

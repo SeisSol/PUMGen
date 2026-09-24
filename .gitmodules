@@ -8,3 +8,6 @@
 [submodule "submodules/tinyxml2"]
 	path = submodules/tinyxml2
 	url = ../../leethomason/tinyxml2.git
+[submodule "submodules/doctest"]
+	path = submodules/doctest
+	url = ../../doctest/doctest.git

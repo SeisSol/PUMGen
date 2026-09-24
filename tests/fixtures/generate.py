@@ -136,6 +136,58 @@ def write_reference(path, mesh_file, periodic=False):
             out.create_dataset("identify", data=periodic_identification(len(vertices)).astype("<u8"))
 
 
+def read_msh41_ascii(path):
+    """The nodes by tag and the node tags of the three-dimensional elements in the order of the
+    file, read from an ASCII MSH 4.1 file without gmsh."""
+    lines = open(path).read().split("\n")
+    nodes = {}
+    cells = []
+    i = 0
+    while i < len(lines):
+        if lines[i] == "$Nodes":
+            blocks = int(lines[i + 1].split()[0])
+            i += 2
+            for _ in range(blocks):
+                count = int(lines[i].split()[3])
+                tags = [int(lines[i + 1 + k]) for k in range(count)]
+                for k in range(count):
+                    nodes[tags[k]] = [float(x) for x in lines[i + 1 + count + k].split()[:3]]
+                i += 1 + 2 * count
+        elif lines[i] == "$Elements":
+            blocks = int(lines[i + 1].split()[0])
+            i += 2
+            for _ in range(blocks):
+                dim, _, _, count = (int(x) for x in lines[i].split())
+                if dim == 3:
+                    cells.extend([int(x) for x in lines[i + 1 + k].split()[1:]] for k in range(count))
+                i += 1 + count
+        else:
+            i += 1
+    return nodes, cells
+
+
+def write_high_order_reference(path, mesh_file, linear_reference):
+    """Reference of a mesh of order 2 whose vertices are the ones of the linear reference: the
+    other nodes of every cell, in the order of gmsh, with their offsets and the orders."""
+    nodes, cells = read_msh41_ascii(mesh_file)
+    with h5py.File(linear_reference, "r") as linear:
+        connect = linear["connect"][...]
+        datasets = {name: linear[name][...] for name in ("connect", "geometry", "group", "boundary")}
+    # the vertices are the nodes which are vertices of a cell, numbered in the order of their tags;
+    # they have to give the linear reference
+    vertex = {tag: i for i, tag in enumerate(sorted({tag for cell in cells for tag in cell[:4]}))}
+    assert all([vertex[tag] for tag in cell[:4]] == list(connect[c]) for c, cell in enumerate(cells))
+    geometry = [x for cell in cells for tag in cell[4:] for x in nodes[tag]]
+    offsets = np.cumsum([0] + [3 * (len(cell) - 4) for cell in cells])
+    with h5py.File(path, "w") as out:
+        for name, data in datasets.items():
+            out.create_dataset(name, data=data)
+        out.create_dataset("geometry_ho", data=np.array(geometry, dtype="<f8"))
+        out["geometry_ho"].attrs.create("node-ordering", "gmsh", dtype=h5py.string_dtype("ascii"))
+        out.create_dataset("geometry_ho_offsets", data=offsets.astype("<u8"))
+        out.create_dataset("order", data=np.full(len(cells), 2, dtype="u1"))
+
+
 def write_mesh(path, version, binary=False):
     gmsh.option.setNumber("Mesh.MshFileVersion", version)
     gmsh.option.setNumber("Mesh.Binary", 1 if binary else 0)
@@ -307,6 +359,32 @@ def generate_periodic():
     write_reference("periodic.puml.h5", "periodic-v41.msh", periodic=True)
 
 
+def generate_periodic_tiny():
+    """A periodic cube of as few vertices as gmsh makes, to be converted on more ranks than it has
+    vertices."""
+    gmsh.clear()
+    gmsh.model.add("periodic-tiny")
+    gmsh.model.occ.addBox(0, 0, 0, 1, 1, 1)
+    gmsh.model.occ.synchronize()
+    translation = [1, 0, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]
+    left = [tag for _, tag in gmsh.model.getEntitiesInBoundingBox(-TOL, -TOL, -TOL, TOL, 1 + TOL, 1 + TOL, 2)]
+    right = [tag for _, tag in gmsh.model.getEntitiesInBoundingBox(1 - TOL, -TOL, -TOL, 1 + TOL, 1 + TOL, 1 + TOL, 2)]
+    gmsh.model.mesh.setPeriodic(2, right, left, translation)
+    gmsh.model.addPhysicalGroup(3, [1], 1)
+    others = [tag for _, tag in gmsh.model.getEntities(2) if tag not in left + right]
+    gmsh.model.addPhysicalGroup(2, others, FREE_SURFACE)
+    # the eight corners only
+    for _, curve in gmsh.model.getEntities(1):
+        gmsh.model.mesh.setTransfiniteCurve(curve, 2)
+    for _, surface in gmsh.model.getEntities(2):
+        gmsh.model.mesh.setTransfiniteSurface(surface)
+    gmsh.model.mesh.setTransfiniteVolume(1)
+    gmsh.model.mesh.generate(3)
+    write_mesh("periodic-tiny-v41.msh", 4.1)
+    write_mesh("periodic-tiny-binary-v41.msh", 4.1, binary=True)
+    write_reference("periodic-tiny.puml.h5", "periodic-tiny-v41.msh", periodic=True)
+
+
 TINY_V41 = """$MeshFormat
 4.1 0 8
 $EndMeshFormat
@@ -398,6 +476,285 @@ def generate_tiny():
     write_reference("tiny.puml.h5", "tiny-v41.msh")
 
 
+# the faces of the cells in the numbering of PUML, as the specification of the file format has them
+FACES = {
+    "tet": [(1, 0, 2), (0, 1, 3), (1, 2, 3), (2, 0, 3)],
+    "hex": [(0, 4, 7, 3), (1, 2, 6, 5), (0, 1, 5, 4), (3, 7, 6, 2), (0, 3, 2, 1), (4, 5, 6, 7)],
+    "wedge": [(0, 2, 1), (3, 4, 5), (0, 1, 4, 3), (1, 2, 5, 4), (2, 0, 3, 5)],
+    "pyramid": [(0, 3, 2, 1), (0, 1, 4), (1, 2, 4), (2, 3, 4), (3, 0, 4)],
+}
+MSH_TYPES = {"tet": 4, "hex": 5, "wedge": 6, "pyramid": 7}
+FACE_TYPES = {3: 2, 4: 3}
+VTK_TYPES = {"tet": 10, "hex": 12, "wedge": 13, "pyramid": 14}
+VOLUME_NAMES = {1: "hexahedron", 2: "pyramids", 3: "wedges", 4: "tetrahedra"}
+SURFACE_NAMES = {1: "free surface", 3: "front", 5: "absorbing"}
+
+
+def mixed_cells():
+    """A conforming mesh of all four kinds of cells, cube by cube along x: a hexahedron, six
+    pyramids around the centre of the next cube, two wedges in the third, and six tetrahedra in a
+    cube next to the triangles of the wedges. Returns the coordinates of the nodes and the cells as
+    (kind, nodes, group), with the nodes in the order of gmsh and positively oriented."""
+    points = []
+    index = {}
+
+    def node(x, y, z):
+        if (x, y, z) not in index:
+            index[(x, y, z)] = len(points)
+            points.append((x, y, z))
+        return index[(x, y, z)]
+
+    def cube(x, y, z):
+        return [node(x + dx, y + dy, z + dz) for dz in (0, 1) for (dx, dy) in ((0, 0), (1, 0), (1, 1), (0, 1))]
+
+    cells = [("hex", cube(0, 0, 0), 1)]
+    corners = cube(1, 0, 0)
+    apex = node(1.5, 0.5, 0.5)
+    for face in FACES["hex"]:
+        # the base of a pyramid turns towards its apex, the hexahedral faces point outwards
+        cells.append(("pyramid", [corners[v] for v in reversed(face)] + [apex], 2))
+    cells.append(("wedge", [node(2, 0, 0), node(2, 0, 1), node(3, 0, 0), node(2, 1, 0), node(2, 1, 1), node(3, 1, 0)], 3))
+    cells.append(("wedge", [node(3, 0, 0), node(2, 0, 1), node(3, 0, 1), node(3, 1, 0), node(2, 1, 1), node(3, 1, 1)], 3))
+    # Kuhn's six tetrahedra around the diagonal from (3, 1, 0), which splits the face y = 1 as the
+    # triangles of the wedges do
+    steps = {"u": (-1, 0, 0), "v": (0, 1, 0), "w": (0, 0, 1)}
+    for order in itertools.permutations("uvw"):
+        position = [3, 1, 0]
+        tet = [node(*position)]
+        for axis in order:
+            position = [a + b for a, b in zip(position, steps[axis])]
+            tet.append(node(*position))
+        cells.append(("tet", tet, 4))
+
+    for kind, nodes, _ in cells:
+        if kind == "tet":
+            a, b, c, d = (np.array(points[n]) for n in nodes)
+            if np.dot(np.cross(b - a, c - a), d - a) < 0:
+                nodes[2], nodes[3] = nodes[3], nodes[2]
+    return points, cells
+
+
+def boundary_faces(cells):
+    """The faces of the cells found once, with their boundary condition: 1 on top (z = 1), 3 at
+    y = 0, and 5 elsewhere."""
+    count = {}
+    for kind, nodes, _ in cells:
+        for face in FACES[kind]:
+            key = tuple(sorted(nodes[v] for v in face))
+            count[key] = count.get(key, 0) + 1
+    return {key for key, n in count.items() if n == 1}
+
+
+def bc_of(face, points):
+    if all(points[v][2] == 1 for v in face):
+        return 1
+    if all(points[v][1] == 0 for v in face):
+        return 3
+    return 5
+
+
+def build_mixed_model(points, cells, boundary, name):
+    """The gmsh model of the cells: one volume per group, one surface per boundary condition."""
+    gmsh.clear()
+    gmsh.model.add(name)
+    for group in (1, 2, 3, 4):
+        gmsh.model.addDiscreteEntity(3, group)
+        gmsh.model.addPhysicalGroup(3, [group], group, name=VOLUME_NAMES[group])
+    for bc in (1, 3, 5):
+        gmsh.model.addDiscreteEntity(2, bc)
+        gmsh.model.addPhysicalGroup(2, [bc], 100 + bc, name=SURFACE_NAMES[bc])
+    gmsh.model.mesh.addNodes(3, 1, list(range(1, len(points) + 1)), [x for p in points for x in p])
+    tag = 1
+    for kind, nodes, group in cells:
+        gmsh.model.mesh.addElementsByType(group, MSH_TYPES[kind], [tag], [n + 1 for n in nodes])
+        tag += 1
+    add_boundary_faces(points, cells, boundary, tag)
+
+
+def add_boundary_faces(points, cells, boundary, tag, tag_of=None):
+    for face in sorted(boundary):
+        # the vertices of a face in the cyclic order of the cell that has it
+        cyclic = next([nodes[v] for v in f] for kind, nodes, _ in cells for f in FACES[kind]
+                      if tuple(sorted(nodes[v] for v in f)) == face)
+        node_tags = [tag_of[n] if tag_of else n + 1 for n in cyclic]
+        gmsh.model.mesh.addElementsByType(bc_of(face, points), FACE_TYPES[len(face)], [tag], node_tags)
+        tag += 1
+
+
+def generate_mixed():
+    points, cells = mixed_cells()
+    boundary = boundary_faces(cells)
+    build_mixed_model(points, cells, boundary, "mixed")
+    write_mesh("mixed-v41.msh", 4.1)
+    write_mesh("mixed-binary-v41.msh", 4.1, binary=True)
+    write_mesh("mixed-v22.msh", 2.2)
+
+    # the references, with the cells in the order of the files: gmsh writes the MSH 2.2 file by
+    # element type
+    _, order = read_msh41_ascii("mixed-v41.msh")
+    write_mixed_reference("mixed.puml.h5", points, cells, boundary, order, read_physical_names("mixed-v41.msh"))
+    write_mixed_reference(
+        "mixed-v22.puml.h5", points, cells, boundary, read_msh22_cells("mixed-v22.msh"), read_physical_names("mixed-v22.msh")
+    )
+
+
+def read_physical_names(path):
+    """The names of the physical groups of an ASCII MSH file, in its order, as (dimension, tag, name)."""
+    lines = open(path).read().split("\n")
+    first = lines.index("$PhysicalNames") + 2
+    names = []
+    for line in lines[first : first + int(lines[first - 1])]:
+        dimension, tag, name = line.split(" ", 2)
+        names.append((int(dimension), int(tag), name.strip().strip('"')))
+    return names
+
+
+def add_names(dataset, names, dimension, boundary):
+    """The attributes naming the values of a dataset: ids, as the dataset holds them, and names."""
+    chosen = [(tag, name) for dim, tag, name in names if dim == dimension]
+    if chosen:
+        ids = [tag - 100 if boundary and tag >= 100 else tag for tag, _ in chosen]
+        dataset.attrs.create("ids", np.array(ids, dtype="<i4"))
+        dataset.attrs.create("names", [name for _, name in chosen], dtype=h5py.string_dtype("utf-8"))
+
+
+def read_msh22_cells(path):
+    """The node tags of the three-dimensional elements of an ASCII MSH 2.2 file, in its order."""
+    lines = open(path).read().split("\n")
+    first = lines.index("$Elements") + 2
+    cells = []
+    for line in lines[first : first + int(lines[first - 1])]:
+        values = [int(x) for x in line.split()]
+        if values[1] in MSH_TYPES.values():
+            cells.append(values[3 + values[2] :])
+    return cells
+
+
+def write_mixed_reference(path, points, cells, boundary, order, names):
+    by_nodes = {tuple(n + 1 for n in nodes): (kind, nodes, group) for kind, nodes, group in cells}
+    ordered = [by_nodes[tuple(tags)] for tags in order]
+    faces = np.zeros((len(ordered), 6), dtype="<i4")
+    for c, (kind, nodes, _) in enumerate(ordered):
+        for f, face in enumerate(FACES[kind]):
+            key = tuple(sorted(nodes[v] for v in face))
+            if key in boundary:
+                faces[c, f] = bc_of(key, points)
+    with h5py.File(path, "w") as out:
+        out.create_dataset("connect", data=np.array([n for _, nodes, _ in ordered for n in nodes], dtype="<u8"))
+        out.create_dataset("connect_offsets", data=np.cumsum([0] + [len(nodes) for _, nodes, _ in ordered]).astype("<u8"))
+        out.create_dataset("cell_type", data=np.array([VTK_TYPES[kind] for kind, _, _ in ordered], dtype="u1"))
+        out.create_dataset("geometry", data=np.array(points, dtype="<f8"))
+        out.create_dataset("group", data=np.array([group for _, _, group in ordered], dtype="<i4"))
+        out.create_dataset("boundary", data=faces)
+        add_names(out["group"], names, 3, False)
+        add_names(out["boundary"], names, 2, True)
+
+
+QUADRATIC_TYPES = {"tet": 11, "hex": 12, "wedge": 13, "pyramid": 14}
+KINDS_OF_TYPES = {4: ("tet", 1), 11: ("tet", 2), 5: ("hex", 1), 12: ("hex", 2), 6: ("wedge", 1),
+                  13: ("wedge", 2), 7: ("pyramid", 1), 14: ("pyramid", 2)}
+VERTEX_COUNTS = {"tet": 4, "hex": 8, "wedge": 6, "pyramid": 5}
+
+
+def read_msh41_cells(path):
+    """The nodes by tag and the three-dimensional elements of an ASCII MSH 4.1 file in its order,
+    as (element type, entity, node tags), read without gmsh."""
+    lines = open(path).read().split("\n")
+    nodes, _ = read_msh41_ascii(path)
+    cells = []
+    i = lines.index("$Elements") + 1
+    blocks = int(lines[i].split()[0])
+    i += 1
+    for _ in range(blocks):
+        dim, entity, element_type, count = (int(x) for x in lines[i].split())
+        if dim == 3:
+            cells.extend((element_type, entity, [int(x) for x in lines[i + 1 + k].split()[1:]]) for k in range(count))
+        i += 1 + count
+    return nodes, cells
+
+
+def generate_mixed_high_order():
+    """The mesh of all kinds of cells, with the hexahedron and the wedges of order 2 and the pyramids
+    and tetrahedra linear: cells of several kinds and orders. gmsh places the nodes of order 2."""
+    points, cells = mixed_cells()
+    boundary = boundary_faces(cells)
+    build_mixed_model(points, cells, boundary, "mixed-high-order")
+    gmsh.model.mesh.setOrder(2)
+    # gmsh numbers the nodes and elements anew; the vertices are found by their coordinates
+    tags, coordinates, _ = gmsh.model.mesh.getNodes()
+    tag_at = {tuple(np.round(coordinates[3 * i : 3 * i + 3], 12)): int(tags[i]) for i in range(len(tags))}
+    tag_of = [tag_at[tuple(np.round(p, 12))] for p in points]
+    index_of = {tag: i for i, tag in enumerate(tag_of)}
+    vertex_counts = {10: 4, 27: 8, 18: 6, 14: 5}
+    quadratic = {}
+    for _, entity in gmsh.model.getEntities(3):
+        _, elements, nodes = gmsh.model.mesh.getElements(3, entity)
+        count = len(nodes[0]) // len(elements[0])
+        for k in range(len(elements[0])):
+            element = [int(n) for n in nodes[0][k * count : (k + 1) * count]]
+            quadratic[tuple(sorted(element[: vertex_counts[count]]))] = element
+
+    gmsh.clear()
+    gmsh.model.add("mixed-high-order")
+    for group in (1, 2, 3, 4):
+        gmsh.model.addDiscreteEntity(3, group)
+        gmsh.model.addPhysicalGroup(3, [group], group, name=VOLUME_NAMES[group])
+    for bc in (1, 3, 5):
+        gmsh.model.addDiscreteEntity(2, bc)
+        gmsh.model.addPhysicalGroup(2, [bc], 100 + bc, name=SURFACE_NAMES[bc])
+    gmsh.model.mesh.addNodes(3, 1, list(tags), list(coordinates))
+    for tag, (kind, nodes, group) in enumerate(cells, start=1):
+        element = quadratic[tuple(sorted(tag_of[n] for n in nodes))]
+        # the vertices keep their order
+        assert element[: len(nodes)] == [tag_of[n] for n in nodes]
+        if group in (1, 3):
+            gmsh.model.mesh.addElementsByType(group, QUADRATIC_TYPES[kind], [tag], element)
+        else:
+            gmsh.model.mesh.addElementsByType(group, MSH_TYPES[kind], [tag], element[: len(nodes)])
+    add_boundary_faces(points, cells, boundary, len(cells) + 1, tag_of)
+    write_mesh("mixed-ho-v41.msh", 4.1)
+    write_mesh("mixed-ho-binary-v41.msh", 4.1, binary=True)
+
+    # the reference from the file: the vertices are the nodes which are a vertex of a cell, in the
+    # order of their tags; the other nodes of a cell of order 2 are its geometry of higher order
+    nodes, elements = read_msh41_cells("mixed-ho-v41.msh")
+    kinds = [KINDS_OF_TYPES[element_type] for element_type, _, _ in elements]
+    corners = [element[2][: VERTEX_COUNTS[kind]] for element, (kind, _) in zip(elements, kinds)]
+    vertex = {tag: i for i, tag in enumerate(sorted({tag for tags in corners for tag in tags}))}
+    faces = np.zeros((len(elements), 6), dtype="<i4")
+    for c, ((kind, _), tags) in enumerate(zip(kinds, corners)):
+        for f, face in enumerate(FACES[kind]):
+            key = tuple(sorted(index_of[tags[v]] for v in face))
+            if key in boundary:
+                faces[c, f] = bc_of(key, points)
+    high_order = [[x for tag in element[2][VERTEX_COUNTS[kind] :] for x in nodes[tag]] for element, (kind, _) in zip(elements, kinds)]
+    with h5py.File("mixed-ho.puml.h5", "w") as out:
+        out.create_dataset("connect", data=np.array([vertex[tag] for tags in corners for tag in tags], dtype="<u8"))
+        out.create_dataset("connect_offsets", data=np.cumsum([0] + [len(tags) for tags in corners]).astype("<u8"))
+        out.create_dataset("cell_type", data=np.array([VTK_TYPES[kind] for kind, _ in kinds], dtype="u1"))
+        out.create_dataset("geometry", data=np.array([nodes[tag] for tag in sorted(vertex)], dtype="<f8"))
+        out.create_dataset("group", data=np.array([entity for _, entity, _ in elements], dtype="<i4"))
+        out.create_dataset("boundary", data=faces)
+        names = read_physical_names("mixed-ho-v41.msh")
+        add_names(out["group"], names, 3, False)
+        add_names(out["boundary"], names, 2, True)
+        out.create_dataset("geometry_ho", data=np.array([x for values in high_order for x in values], dtype="<f8"))
+        out["geometry_ho"].attrs.create("node-ordering", "gmsh", dtype=h5py.string_dtype("ascii"))
+        out.create_dataset("geometry_ho_offsets", data=np.cumsum([0] + [len(values) for values in high_order]).astype("<u8"))
+        out.create_dataset("order", data=np.array([order for _, order in kinds], dtype="u1"))
+
+
+def write_vtkhdf_reference(path, linear_reference):
+    """Reference of the VTKHDF view of a mesh of tetrahedra: its datasets and the view's cells."""
+    with h5py.File(linear_reference, "r") as linear, h5py.File(path, "w") as out:
+        for name in ("connect", "geometry", "group", "boundary"):
+            out.create_dataset(name, data=linear[name][...])
+        connect = linear["connect"][...]
+        out.create_dataset("VTKHDF/Connectivity", data=connect.reshape(-1))
+        out.create_dataset("VTKHDF/Offsets", data=(np.arange(len(connect) + 1) * connect.shape[1]).astype("<u8"))
+        out.create_dataset("VTKHDF/Types", data=np.full(len(connect), VTK_TYPES["tet"], dtype="u1"))
+
+
 def main():
     gmsh.initialize()
     gmsh.option.setNumber("General.Terminal", 0)
@@ -405,8 +762,12 @@ def main():
     gmsh.option.setNumber("Mesh.Algorithm3D", 1)
     generate_layered()
     generate_coarse()
+    write_vtkhdf_reference("coarse-vtkhdf.puml.h5", "coarse.puml.h5")
     generate_periodic()
+    generate_periodic_tiny()
     generate_tiny()
+    generate_mixed()
+    generate_mixed_high_order()
     gmsh.finalize()
 
 

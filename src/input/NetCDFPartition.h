@@ -7,44 +7,34 @@
 #ifndef PUMGEN_SRC_INPUT_NETCDFPARTITION_H_
 #define PUMGEN_SRC_INPUT_NETCDFPARTITION_H_
 
-#include <cstring>
+#include <algorithm>
+#include <cstddef>
+#include <vector>
 
 /**
  * Describes one partition (required for reading netCDF meshes)
  */
 class Partition {
   private:
-  std::size_t m_nElements;
-  std::size_t m_nVertices;
+  std::size_t m_nElements = 0;
+  std::size_t m_nVertices = 0;
 
-  int* m_elements;
-  double* m_vertices;
-  int* m_boundaries;
-  int* m_groups;
+  std::vector<int> m_elements;
+  std::vector<double> m_vertices;
+  std::vector<int> m_boundaries;
+  std::vector<int> m_groups;
 
   public:
-  Partition()
-      : m_nElements(0), m_nVertices(0), m_elements(0L), m_vertices(0L), m_boundaries(0L),
-        m_groups(0L) {}
-
-  ~Partition() {
-    delete[] m_elements;
-    delete[] m_vertices;
-    delete[] m_boundaries;
-    delete[] m_groups;
-  }
-
   void setElemSize(std::size_t nElements) {
     if (m_nElements != 0)
       return;
 
     m_nElements = nElements;
 
-    m_elements = new int[nElements * 4];
-    m_boundaries = new int[nElements * 4];
-    m_groups = new int[nElements];
-    // Set default value for groups
-    memset(m_groups, 0, nElements * sizeof(int));
+    m_elements.resize(nElements * 4);
+    m_boundaries.resize(nElements * 4);
+    // group 0 unless the file gives one
+    m_groups.assign(nElements, 0);
   }
 
   void setVrtxSize(std::size_t nVertices) {
@@ -53,14 +43,14 @@ class Partition {
 
     m_nVertices = nVertices;
 
-    m_vertices = new double[nVertices * 3];
+    m_vertices.resize(nVertices * 3);
   }
 
   void convertBoundary() {
     int ncBoundaries[4];
 
-    for (unsigned int i = 0; i < m_nElements * 4; i += 4) {
-      memcpy(ncBoundaries, &m_boundaries[i], 4 * sizeof(int));
+    for (std::size_t i = 0; i < m_nElements * 4; i += 4) {
+      std::copy_n(&m_boundaries[i], 4, ncBoundaries);
       for (unsigned int j = 0; j < 4; j++)
         m_boundaries[i + j] = ncBoundaries[INTERNAL2EX_ORDER[j]];
     }
@@ -70,13 +60,13 @@ class Partition {
 
   std::size_t nVertices() const { return m_nVertices; }
 
-  int* elements() { return m_elements; }
+  int* elements() { return m_elements.data(); }
 
-  double* vertices() { return m_vertices; }
+  double* vertices() { return m_vertices.data(); }
 
-  int* boundaries() { return m_boundaries; }
+  int* boundaries() { return m_boundaries.data(); }
 
-  int* groups() { return m_groups; }
+  int* groups() { return m_groups.data(); }
 
   private:
   const static int INTERNAL2EX_ORDER[4];

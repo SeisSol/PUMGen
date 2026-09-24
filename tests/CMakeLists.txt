@@ -12,12 +12,16 @@ set(PUMGEN_TEST_OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/output)
 file(MAKE_DIRECTORY ${PUMGEN_TEST_OUTPUT})
 
 # pumgen_add_test(<name> RANKS <n> SOURCE <source> INPUT <fixture>
-#                 [REFERENCE <fixture> [TOLERANCE <tolerance>] [IDENTIFY]]
-#                 [EXPECT_OUTPUT <regex>] [EXPECT_ERROR <regex>] [ARGS <argument>...])
+#                 [REFERENCE <fixture> [TOLERANCE <tolerance>] [IDENTIFY] [HIGHORDER] [MIXED] [VTKHDF]]
+#                 [EXPECT_OUTPUT <regex>] [EXPECT_ERROR <regex>]
+#                 [OUTPUT <file>] [EXPECT_XDMF <regex>] [ARGS <argument>...])
 function(pumgen_add_test name)
-  cmake_parse_arguments(PARSE_ARGV 1 TEST "IDENTIFY"
-                        "RANKS;SOURCE;INPUT;REFERENCE;TOLERANCE;EXPECT_OUTPUT;EXPECT_ERROR" "ARGS")
+  cmake_parse_arguments(PARSE_ARGV 1 TEST "IDENTIFY;HIGHORDER;MIXED;VTKHDF"
+                        "RANKS;SOURCE;INPUT;OUTPUT;REFERENCE;TOLERANCE;EXPECT_OUTPUT;EXPECT_ERROR;EXPECT_XDMF" "ARGS")
   set(output ${PUMGEN_TEST_OUTPUT}/${name}.puml.h5)
+  if(DEFINED TEST_OUTPUT)
+    set(output ${TEST_OUTPUT})
+  endif()
   if(DEFINED TEST_EXPECT_ERROR AND TEST_RANKS EQUAL 1)
     # started as MPI singleton, since mpiexec may drop the output of a process ending with
     # MPI_Abort
@@ -31,13 +35,19 @@ function(pumgen_add_test name)
         $<TARGET_FILE:pumgen>
         ${MPIEXEC_POSTFLAGS})
   endif()
-  list(APPEND command -s ${TEST_SOURCE} ${TEST_ARGS} ${PUMGEN_TEST_FIXTURES}/${TEST_INPUT}
-       ${output})
+  set(input ${TEST_INPUT})
+  if(NOT IS_ABSOLUTE ${input})
+    set(input ${PUMGEN_TEST_FIXTURES}/${input})
+  endif()
+  list(APPEND command -s ${TEST_SOURCE} ${TEST_ARGS} ${input} ${output})
   string(REPLACE ";" "|" command "${command}")
 
   set(script_args -DCOMMAND=${command} -DOUTPUT=${output})
   if(DEFINED TEST_EXPECT_OUTPUT)
     list(APPEND script_args "-DEXPECT_OUTPUT=${TEST_EXPECT_OUTPUT}")
+  endif()
+  if(DEFINED TEST_EXPECT_XDMF)
+    list(APPEND script_args "-DEXPECT_XDMF=${TEST_EXPECT_XDMF}")
   endif()
   if(DEFINED TEST_EXPECT_ERROR)
     list(APPEND script_args "-DEXPECT_ERROR=${TEST_EXPECT_ERROR}")
@@ -50,6 +60,15 @@ function(pumgen_add_test name)
     if(TEST_IDENTIFY)
       list(APPEND script_args -DIDENTIFY=ON)
     endif()
+    if(TEST_HIGHORDER)
+      list(APPEND script_args -DHIGHORDER=ON)
+    endif()
+    if(TEST_MIXED)
+      list(APPEND script_args -DMIXED=ON)
+    endif()
+    if(TEST_VTKHDF)
+      list(APPEND script_args -DVTKHDF=ON)
+    endif()
   endif()
 
   add_test(NAME pumgen.${name} COMMAND ${CMAKE_COMMAND} ${script_args} -P
@@ -60,17 +79,24 @@ function(pumgen_add_test name)
 endfunction()
 
 # the GMSH parsers with a tiny read buffer
-add_executable(
-  pumgen_reader_test
-  ReaderTest.cpp ${PROJECT_SOURCE_DIR}/src/meshreader/MshInput.cpp
-  ${PROJECT_SOURCE_DIR}/src/meshreader/GMSHParser.cpp
-  ${PROJECT_SOURCE_DIR}/src/meshreader/GMSH2Parser.cpp
-  ${PROJECT_SOURCE_DIR}/src/meshreader/GMSH4Parser.cpp)
-target_include_directories(pumgen_reader_test PRIVATE ${PROJECT_SOURCE_DIR}/src
-                                                      ${PROJECT_SOURCE_DIR}/submodules)
-target_compile_definitions(pumgen_reader_test PRIVATE LOG_LEVEL=${LOG_LEVEL})
+add_executable(pumgen_reader_test ReaderTest.cpp)
+target_link_libraries(pumgen_reader_test PRIVATE pumgen-core)
 add_test(NAME reader.buffer-boundaries COMMAND pumgen_reader_test ${PUMGEN_TEST_FIXTURES})
 set_tests_properties(reader.buffer-boundaries PROPERTIES ENVIRONMENT "ASAN_OPTIONS=detect_leaks=0")
+
+# unit tests; the ones needing more ranks than started with are skipped
+add_executable(pumgen_unit_tests unit/Main.cpp unit/DistributorTest.cpp unit/BoundaryTest.cpp
+                                 unit/VertexFilterTest.cpp unit/GMSHTypesTest.cpp
+                                 unit/CellTypeTest.cpp)
+target_include_directories(pumgen_unit_tests SYSTEM PRIVATE ${PROJECT_SOURCE_DIR}/submodules/doctest)
+target_link_libraries(pumgen_unit_tests PRIVATE pumgen-core)
+foreach(ranks 1 3)
+  add_test(NAME unit.np${ranks}
+           COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${ranks} ${MPIEXEC_PREFLAGS}
+                   $<TARGET_FILE:pumgen_unit_tests> ${MPIEXEC_POSTFLAGS})
+  set_tests_properties(unit.np${ranks} PROPERTIES PROCESSORS ${ranks} TIMEOUT 120 ENVIRONMENT
+                                                  "ASAN_OPTIONS=detect_leaks=0")
+endforeach()
 
 # The fixtures are created by fixtures/generate.py; the reference files are computed from the
 # gmsh model directly. The layered mesh has element and vertex counts which do not divide evenly
@@ -90,7 +116,7 @@ foreach(ranks 1 2 3 4)
 endforeach()
 pumgen_add_test(msh4.coarse.np2 RANKS 2 SOURCE msh4 INPUT coarse-v41.msh REFERENCE coarse.puml.h5)
 pumgen_add_test(msh2.coarse-o2.np1 RANKS 1 SOURCE msh2 INPUT coarse-o2-v22.msh
-                REFERENCE coarse-o2.puml.h5 ARGS --order=2)
+                REFERENCE coarse-o2.puml.h5 HIGHORDER)
 pumgen_add_test(msh4.tiny.np1 RANKS 1 SOURCE msh4 INPUT tiny-v41.msh REFERENCE tiny.puml.h5)
 pumgen_add_test(msh2.tiny.np1 RANKS 1 SOURCE msh2 INPUT tiny-v22.msh REFERENCE tiny.puml.h5)
 
@@ -107,18 +133,17 @@ pumgen_add_test(msh4.tiny.scaleoffset.np3 RANKS 3 SOURCE msh4 INPUT tiny-v41.msh
                 REFERENCE tiny.puml.h5 ARGS --filter-enable=scaleoffset)
 
 # command line options
-pumgen_add_test(msh2.coarse-o2.shortopt.np1 RANKS 1 SOURCE msh2 INPUT coarse-o2-v22.msh
-                REFERENCE coarse-o2.puml.h5 ARGS -o 2)
 pumgen_add_test(msh4.layered.chunksize.np3 RANKS 3 SOURCE msh4 INPUT layered-v41.msh
                 REFERENCE layered.puml.h5 ARGS --chunksize=4096)
-pumgen_add_test(msh4.tiny.order0 RANKS 1 SOURCE msh4 INPUT tiny-v41.msh ARGS --order=0
-                EXPECT_ERROR "mesh order has to be at least 1")
+# a chunk smaller than a row
+pumgen_add_test(msh4.layered.chunksize1.np3 RANKS 3 SOURCE msh4 INPUT layered-v41.msh
+                REFERENCE layered.puml.h5 ARGS --chunksize=1)
 
 # integer types reduced to the value range
 pumgen_add_test(msh4.layered.compact.np3 RANKS 3 SOURCE msh4 INPUT layered-v41.msh
                 REFERENCE layered.puml.h5 ARGS --compactify-datatypes)
 pumgen_add_test(msh2.coarse-o2.compact.np2 RANKS 2 SOURCE msh2 INPUT coarse-o2-v22.msh
-                REFERENCE coarse-o2.puml.h5 ARGS --compactify-datatypes --order=2)
+                REFERENCE coarse-o2.puml.h5 HIGHORDER ARGS --compactify-datatypes)
 
 # malformed or unsupported input
 pumgen_add_test(msh4.tiny-truncated RANKS 1 SOURCE msh4 INPUT tiny-truncated-v41.msh
@@ -154,14 +179,16 @@ pumgen_add_test(msh2.tiny-duplicate RANKS 1 SOURCE msh2 INPUT tiny-duplicate-v22
 pumgen_add_test(msh2.tiny-badnode RANKS 1 SOURCE msh2 INPUT tiny-badnode-v22.msh
                 EXPECT_ERROR "Unknown node tag")
 
-# higher-order meshes (with the inspheres of the linear mesh) and partitioned files
+# higher-order meshes: the vertices of the cells are the vertices of the linear mesh, the other
+# nodes the geometry of higher order; the inspheres are the ones of the linear mesh. The reference
+# is written by fixtures/generate.py from the node tags in the file.
 foreach(ranks 1 2)
   pumgen_add_test(msh4.coarse-o2.np${ranks} RANKS ${ranks} SOURCE msh4 INPUT coarse-o2-v41.msh
-                  REFERENCE coarse-o2.puml.h5 ARGS --order=2
+                  REFERENCE coarse-o2.puml.h5 HIGHORDER
                   EXPECT_OUTPUT "Minimum insphere found: 0[.]03184[67]")
 endforeach()
 pumgen_add_test(msh2.coarse-o2.np2 RANKS 2 SOURCE msh2 INPUT coarse-o2-v22.msh
-                REFERENCE coarse-o2.puml.h5 ARGS --order=2
+                REFERENCE coarse-o2.puml.h5 HIGHORDER
                 EXPECT_OUTPUT "Minimum insphere found: 0[.]03184[67]")
 pumgen_add_test(msh4.coarse.insphere RANKS 1 SOURCE msh4 INPUT coarse-v41.msh
                 EXPECT_OUTPUT "Minimum insphere found: 0[.]03184[67]")
@@ -179,8 +206,9 @@ foreach(variant binary binary-bigendian binary-size4)
   pumgen_add_test(msh4.coarse-${variant}.np2 RANKS 2 SOURCE msh4 INPUT coarse-${variant}-v41.msh
                   REFERENCE coarse.puml.h5 TOLERANCE 1e-12)
 endforeach()
-pumgen_add_test(msh4.coarse-o2-binary.np2 RANKS 2 SOURCE msh4 INPUT coarse-o2-binary-v41.msh
-                REFERENCE coarse-o2.puml.h5 TOLERANCE 1e-12 ARGS --order=2)
+pumgen_add_test(msh4.coarse-o2-binary.np3 RANKS 3 SOURCE msh4 INPUT coarse-o2-binary-v41.msh
+                REFERENCE coarse-o2.puml.h5 TOLERANCE 1e-12 HIGHORDER
+                EXPECT_OUTPUT "binary, read by all ranks")
 pumgen_add_test(msh4.periodic-binary.np2 RANKS 2 SOURCE msh4 INPUT periodic-binary-v41.msh
                 REFERENCE periodic.puml.h5 TOLERANCE 1e-12 IDENTIFY)
 pumgen_add_test(msh4.coarse-binary-truncated RANKS 1 SOURCE msh4
@@ -205,6 +233,38 @@ pumgen_add_test(msh4.tiny-binary-badnode RANKS 1 SOURCE msh4 INPUT tiny-binary-b
                 EXPECT_ERROR "Unknown node tag 9")
 pumgen_add_test(msh4.tiny-binary-sparse RANKS 1 SOURCE msh4 INPUT tiny-binary-sparse-v41.msh
                 EXPECT_ERROR "Non-contiguous node tags are not supported")
+
+# a Gambit mesh whose elements are in no group, derived from the layered one
+file(READ ${PUMGEN_TEST_FIXTURES}/layered.neu gambit)
+string(REPLACE "      1597         2         3" "      1597         0         3" gambit "${gambit}")
+while(TRUE)
+  string(FIND "${gambit}" "       ELEMENT GROUP" begin)
+  if(begin EQUAL -1)
+    break()
+  endif()
+  string(SUBSTRING "${gambit}" ${begin} -1 tail)
+  string(FIND "${tail}" "ENDOFSECTION\n" length)
+  math(EXPR end "${begin} + ${length} + 13")
+  string(SUBSTRING "${gambit}" 0 ${begin} head)
+  string(SUBSTRING "${gambit}" ${end} -1 rest)
+  set(gambit "${head}${rest}")
+endwhile()
+file(WRITE ${PUMGEN_TEST_OUTPUT}/layered-nogroups.neu "${gambit}")
+pumgen_add_test(gambit.nogroups.np3 RANKS 3 SOURCE gambit
+                INPUT ${PUMGEN_TEST_OUTPUT}/layered-nogroups.neu
+                EXPECT_OUTPUT "1597 elements belong to no group and get group 0")
+
+# the XDMF file: the cells of a higher-order mesh with their vertices only, the precision of
+# compacted integers, and the file name next to an output in a directory whose name ends in .h5
+pumgen_add_test(
+  msh4.coarse-o2.xdmf RANKS 1 SOURCE msh4 INPUT coarse-o2-v41.msh
+  EXPECT_XDMF "Tetrahedron. NumberOfElements=.320.[^#]*Dimensions=.320 4.>[^#]*Name=.order.")
+pumgen_add_test(
+  msh4.coarse.compact-xdmf RANKS 2 SOURCE msh4 INPUT coarse-v41.msh ARGS --compactify-datatypes
+  EXPECT_XDMF "Precision=.1. Format=.HDF. Dimensions=.320 4.>[^#]*Precision=.8. Format=.HDF. Dimensions=.109 3.")
+file(MAKE_DIRECTORY ${PUMGEN_TEST_OUTPUT}/directory.h5)
+pumgen_add_test(msh4.tiny.xdmf-path RANKS 1 SOURCE msh4 INPUT tiny-v41.msh
+                OUTPUT ${PUMGEN_TEST_OUTPUT}/directory.h5/tiny.puml.h5 EXPECT_XDMF "tiny.puml.h5:/connect")
 
 # a face of the surface mesh given twice
 pumgen_add_test(msh2.tiny-duplicateface RANKS 1 SOURCE msh2 INPUT tiny-duplicateface-v22.msh
@@ -242,4 +302,68 @@ endif()
 if(NOT EASI)
   pumgen_add_test(msh4.tiny.velocity-check-without-easi RANKS 1 SOURCE msh4 INPUT tiny-v41.msh
                   ARGS --velocity-check=unused.xml EXPECT_ERROR "compiled without easi")
+endif()
+
+# a mesh of all four kinds of cells, in the layout of a VTKHDF unstructured grid; the reference is
+# written by fixtures/generate.py from the cells it builds
+foreach(ranks 1 2 3)
+  pumgen_add_test(msh4.mixed.np${ranks} RANKS ${ranks} SOURCE msh4 INPUT mixed-v41.msh
+                  REFERENCE mixed.puml.h5 MIXED)
+endforeach()
+pumgen_add_test(msh4.mixed-binary.np3 RANKS 3 SOURCE msh4 INPUT mixed-binary-v41.msh
+                REFERENCE mixed.puml.h5 MIXED EXPECT_OUTPUT "binary, read by all ranks")
+pumgen_add_test(msh4.mixed-binary-serial.np2 RANKS 2 SOURCE msh4 INPUT mixed-binary-v41.msh
+                REFERENCE mixed.puml.h5 MIXED ARGS --gmsh-reader=serial)
+pumgen_add_test(msh2.mixed.np2 RANKS 2 SOURCE msh2 INPUT mixed-v22.msh
+                REFERENCE mixed-v22.puml.h5 MIXED)
+pumgen_add_test(msh4.mixed.compact.np2 RANKS 2 SOURCE msh4 INPUT mixed-v41.msh
+                REFERENCE mixed.puml.h5 MIXED ARGS --compactify-datatypes)
+pumgen_add_test(msh4.mixed.packed RANKS 1 SOURCE msh4 INPUT mixed-v41.msh ARGS --boundarytype=i32
+                EXPECT_ERROR "packs four faces per cell")
+
+# more ranks than vertices: the ranks without vertices take part in writing the identification
+foreach(input periodic-tiny periodic-tiny-binary)
+  pumgen_add_test(msh4.${input}.np9 RANKS 9 SOURCE msh4 INPUT ${input}-v41.msh
+                  REFERENCE periodic-tiny.puml.h5 IDENTIFY)
+endforeach()
+
+# cells of several kinds and orders: the hexahedron and the wedges of order 2, the others linear
+foreach(ranks 1 3)
+  pumgen_add_test(msh4.mixed-ho.np${ranks} RANKS ${ranks} SOURCE msh4 INPUT mixed-ho-v41.msh
+                  REFERENCE mixed-ho.puml.h5 MIXED HIGHORDER)
+endforeach()
+foreach(ranks 1 3 4)
+  pumgen_add_test(msh4.mixed-ho-binary.np${ranks} RANKS ${ranks} SOURCE msh4
+                  INPUT mixed-ho-binary-v41.msh REFERENCE mixed-ho.puml.h5 MIXED HIGHORDER
+                  EXPECT_OUTPUT "binary, read by all ranks")
+endforeach()
+pumgen_add_test(msh4.mixed-ho-binary-serial.np2 RANKS 2 SOURCE msh4 INPUT mixed-ho-binary-v41.msh
+                REFERENCE mixed-ho.puml.h5 MIXED HIGHORDER ARGS --gmsh-reader=serial)
+
+# the VTKHDF view of cells of one kind, with a virtual connectivity; the reference adds the view,
+# written by fixtures/generate.py
+pumgen_add_test(msh4.coarse.vtkhdf.np2 RANKS 2 SOURCE msh4 INPUT coarse-v41.msh
+                REFERENCE coarse-vtkhdf.puml.h5 VTKHDF ARGS --vtkhdf)
+pumgen_add_test(msh4.coarse.vtkhdf.compact.np3 RANKS 3 SOURCE msh4 INPUT coarse-v41.msh
+                REFERENCE coarse-vtkhdf.puml.h5 VTKHDF ARGS --vtkhdf --compactify-datatypes)
+
+# PUML reads converted meshes, if a checkout of PUML2 is given which reads meshes of several kinds
+# of cells and walks down from them
+set(PUML_DIR "" CACHE PATH "A checkout of PUML2, which then reads the converted meshes in tests")
+if(PUML_DIR)
+  add_executable(pumgen-puml-read puml/ReadWithPuml.cpp)
+  target_include_directories(pumgen-puml-read SYSTEM PRIVATE ${PUML_DIR} ${PUML_DIR}/submodules
+                                                             ${HDF5_INCLUDE_DIRS})
+  target_compile_definitions(pumgen-puml-read PRIVATE USE_MPI)
+  target_link_libraries(pumgen-puml-read PRIVATE ${HDF5_C_LIBRARIES} MPI::MPI_CXX)
+  foreach(case msh4.coarse.np2 msh4.coarse-o2.np2 msh4.mixed.np1 msh4.mixed-binary.np3
+               msh2.mixed.np2 msh4.mixed-ho-binary.np3)
+    set_tests_properties(pumgen.${case} PROPERTIES FIXTURES_SETUP ${case})
+    foreach(ranks 1 3)
+      add_test(NAME puml.${case}.read${ranks}
+               COMMAND ${MPIEXEC_EXECUTABLE} ${MPIEXEC_NUMPROC_FLAG} ${ranks} ${MPIEXEC_PREFLAGS}
+                       $<TARGET_FILE:pumgen-puml-read> ${PUMGEN_TEST_OUTPUT}/${case}.puml.h5)
+      set_tests_properties(puml.${case}.read${ranks} PROPERTIES FIXTURES_REQUIRED ${case})
+    endforeach()
+  endforeach()
 endif()

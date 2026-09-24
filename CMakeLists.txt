@@ -2,15 +2,11 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-cmake_minimum_required(VERSION 3.9)
+cmake_minimum_required(VERSION 3.13)
 
 cmake_policy(SET CMP0074 NEW)
 
 project(pumgen LANGUAGES C CXX)
-
-set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
-set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
-set(CMAKE_LINKER_FLAGS_DEBUG "${CMAKE_LINKER_FLAGS_DEBUG} -fno-omit-frame-pointer -fsanitize=address")
 
 option(SIMMETRIX "Use simmetrix libraries" OFF)
 option(EASI "Build the velocity-aware sizing with easi (always on with SIMMETRIX)" OFF)
@@ -21,6 +17,10 @@ option(PARASOLID "enable support for parasolid files" OFF)
 option(SCOREC "Use PUMI/APF" OFF)
 set(LOG_LEVEL "info" CACHE STRING "Log level for the code")
 set_property(CACHE LOG_LEVEL PROPERTY STRINGS "debug" "info" "warning" "error")
+set(SANITIZERS "address" CACHE STRING
+    "Sanitizers of Debug builds, as passed to -fsanitize= (empty for none)")
+
+include(GNUInstallDirs)
 
 set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake" ${CMAKE_MODULE_PATH})
 
@@ -33,11 +33,17 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release CACHE STRING "" FORCE)
   message(STATUS "Set build type to Release as none was supplied.")
 endif()
-set(CMAKE_CXX_FLAGS_RELEASE "-O2")
+set(CMAKE_CXX_FLAGS_RELEASE "-O2 -DNDEBUG")
+if(SANITIZERS)
+  add_compile_options("$<$<CONFIG:Debug>:-fno-omit-frame-pointer;-fsanitize=${SANITIZERS}>")
+  add_link_options("$<$<CONFIG:Debug>:-fsanitize=${SANITIZERS}>")
+endif()
 
-add_executable(pumgen
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/pumgen.cpp
+# Everything but the command line driver lives in a library, which the tests link as well.
+add_library(pumgen-core STATIC
   ${CMAKE_CURRENT_SOURCE_DIR}/src/meshreader/GambitReader.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/mesh/CellType.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/meshreader/GMSHBuilder.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/meshreader/GMSHParser.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/meshreader/GMSH2Parser.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/meshreader/GMSH4Parser.cpp
@@ -45,78 +51,79 @@ add_executable(pumgen
   ${CMAKE_CURRENT_SOURCE_DIR}/src/meshreader/Msh4Index.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/meshreader/DistributedGMSHReader.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/input/ParallelVertexFilter.cpp
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/helper/BoundaryFormat.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/helper/InsphereCalculator.cpp
   ${CMAKE_CURRENT_SOURCE_DIR}/src/helper/MPIConvenience.cpp
   )
 
-target_include_directories(pumgen PUBLIC src
+target_include_directories(pumgen-core PUBLIC
   "${CMAKE_CURRENT_SOURCE_DIR}/src"
   "${CMAKE_CURRENT_SOURCE_DIR}/submodules/"
 )
 
 if (PARASOLID)
-  target_compile_definitions(pumgen PUBLIC PARASOLID)
+  target_compile_definitions(pumgen-core PUBLIC PARASOLID)
 endif()
 
 if (NETCDF)
   find_package(NetCDF REQUIRED)
-  target_sources(pumgen PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/src/input/NetCDFPartition.cpp)
-  target_include_directories(pumgen PUBLIC ${NetCDF_INCLUDE_DIRS})
-  target_link_libraries(pumgen PUBLIC ${NetCDF_LIBRARY})
-  target_compile_definitions(pumgen PUBLIC USE_NETCDF)
+  target_sources(pumgen-core PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/input/NetCDFPartition.cpp)
+  target_include_directories(pumgen-core PUBLIC ${NetCDF_INCLUDE_DIRS})
+  target_link_libraries(pumgen-core PUBLIC ${NetCDF_LIBRARY})
+  target_compile_definitions(pumgen-core PUBLIC USE_NETCDF)
   set(INSTALL_RPATH "${NetCDF_LIBRARY_DIR}")
 endif()
 
 set(HDF5_PREFER_PARALLEL True)
 find_package(HDF5 REQUIRED COMPONENTS C HL)
-target_include_directories(pumgen PUBLIC ${HDF5_INCLUDE_DIRS})
-target_link_libraries(pumgen PUBLIC ${HDF5_C_HL_LIBRARIES} ${HDF5_C_LIBRARIES})
-target_compile_definitions(pumgen PUBLIC USE_HDF)
+target_include_directories(pumgen-core PUBLIC ${HDF5_INCLUDE_DIRS})
+target_link_libraries(pumgen-core PUBLIC ${HDF5_C_HL_LIBRARIES} ${HDF5_C_LIBRARIES})
+target_compile_definitions(pumgen-core PUBLIC USE_HDF)
 string(REPLACE "include" "lib" HDF5_LIBRARY_DIRS "${HDF5_INCLUDE_DIRS}")
 set(INSTALL_RPATH "${HDF5_LIBRARY_DIRS}:${INSTALL_RPATH}")
 
 find_package(OpenMP REQUIRED)
-target_link_libraries(pumgen PUBLIC OpenMP::OpenMP_CXX)
+target_link_libraries(pumgen-core PUBLIC OpenMP::OpenMP_CXX)
 
 find_package(MPI REQUIRED)
-target_link_libraries(pumgen PUBLIC MPI::MPI_CXX)
+target_link_libraries(pumgen-core PUBLIC MPI::MPI_CXX)
 
-target_compile_definitions(pumgen PUBLIC PARALLEL)
+target_compile_definitions(pumgen-core PUBLIC PARALLEL)
 
 if (SCOREC)
   find_package(APF REQUIRED)
-  target_include_directories(pumgen PUBLIC ${APF_INCLUDE_DIR})
-  target_link_libraries(pumgen PUBLIC ${APF_LIBRARIES})
-  target_compile_definitions(pumgen PUBLIC USE_SCOREC)
+  target_include_directories(pumgen-core PUBLIC ${APF_INCLUDE_DIR})
+  target_link_libraries(pumgen-core PUBLIC ${APF_LIBRARIES})
+  target_compile_definitions(pumgen-core PUBLIC USE_SCOREC)
 endif()
 
 add_library(tinyxml2 submodules/tinyxml2/tinyxml2.cpp)
-target_link_libraries(pumgen PUBLIC tinyxml2)
+target_link_libraries(pumgen-core PUBLIC tinyxml2)
 
 if (SIMMETRIX)
     find_package(SIMMETRIX REQUIRED)
 
-    target_sources(pumgen PUBLIC
+    target_sources(pumgen-core PRIVATE
       ${CMAKE_CURRENT_SOURCE_DIR}/src/input/AnalysisAttributes.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/src/input/EasiMeshSize.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/src/input/MeshAttributes.cpp
       ${CMAKE_CURRENT_SOURCE_DIR}/src/input/split.cpp
     )
-    target_compile_definitions(pumgen PUBLIC USE_SIMMOD)
+    target_compile_definitions(pumgen-core PUBLIC USE_SIMMOD)
     if(${SIM_MAJOR_VER} LESS 11)
-      target_compile_definitions(pumgen PUBLIC BEFORE_SIM_11)
+      target_compile_definitions(pumgen-core PUBLIC BEFORE_SIM_11)
     endif()
     if(${SIM_MAJOR_VER} LESS 15)
-      target_compile_definitions(pumgen PUBLIC BEFORE_SIM_15)
+      target_compile_definitions(pumgen-core PUBLIC BEFORE_SIM_15)
     endif()
     if(${SIM_MAJOR_VER} LESS 18)
-      target_compile_definitions(pumgen PUBLIC BEFORE_SIM_18)
+      target_compile_definitions(pumgen-core PUBLIC BEFORE_SIM_18)
     endif()
     if(${SIM_MAJOR_VER} LESS 2024)
-      target_compile_definitions(pumgen PUBLIC BEFORE_SIM_2024)
+      target_compile_definitions(pumgen-core PUBLIC BEFORE_SIM_2024)
     endif()
-    target_include_directories(pumgen PUBLIC ${SIMMETRIX_INCLUDE_DIR})
-    target_link_libraries(pumgen PUBLIC ${SIMMETRIX_LIBRARIES})
+    target_include_directories(pumgen-core PUBLIC ${SIMMETRIX_INCLUDE_DIR})
+    target_link_libraries(pumgen-core PUBLIC ${SIMMETRIX_LIBRARIES})
 endif()
 
 function(cast_log_level_to_int log_level_str log_level_int)
@@ -132,7 +139,7 @@ function(cast_log_level_to_int log_level_str log_level_int)
 endfunction()
 
 cast_log_level_to_int(LOG_LEVEL LOG_LEVEL)
-target_compile_definitions(pumgen PUBLIC LOG_LEVEL=${LOG_LEVEL})
+target_compile_definitions(pumgen-core PUBLIC LOG_LEVEL=${LOG_LEVEL})
 
 if (SIMMETRIX)
   set(EASI ON)
@@ -150,21 +157,36 @@ if (EASI)
   )
   target_compile_definitions(pumgen_sizing PRIVATE LOG_LEVEL=${LOG_LEVEL})
   target_link_libraries(pumgen_sizing PUBLIC easi::easi tinyxml2)
-  target_link_libraries(pumgen PUBLIC pumgen_sizing)
-  target_sources(pumgen PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/sizing/VelocityCheck.cpp)
-  target_compile_definitions(pumgen PUBLIC USE_EASI)
+  target_link_libraries(pumgen-core PUBLIC pumgen_sizing)
+  target_sources(pumgen-core PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/sizing/VelocityCheck.cpp)
+  target_compile_definitions(pumgen-core PUBLIC USE_EASI)
 
   add_executable(pumgen-sizefield ${CMAKE_CURRENT_SOURCE_DIR}/src/sizefield.cpp)
   target_compile_definitions(pumgen-sizefield PRIVATE LOG_LEVEL=${LOG_LEVEL})
   target_link_libraries(pumgen-sizefield PRIVATE pumgen_sizing MPI::MPI_CXX)
   set_target_properties(pumgen-sizefield PROPERTIES INSTALL_RPATH "${INSTALL_RPATH}")
-  install(TARGETS pumgen-sizefield RUNTIME DESTINATION bin)
+  install(TARGETS pumgen-sizefield RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 if(SIMMETRIX)
   set(INSTALL_RPATH "${SIM_PS_KRNL_LIB_DIR}:${INSTALL_RPATH}")
 endif()
+add_executable(pumgen ${CMAKE_CURRENT_SOURCE_DIR}/src/pumgen.cpp)
+target_link_libraries(pumgen PRIVATE pumgen-core)
+# the version the mesh files name as their generator
+set(PUMGEN_VERSION "unknown")
+find_package(Git QUIET)
+if(GIT_FOUND)
+  execute_process(COMMAND ${GIT_EXECUTABLE} describe --always --dirty
+                  WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+                  OUTPUT_VARIABLE PUMGEN_GIT_VERSION OUTPUT_STRIP_TRAILING_WHITESPACE
+                  RESULT_VARIABLE PUMGEN_GIT_RESULT ERROR_QUIET)
+  if(PUMGEN_GIT_RESULT EQUAL 0)
+    set(PUMGEN_VERSION ${PUMGEN_GIT_VERSION})
+  endif()
+endif()
+target_compile_definitions(pumgen PRIVATE PUMGEN_VERSION="${PUMGEN_VERSION}")
 set_target_properties(pumgen PROPERTIES INSTALL_RPATH "${INSTALL_RPATH}")
-install(TARGETS pumgen RUNTIME DESTINATION bin DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(TARGETS pumgen RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 include(CTest)
 if (BUILD_TESTING)
