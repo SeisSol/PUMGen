@@ -85,8 +85,9 @@ jobs:
     name: read-with-puml
     runs-on: ubuntu-24.04
     env:
-      # a branch of PUML2 which reads meshes of several kinds of cells and walks down from them
-      PUML_REF: davschneller/puml-rework3
+      # the master of PUML2 as of its mesh checks, which reads meshes of several kinds of cells and
+      # walks down from them; a commit, as the branches of PUML2 go once they are merged
+      PUML_REF: 122bf0ede849f10b8556a9eb9a9fd1c8650dc3c7
 
     steps:
       - uses: actions/checkout@v5
