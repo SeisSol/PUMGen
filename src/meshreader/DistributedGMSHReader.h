@@ -11,16 +11,19 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <limits>
 #include <numeric>
 #include <string>
 #include <type_traits>
 #include <unordered_map>
+#include <utility>
 #include <vector>
 
-#include "GMSHBuilder.h"
 #include "Msh4Index.h"
 #include "helper/Distributor.h"
 #include "helper/MPIConvenience.h"
+#include "input/MeshData.h"
+#include "mesh/CellType.h"
 #include "third_party/MPITraits.h"
 #include "utils/logger.h"
 
@@ -110,7 +113,7 @@ void forBlockRanges(const std::vector<Block>& blocks, std::uint64_t first, std::
   }
 }
 
-std::uint64_t hashFace(const std::array<std::uint64_t, 3>& face);
+std::uint64_t hashFace(const std::array<std::uint64_t, 4>& face);
 
 // items are read in pieces of at most this many
 constexpr std::uint64_t Piece = std::uint64_t{1} << 20;
@@ -119,21 +122,16 @@ constexpr std::uint64_t Piece = std::uint64_t{1} << 20;
 
 /**
  * Reads a binary MSH 4.1 file with all ranks: rank 0 only locates the data, every rank reads a
- * share of the nodes, cells and boundary faces, and the parts are sent to the ranks which own
- * them in the chunk distribution of getChunksize. The boundary conditions are matched in a
- * distributed table of the boundary faces; only faces whose vertices all lie on the surface mesh
- * are looked up.
+ * share of the nodes, cells and boundary faces, and the parts are sent to the ranks which own them
+ * in the chunk distribution of getChunksize. The boundary conditions are matched in a distributed
+ * table of the boundary faces; only faces whose vertices all lie on the surface mesh are looked up.
+ * In a mesh with cells of higher order, the vertices are the nodes which are a vertex of a cell,
+ * numbered in the order of the nodes, and every rank fetches the other nodes of its cells from the
+ * ranks which read them.
  */
-template <std::size_t OrderP> class DistributedGMSHReader {
+class DistributedGMSHReader {
   public:
-  constexpr static std::size_t Order = OrderP;
-  constexpr static std::size_t Dim = 3;
-  constexpr static bool SupportsIdentify = true;
-  constexpr static std::size_t NodesPerCell = nodeCount(Dim, Order);
-  constexpr static std::size_t NodesPerFacet = nodeCount(Dim - 1, Order);
-  constexpr static std::size_t Facet2Nodes[Dim + 1][Dim] = {
-      {1, 0, 2}, {0, 1, 3}, {1, 2, 3}, {2, 0, 3}};
-  constexpr static long BoundaryConditionOffset = 100;
+  constexpr static bool ProvidesLocalMesh = true;
 
   explicit DistributedGMSHReader(MPI_Comm comm = MPI_COMM_WORLD) : comm(comm) {
     MPI_Comm_rank(comm, &rank);
@@ -146,33 +144,40 @@ template <std::size_t OrderP> class DistributedGMSHReader {
     readNodes(file);
     readCells(file);
     matchBoundaryConditions(file);
+    if (highOrder) {
+      findVertices();
+      gatherHighOrderGeometry();
+      distributeVertices();
+      for (auto& vertex : local.connectivity) {
+        vertex = vertexOf(vertex);
+      }
+    } else {
+      numVertices = index.numNodes;
+      local.geometry = std::move(nodeCoordinates);
+    }
+    std::vector<double>().swap(nodeCoordinates);
     identifyPeriodicNodes();
   }
 
-  [[nodiscard]] std::size_t nVertices() const { return index.numNodes; }
-  [[nodiscard]] std::size_t nElements() const { return numCells; }
-
-  // Each read function hands over one part of the local mesh and releases it, so it can be called
-  // only once.
-
-  void readVertices(double* vertices) { handOver(geometry, vertices); }
-  void readElements(std::size_t* elements) { handOver(connectivity, elements); }
-  void readGroups(int* groupsOut) { handOver(groups, groupsOut); }
-  void readBoundaries(int* boundariesOut) { handOver(boundaries, boundariesOut); }
-  [[nodiscard]] bool hasIdentify() const { return hasIdentify_; }
-  void readIdentify(std::size_t* vertices) { handOver(identify, vertices); }
+  /**
+   * The part of the mesh of this rank; possible only once.
+   */
+  LocalMesh read() { return std::move(local); }
 
   private:
+  using Face = std::array<std::uint64_t, MaxFaceVertices>;
+  static constexpr std::uint64_t NoVertex = std::numeric_limits<std::uint64_t>::max();
+
   struct NodeRecord {
     std::uint64_t index;
     double x[3];
   };
   struct FaceRecord {
-    std::array<std::uint64_t, 3> vertices;
+    Face vertices;
     std::int64_t bc;
   };
   struct FaceQuery {
-    std::array<std::uint64_t, 3> vertices;
+    Face vertices;
     std::uint64_t localFace;
   };
   struct FaceReply {
@@ -185,19 +190,35 @@ template <std::size_t OrderP> class DistributedGMSHReader {
   };
   constexpr static std::int64_t NoMatch = -1;
 
-  template <typename T, typename U> static void handOver(std::vector<T>& values, U* out) {
-    std::copy(values.begin(), values.end(), out);
-    std::vector<T>().swap(values);
-  }
-
-  [[nodiscard]] std::uint64_t localFirstVertex() const {
+  [[nodiscard]] std::uint64_t localFirstNode() const {
     return getChunksum(index.numNodes, rank, size);
   }
-  [[nodiscard]] std::uint64_t localVertexCount() const {
+  [[nodiscard]] std::uint64_t localNodeCount() const {
     return getChunksize(index.numNodes, rank, size);
   }
+  [[nodiscard]] int nodeOwner(std::uint64_t node) const {
+    return getChunkOwner(index.numNodes, node, size);
+  }
+  [[nodiscard]] std::uint64_t localFirstVertex() const {
+    return getChunksum(numVertices, rank, size);
+  }
+  [[nodiscard]] std::uint64_t localVertexCount() const {
+    return getChunksize(numVertices, rank, size);
+  }
   [[nodiscard]] int vertexOwner(std::uint64_t vertex) const {
-    return getChunkOwner(index.numNodes, vertex, size);
+    return getChunkOwner(numVertices, vertex, size);
+  }
+
+  /** Whether a node is a vertex; every node is one in a mesh of linear cells */
+  [[nodiscard]] bool isVertex(std::uint64_t node) const {
+    return !highOrder || ((vertexBits[node / 64] >> (node % 64)) & 1) != 0;
+  }
+  [[nodiscard]] std::uint64_t vertexOf(std::uint64_t node) const {
+    if (!highOrder) {
+      return node;
+    }
+    const auto below = vertexBits[node / 64] & ((std::uint64_t{1} << (node % 64)) - 1);
+    return verticesBefore[node / 64] + static_cast<std::uint64_t>(__builtin_popcountll(below));
   }
 
   [[nodiscard]] std::uint64_t nodeIndex(std::uint64_t tag) const {
@@ -216,21 +237,24 @@ template <std::size_t OrderP> class DistributedGMSHReader {
 
   void readIndex(const char* meshFile) {
     if (rank == 0) {
-      Msh4Indexer indexer(GMSHSimplexType<Dim, Order>::type, GMSHSimplexType<Dim - 1, Order>::type);
+      Msh4Indexer indexer;
       if (!indexer.parseFile(meshFile)) {
         logError() << meshFile << std::endl << indexer.getErrorMessage();
       }
       index = indexer.getIndex();
+      local.physicalNames = indexer.getPhysicalNames();
     }
-    std::array<std::uint64_t, 5> scalars{index.dataSize, index.swapBytes ? 1U : 0U,
-                                         index.firstNodeTag, index.numNodes,
-                                         index.periodic.empty() ? 0U : 1U};
+    std::array<std::uint64_t, 6> scalars{
+        index.dataSize, index.swapBytes ? 1U : 0U,        index.firstNodeTag,
+        index.numNodes, index.periodic.empty() ? 0U : 1U, index.highOrder ? 1U : 0U};
     MPI_Bcast(scalars.data(), scalars.size(), MPI_UINT64_T, 0, comm);
     index.dataSize = scalars[0];
     index.swapBytes = scalars[1] != 0;
     index.firstNodeTag = scalars[2];
     index.numNodes = scalars[3];
-    hasIdentify_ = scalars[4] != 0;
+    hasIdentify = scalars[4] != 0;
+    highOrder = scalars[5] != 0;
+    broadcastPhysicalNames(local.physicalNames, 0, comm);
     broadcastVector(index.nodeBlocks);
     broadcastVector(index.cellBlocks);
     broadcastVector(index.facetBlocks);
@@ -261,7 +285,7 @@ template <std::size_t OrderP> class DistributedGMSHReader {
             for (std::uint64_t i = 0; i < n; ++i) {
               const auto vertex = nodeIndex(tags[i]);
               const double* x = &coordinates[i * block.valuesPerNode];
-              outgoing[vertexOwner(vertex)].push_back({vertex, {x[0], x[1], x[2]}});
+              outgoing[nodeOwner(vertex)].push_back({vertex, {x[0], x[1], x[2]}});
             }
           }
         });
@@ -269,22 +293,22 @@ template <std::size_t OrderP> class DistributedGMSHReader {
     const auto incoming = distributed::exchange(outgoing, comm);
     std::vector<std::vector<NodeRecord>>().swap(outgoing);
 
-    const auto localFirst = localFirstVertex();
-    geometry.assign(localVertexCount() * Dim, 0.0);
-    std::vector<bool> defined(localVertexCount(), false);
+    const auto localFirst = localFirstNode();
+    nodeCoordinates.assign(localNodeCount() * 3, 0.0);
+    std::vector<bool> defined(localNodeCount(), false);
     std::uint64_t numDefined = 0;
     for (const auto& records : incoming) {
       for (const auto& record : records) {
-        const auto local = record.index - localFirst;
-        if (defined[local]) {
+        const auto localVertex = record.index - localFirst;
+        if (defined[localVertex]) {
           logError() << "Duplicate node tag" << record.index + index.firstNodeTag;
         }
-        defined[local] = true;
+        defined[localVertex] = true;
         ++numDefined;
-        std::copy_n(record.x, Dim, &geometry[local * Dim]);
+        std::copy_n(record.x, 3, &nodeCoordinates[localVertex * 3]);
       }
     }
-    if (numDefined != localVertexCount()) {
+    if (numDefined != localNodeCount()) {
       logError() << "Missing nodes: the node tags are not unique";
     }
   }
@@ -292,29 +316,137 @@ template <std::size_t OrderP> class DistributedGMSHReader {
   void readCells(distributed::RawMshFile& file) {
     const std::uint64_t first = getChunksum(numCells, rank, size);
     const std::uint64_t count = getChunksize(numCells, rank, size);
-    connectivity.resize(count * NodesPerCell);
-    groups.resize(count);
+    local.cellTypes.reserve(count);
+    local.groups.reserve(count);
+    if (highOrder) {
+      local.orders.reserve(count);
+    }
+    std::uint64_t vertices = 0;
+    std::uint64_t otherNodes = 0;
+    distributed::forBlockRanges(
+        index.cellBlocks, first, first + count,
+        [&](const Msh4ElementBlock& block, std::uint64_t /*begin*/, std::uint64_t blockCount) {
+          const auto vertexCount = shapeOf(gmshElementType(block.type).cellType).vertexCount;
+          vertices += blockCount * vertexCount;
+          otherNodes += blockCount * (block.nodesPerElement - vertexCount);
+        });
+    local.connectivity.reserve(vertices);
+    highOrderNodes.reserve(otherNodes);
 
-    constexpr std::uint64_t ValuesPerCell = 1 + NodesPerCell;
     std::vector<std::uint64_t> values;
-    std::uint64_t cell = 0;
     distributed::forBlockRanges(
         index.cellBlocks, first, first + count,
         [&](const Msh4ElementBlock& block, std::uint64_t begin, std::uint64_t blockCount) {
+          const auto element = gmshElementType(block.type);
+          const auto vertexCount = shapeOf(element.cellType).vertexCount;
+          const std::uint64_t valuesPerCell = 1 + block.nodesPerElement;
           for (std::uint64_t done = 0; done < blockCount; done += distributed::Piece) {
             const auto n = std::min(distributed::Piece, blockCount - done);
-            values.resize(n * ValuesPerCell);
-            file.readSizes(block.offset + (begin + done) * ValuesPerCell * index.dataSize,
+            values.resize(n * valuesPerCell);
+            file.readSizes(block.offset + (begin + done) * valuesPerCell * index.dataSize,
                            values.size(), values.data());
-            for (std::uint64_t e = 0; e < n; ++e, ++cell) {
-              for (std::size_t k = 0; k < NodesPerCell; ++k) {
-                connectivity[cell * NodesPerCell + k] =
-                    nodeIndex(values[e * ValuesPerCell + 1 + k]);
+            for (std::uint64_t e = 0; e < n; ++e) {
+              // the vertices of a cell come first, the other nodes follow
+              for (std::size_t k = 0; k < block.nodesPerElement; ++k) {
+                const auto node = nodeIndex(values[e * valuesPerCell + 1 + k]);
+                (k < vertexCount ? local.connectivity : highOrderNodes).push_back(node);
               }
-              groups[cell] = static_cast<int>(block.physical);
+              local.cellTypes.push_back(element.cellType);
+              local.groups.push_back(static_cast<int>(block.physical));
+              if (highOrder) {
+                local.orders.push_back(static_cast<std::uint8_t>(element.order));
+              }
             }
           }
         });
+  }
+
+  /**
+   * Marks the nodes which are a vertex of a cell, in a bit set of all nodes, which all ranks share.
+   */
+  void findVertices() {
+    vertexBits.assign((index.numNodes + 63) / 64, 0);
+    for (const auto node : local.connectivity) {
+      vertexBits[node / 64] |= std::uint64_t{1} << (node % 64);
+    }
+    MPI_Allreduce(MPI_IN_PLACE, vertexBits.data(), static_cast<int>(vertexBits.size()),
+                  MPI_UINT64_T, MPI_BOR, comm);
+    verticesBefore.resize(vertexBits.size());
+    numVertices = 0;
+    for (std::size_t word = 0; word < vertexBits.size(); ++word) {
+      verticesBefore[word] = numVertices;
+      numVertices += static_cast<std::uint64_t>(__builtin_popcountll(vertexBits[word]));
+    }
+  }
+
+  /**
+   * Fetches the coordinates of the other nodes of the local cells from the ranks which read them.
+   */
+  void gatherHighOrderGeometry() {
+    std::vector<std::uint64_t> wanted(highOrderNodes);
+    std::sort(wanted.begin(), wanted.end());
+    wanted.erase(std::unique(wanted.begin(), wanted.end()), wanted.end());
+    std::vector<std::vector<std::uint64_t>> requests(size);
+    for (const auto node : wanted) {
+      requests[nodeOwner(node)].push_back(node);
+    }
+
+    const auto firstNode = localFirstNode();
+    std::vector<std::vector<NodeRecord>> replies(size);
+    const auto received = distributed::exchange(requests, comm);
+    for (int r = 0; r < size; ++r) {
+      for (const auto node : received[r]) {
+        const double* x = &nodeCoordinates[(node - firstNode) * 3];
+        replies[r].push_back({node, {x[0], x[1], x[2]}});
+      }
+    }
+
+    // the replies come in the order of the requests, which is the order of the wanted nodes
+    std::vector<double> coordinates(wanted.size() * 3);
+    std::size_t position = 0;
+    for (const auto& records : distributed::exchange(replies, comm)) {
+      for (const auto& record : records) {
+        if (record.index != wanted[position]) {
+          logError() << "Received the coordinates of node" << record.index << "instead of"
+                     << wanted[position];
+        }
+        std::copy_n(record.x, 3, &coordinates[position * 3]);
+        ++position;
+      }
+    }
+
+    local.highOrderGeometry.reserve(highOrderNodes.size() * 3);
+    for (const auto node : highOrderNodes) {
+      const auto i = static_cast<std::size_t>(std::lower_bound(wanted.begin(), wanted.end(), node) -
+                                              wanted.begin());
+      local.highOrderGeometry.insert(local.highOrderGeometry.end(), &coordinates[i * 3],
+                                     &coordinates[i * 3] + 3);
+    }
+    std::vector<std::uint64_t>().swap(highOrderNodes);
+  }
+
+  /**
+   * Sends the coordinates of the vertices from the ranks which read their nodes to the ranks which
+   * own them.
+   */
+  void distributeVertices() {
+    std::vector<std::vector<NodeRecord>> outgoing(size);
+    const auto firstNode = localFirstNode();
+    for (std::uint64_t i = 0; i < localNodeCount(); ++i) {
+      const auto node = firstNode + i;
+      if (isVertex(node)) {
+        const auto vertex = vertexOf(node);
+        const double* x = &nodeCoordinates[i * 3];
+        outgoing[vertexOwner(vertex)].push_back({vertex, {x[0], x[1], x[2]}});
+      }
+    }
+    const auto firstVertex = localFirstVertex();
+    local.geometry.assign(localVertexCount() * 3, 0.0);
+    for (const auto& records : distributed::exchange(outgoing, comm)) {
+      for (const auto& record : records) {
+        std::copy_n(record.x, 3, &local.geometry[(record.index - firstVertex) * 3]);
+      }
+    }
   }
 
   void matchBoundaryConditions(distributed::RawMshFile& file) {
@@ -329,20 +461,22 @@ template <std::size_t OrderP> class DistributedGMSHReader {
     // set of all vertices, which all ranks share
     std::vector<std::vector<FaceRecord>> outgoingFaces(size);
     std::vector<std::uint64_t> onBoundary((index.numNodes + 63) / 64, 0);
-    constexpr std::uint64_t ValuesPerFacet = 1 + NodesPerFacet;
     std::vector<std::uint64_t> values;
     distributed::forBlockRanges(
         index.facetBlocks, first, last,
         [&](const Msh4ElementBlock& block, std::uint64_t begin, std::uint64_t count) {
+          const auto faceVertices = gmshElementType(block.type).faceVertices;
+          const std::uint64_t valuesPerFacet = 1 + block.nodesPerElement;
           for (std::uint64_t done = 0; done < count; done += distributed::Piece) {
             const auto n = std::min(distributed::Piece, count - done);
-            values.resize(n * ValuesPerFacet);
-            file.readSizes(block.offset + (begin + done) * ValuesPerFacet * index.dataSize,
+            values.resize(n * valuesPerFacet);
+            file.readSizes(block.offset + (begin + done) * valuesPerFacet * index.dataSize,
                            values.size(), values.data());
             for (std::uint64_t e = 0; e < n; ++e) {
-              std::array<std::uint64_t, 3> face{};
-              for (std::size_t k = 0; k < Dim; ++k) {
-                face[k] = nodeIndex(values[e * ValuesPerFacet + 1 + k]);
+              Face face;
+              face.fill(NoVertex);
+              for (std::size_t k = 0; k < faceVertices; ++k) {
+                face[k] = nodeIndex(values[e * valuesPerFacet + 1 + k]);
                 onBoundary[face[k] / 64] |= std::uint64_t{1} << (face[k] % 64);
               }
               std::sort(face.begin(), face.end());
@@ -367,30 +501,37 @@ template <std::size_t OrderP> class DistributedGMSHReader {
       return ((onBoundary[vertex / 64] >> (vertex % 64)) & 1) != 0;
     };
 
-    const std::uint64_t numLocalCells = groups.size();
+    const std::uint64_t numLocalCells = local.cellTypes.size();
     // only faces with all vertices on the surface mesh can be part of it
     std::vector<std::vector<FaceQuery>> queries(size);
+    std::uint64_t firstVertex = 0;
+    std::uint64_t firstFace = 0;
     for (std::uint64_t cell = 0; cell < numLocalCells; ++cell) {
-      std::array<bool, Dim + 1> flagged{};
+      const auto& shape = shapeOf(local.cellTypes[cell]);
+      const auto* vertices = &local.connectivity[firstVertex];
+      const auto cellFaces = firstFace;
+      firstVertex += shape.vertexCount;
+      firstFace += shape.faceCount;
+      std::array<bool, MaxCellVertices> flagged{};
       std::size_t numFlagged = 0;
-      for (std::size_t k = 0; k < Dim + 1; ++k) {
-        flagged[k] = vertexOnBoundary(connectivity[cell * NodesPerCell + k]);
+      for (std::size_t k = 0; k < shape.vertexCount; ++k) {
+        flagged[k] = vertexOnBoundary(vertices[k]);
         numFlagged += flagged[k] ? 1 : 0;
       }
-      if (numFlagged < Dim) {
+      if (numFlagged < 3) {
         continue;
       }
-      for (std::size_t localFace = 0; localFace < Dim + 1; ++localFace) {
-        std::array<std::uint64_t, 3> face{};
+      for (std::size_t f = 0; f < shape.faceCount; ++f) {
+        Face face;
+        face.fill(NoVertex);
         bool candidate = true;
-        for (std::size_t k = 0; k < Dim; ++k) {
-          candidate = candidate && flagged[Facet2Nodes[localFace][k]];
-          face[k] = connectivity[cell * NodesPerCell + Facet2Nodes[localFace][k]];
+        for (std::size_t k = 0; k < shape.faceVertexCount[f]; ++k) {
+          candidate = candidate && flagged[shape.faceVertices[f][k]];
+          face[k] = vertices[shape.faceVertices[f][k]];
         }
         if (candidate) {
           std::sort(face.begin(), face.end());
-          queries[distributed::hashFace(face) % size].push_back(
-              {face, cell * (Dim + 1) + localFace});
+          queries[distributed::hashFace(face) % size].push_back({face, cellFaces + f});
         }
       }
     }
@@ -410,28 +551,27 @@ template <std::size_t OrderP> class DistributedGMSHReader {
       }
     }
 
-    boundaries.assign(numLocalCells * (Dim + 1), 0);
+    local.boundaries.assign(firstFace, 0);
     for (const auto& answersFrom : distributed::exchange(replies, comm)) {
       for (const auto& reply : answersFrom) {
         if (reply.bc != NoMatch) {
-          const auto bc =
-              reply.bc >= BoundaryConditionOffset ? reply.bc - BoundaryConditionOffset : reply.bc;
-          boundaries[reply.localFace] = static_cast<int>(bc);
+          local.boundaries[reply.localFace] = static_cast<int>(boundaryConditionOf(reply.bc));
         }
       }
     }
   }
 
   void identifyPeriodicNodes() {
-    if (!hasIdentify_) {
+    if (!hasIdentify) {
       return;
     }
-    // rank 0 joins the periodic nodes into classes, represented by their smallest vertex
+    // rank 0 joins the periodic nodes into classes, represented by their smallest vertex; nodes
+    // which are no vertices drop out
     std::vector<std::vector<Identification>> outgoing(size);
     if (rank == 0) {
       std::unordered_map<std::uint64_t, std::uint64_t> parent;
-      const auto find = [&](std::uint64_t vertex) {
-        auto it = parent.try_emplace(vertex, vertex).first;
+      const auto find = [&](std::uint64_t node) {
+        auto it = parent.try_emplace(node, node).first;
         while (it->second != it->first) {
           const auto next = parent.find(it->second);
           it->second = next->second;
@@ -444,22 +584,32 @@ template <std::size_t OrderP> class DistributedGMSHReader {
         const auto b = find(nodeIndex(masterTag));
         parent[std::max(a, b)] = std::min(a, b);
       }
-      std::vector<std::uint64_t> vertices;
-      vertices.reserve(parent.size());
+      std::vector<std::uint64_t> nodes;
+      nodes.reserve(parent.size());
       for (const auto& entry : parent) {
-        vertices.push_back(entry.first);
+        if (isVertex(entry.first)) {
+          nodes.push_back(entry.first);
+        }
       }
-      for (const auto vertex : vertices) {
-        outgoing[vertexOwner(vertex)].push_back({vertex, find(vertex)});
+      std::unordered_map<std::uint64_t, std::uint64_t> smallest;
+      for (const auto node : nodes) {
+        const auto [it, inserted] = smallest.try_emplace(find(node), node);
+        if (!inserted) {
+          it->second = std::min(it->second, node);
+        }
+      }
+      for (const auto node : nodes) {
+        const auto vertex = vertexOf(node);
+        outgoing[vertexOwner(vertex)].push_back({vertex, vertexOf(smallest[find(node)])});
       }
     }
 
     const auto localFirst = localFirstVertex();
-    identify.resize(localVertexCount());
-    std::iota(identify.begin(), identify.end(), localFirst);
+    local.identify.resize(localVertexCount());
+    std::iota(local.identify.begin(), local.identify.end(), localFirst);
     for (const auto& identifications : distributed::exchange(outgoing, comm)) {
       for (const auto& identification : identifications) {
-        identify[identification.vertex - localFirst] = identification.representative;
+        local.identify[identification.vertex - localFirst] = identification.representative;
       }
     }
   }
@@ -469,12 +619,17 @@ template <std::size_t OrderP> class DistributedGMSHReader {
   int size = 1;
   Msh4Index index;
   std::uint64_t numCells = 0;
-  bool hasIdentify_ = false;
-  std::vector<double> geometry;
-  std::vector<std::size_t> connectivity;
-  std::vector<int> groups;
-  std::vector<int> boundaries;
-  std::vector<std::size_t> identify;
+  bool hasIdentify = false;
+  bool highOrder = false;
+  std::uint64_t numVertices = 0;
+  /** The coordinates of the chunk of the nodes this rank read */
+  std::vector<double> nodeCoordinates;
+  /** The nodes of the local cells but their vertices, one cell after the other */
+  std::vector<std::uint64_t> highOrderNodes;
+  /** Which nodes are vertices, and how many vertices come before the nodes of each word */
+  std::vector<std::uint64_t> vertexBits;
+  std::vector<std::uint64_t> verticesBefore;
+  LocalMesh local;
 };
 
 } // namespace puml

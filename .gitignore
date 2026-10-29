@@ -11,3 +11,6 @@
 
 # CMake build directory
 build/
+
+# Python
+__pycache__/

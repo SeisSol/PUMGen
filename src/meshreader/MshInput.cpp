@@ -38,6 +38,30 @@ std::string_view MshInput::readToken() {
   return token;
 }
 
+std::optional<std::string> MshInput::readQuoted() {
+  if (!skipWhitespace() || buffer[begin] != '"') {
+    return std::nullopt;
+  }
+  ++begin;
+  std::string text;
+  while (true) {
+    while (begin < end) {
+      const char c = buffer[begin];
+      ++begin;
+      if (c == '"') {
+        return text;
+      }
+      if (c == '\n') {
+        return std::nullopt;
+      }
+      text.push_back(c);
+    }
+    if (!refill()) {
+      return std::nullopt;
+    }
+  }
+}
+
 bool MshInput::readLineBreak() {
   ensure(2);
   if (begin < end && buffer[begin] == '\r') {

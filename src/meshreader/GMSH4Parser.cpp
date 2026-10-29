@@ -75,6 +75,8 @@ void GMSH4Parser::parse_() {
       hasElements = true;
     } else if (section == "$Periodic") {
       parsePeriodic();
+    } else if (section == "$PhysicalNames") {
+      parsePhysicalNames();
     } else if (section == "$PartitionedEntities") {
       failFile("Partitioned MSH files are not supported; save the mesh without partitions");
     } else {

@@ -97,24 +97,26 @@ void checkVelocityAwareMeshSize(const VelocityAwareMeshSize& meshSize, const Cel
     frequencies.resize(count);
     edges.resize(count);
     for (std::size_t c = 0; c < count; ++c) {
+      const auto& shape = puml::shapeOf(cells.type(first + c));
       const auto vertices = cells(first + c);
       std::array<double, 3> barycenter{};
+      for (std::size_t a = 0; a < shape.vertexCount; ++a) {
+        for (int d = 0; d < 3; ++d) {
+          barycenter[d] += vertices[a][d] / static_cast<double>(shape.vertexCount);
+        }
+      }
       double sum = 0;
       double longest = 0;
-      for (std::size_t a = 0; a < vertices.size(); ++a) {
-        for (int d = 0; d < 3; ++d) {
-          barycenter[d] += vertices[a][d] / static_cast<double>(vertices.size());
-        }
-        for (std::size_t b = a + 1; b < vertices.size(); ++b) {
-          const double length = distance(vertices[a], vertices[b]);
-          sum += length;
-          longest = std::max(longest, length);
-        }
+      for (std::size_t e = 0; e < shape.edgeCount; ++e) {
+        const double length =
+            distance(vertices[shape.edgeVertices[e][0]], vertices[shape.edgeVertices[e][1]]);
+        sum += length;
+        longest = std::max(longest, length);
       }
       barycenters[c] = barycenter;
       cellGroups[c] = groups[first + c];
       frequencies[c] = meshSize.targetedFrequencyAndGroup(barycenter).first;
-      edges[c] = {sum / 6, longest};
+      edges[c] = {sum / static_cast<double>(shape.edgeCount), longest};
     }
 
     const auto sizes = meshSize.meshSizes(barycenters, cellGroups, frequencies);

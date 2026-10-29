@@ -84,6 +84,24 @@ std::string_view GMSHParser::nextSection() {
   return section;
 }
 
+void GMSHParser::parsePhysicalNames() {
+  const auto count = expectSize();
+  for (std::size_t i = 0; i < count; ++i) {
+    const auto dimension = expectInteger();
+    const auto tag = expectInteger();
+    const auto offset = input->offset();
+    auto name = input->readQuoted();
+    if (!name) {
+      failAt(offset, "Expected a name in double quotes");
+    }
+    physicalNames.push_back({static_cast<int>(dimension), tag, std::move(*name)});
+    if (builder != nullptr) {
+      builder->addPhysicalName(static_cast<int>(dimension), tag, physicalNames.back().name);
+    }
+  }
+  expectToken("$EndPhysicalNames");
+}
+
 void GMSHParser::skipSection(std::string_view section) {
   const std::string endMarker = "$End" + std::string(section.substr(1));
   if (!input->skipTo(endMarker)) {

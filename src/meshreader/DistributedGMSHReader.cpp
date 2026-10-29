@@ -72,8 +72,8 @@ void RawMshFile::readDoubles(std::uint64_t offset, std::size_t count, double* va
   }
 }
 
-std::uint64_t hashFace(const std::array<std::uint64_t, 3>& face) {
-  return mix(mix(mix(face[0]) ^ face[1]) ^ face[2]);
+std::uint64_t hashFace(const std::array<std::uint64_t, 4>& face) {
+  return mix(mix(mix(mix(face[0]) ^ face[1]) ^ face[2]) ^ face[3]);
 }
 
 } // namespace puml::distributed

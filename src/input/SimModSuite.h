@@ -72,12 +72,11 @@ class SimModSuite : public FullStorageMeshData {
   bool m_log;
 
   public:
-  SimModSuite(const char* modFile, int boundarySize, const char* cadFile = nullptr,
-              const char* licenseFile = nullptr, const char* meshCaseName = "mesh",
-              const char* analysisCaseName = "analysis", int enforceSize = 0,
-              const char* xmlFile = nullptr, const bool analyseAR = false,
+  SimModSuite(const char* modFile, const char* cadFile = nullptr, const char* licenseFile = nullptr,
+              const char* meshCaseName = "mesh", const char* analysisCaseName = "analysis",
+              int enforceSize = 0, const char* xmlFile = nullptr, const bool analyseAR = false,
               const char* logFile = nullptr)
-      : FullStorageMeshData(boundarySize) {
+      : FullStorageMeshData() {
     // Init SimModSuite
     SimModel_start();
     SimPartitionedMesh_start(nullptr, nullptr);

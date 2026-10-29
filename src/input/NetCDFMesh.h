@@ -13,9 +13,9 @@
 #include <netcdf_par.h>
 
 #include "MeshData.h"
+#include "helper/Distributor.h"
 #include "utils/logger.h"
 
-#include "MeshData.h"
 #include "NetCDFPartition.h"
 #include "ParallelVertexFilter.h"
 
@@ -26,8 +26,7 @@ class NetCDFMesh : public FullStorageMeshData {
   public:
   virtual ~NetCDFMesh() = default;
 
-  NetCDFMesh(const char* meshFile, int boundarySize, MPI_Comm comm = MPI_COMM_WORLD)
-      : FullStorageMeshData(boundarySize) {
+  explicit NetCDFMesh(const char* meshFile, MPI_Comm comm = MPI_COMM_WORLD) {
     int rank = 0;
     int nProcs = 1;
     MPI_Comm_rank(comm, &rank);
@@ -42,15 +41,12 @@ class NetCDFMesh : public FullStorageMeshData {
     size_t nPartitions;
     checkNcError(nc_inq_dimlen(ncFile, ncDimPart, &nPartitions));
 
-    // Local partitions
-    const std::size_t nMaxLocalPart = (nPartitions + nProcs - 1) / nProcs;
-    std::size_t nLocalPart = nMaxLocalPart;
-    if (nPartitions < (rank + 1) * nMaxLocalPart && nPartitions >= rank * nMaxLocalPart) {
-      nLocalPart = static_cast<std::size_t>(nPartitions - rank * nMaxLocalPart);
-    }
+    // Local partitions; all ranks with partitions take part in the same number of reads
+    const auto [firstLocalPart, nLocalPart] = getBlockRange(nPartitions, rank, nProcs);
+    const std::size_t nMaxLocalPart = getBlockRange(nPartitions, 0, nProcs).second;
 
-    MPI_Comm commIO;
-    MPI_Comm_split(MPI_COMM_WORLD, (nLocalPart > 0 ? 0 : MPI_UNDEFINED), 0, &commIO);
+    MPI_Comm commIO = MPI_COMM_NULL;
+    MPI_Comm_split(comm, (nLocalPart > 0 ? 0 : MPI_UNDEFINED), 0, &commIO);
 
     // Reopen netCDF file with correct communicator
     checkNcError(nc_close(ncFile));
@@ -102,7 +98,7 @@ class NetCDFMesh : public FullStorageMeshData {
 
         // for now, each partition stays limited to about 2^31 maximum elements
 
-        size_t start[3] = {j + rank * nMaxLocalPart, 0, 0};
+        size_t start[3] = {firstLocalPart + j, 0, 0};
 
         // Element size
         unsigned int size;
@@ -197,6 +193,10 @@ class NetCDFMesh : public FullStorageMeshData {
       for (std::size_t i = 0; i < nElements * 4; i++) {
         connectivityData[i] = filter.globalIds()[elementsLocal[i]];
       }
+    }
+
+    if (commIO != MPI_COMM_NULL) {
+      MPI_Comm_free(&commIO);
     }
   }
 

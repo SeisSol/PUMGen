@@ -36,6 +36,8 @@ void GMSH2Parser::parse_() {
       hasElements = true;
     } else if (section == "$Periodic") {
       parsePeriodic();
+    } else if (section == "$PhysicalNames") {
+      parsePhysicalNames();
     } else {
       skipSection(section);
     }

@@ -7,79 +7,44 @@
 #ifndef PUMGEN_SRC_INPUT_SERIALMESHFILE_H_
 #define PUMGEN_SRC_INPUT_SERIALMESHFILE_H_
 
-#ifdef PARALLEL
 #include <mpi.h>
-#endif // PARALLEL
 
-#include "helper/Distributor.h"
 #include <cstddef>
 #include <vector>
 
 #include "MeshData.h"
+#include "helper/Distributor.h"
 #include "utils/logger.h"
 
 /**
- * Read a mesh from a serial file
+ * Read a mesh from a serial file. A reader either hands over the part of the mesh of this rank
+ * (ProvidesLocalMesh), or it fills the arrays of a tetrahedral mesh.
  */
 template <typename T> class SerialMeshFile : public FullStorageMeshData {
   public:
-  virtual ~SerialMeshFile() = default;
+  explicit SerialMeshFile(const char* meshFile, MPI_Comm comm = MPI_COMM_WORLD)
+      : m_meshReader(comm) {
+    int rank = 0;
+    int processes = 1;
+    MPI_Comm_rank(comm, &rank);
+    MPI_Comm_size(comm, &processes);
 
-  std::size_t vertexSize() const override { return T::Dim; }
-  std::size_t cellSize() const override { return puml::nodeCount(T::Dim, T::Order); }
+    m_meshReader.open(meshFile);
+    if constexpr (T::ProvidesLocalMesh) {
+      take(m_meshReader.read());
+    } else {
+      readTetrahedra(rank, processes);
+    }
+  }
 
   private:
-#ifdef PARALLEL
-  MPI_Comm m_comm;
-#endif // PARALLEL
-
-  int m_rank;
-  int m_nProcs;
-
   T m_meshReader;
 
-  public:
-#ifdef PARALLEL
-  SerialMeshFile(const char* meshFile, int boundarySize, MPI_Comm comm = MPI_COMM_WORLD)
-      : FullStorageMeshData(boundarySize), m_comm(comm), m_meshReader(comm) {
-    init();
-    open(meshFile);
-  }
-#else  // PARALLEL
-  SerialMeshFile(const char* meshFile, int boundarySize) : FullStorageMeshData(boundarySize) {
-    init();
-    open(meshFile);
-  }
-#endif // PARALLEL
+  void readTetrahedra(int rank, int processes) {
+    const std::size_t nLocalVertices = getChunksize(m_meshReader.nVertices(), rank, processes);
+    const std::size_t nLocalElements = getChunksize(m_meshReader.nElements(), rank, processes);
 
-  private:
-  /**
-   * Sets some parameters (called from the constructor)
-   */
-  void init() {
-#ifdef PARALLEL
-    MPI_Comm_rank(m_comm, &m_rank);
-    MPI_Comm_size(m_comm, &m_nProcs);
-#else  // PARALLLEL
-    m_rank = 0;
-    m_nProcs = 1;
-#endif // PARALLEL
-  }
-
-  void open(const char* meshFile) {
-    m_meshReader.open(meshFile);
-
-    const std::size_t nVertices = m_meshReader.nVertices();
-    const std::size_t nElements = m_meshReader.nElements();
-    const std::size_t nLocalVertices = getChunksize(nVertices, m_rank, m_nProcs);
-    const std::size_t nLocalElements = getChunksize(nElements, m_rank, m_nProcs);
-
-    bool identify = false;
-    if constexpr (T::SupportsIdentify) {
-      identify = m_meshReader.hasIdentify();
-    }
-
-    setup(nLocalElements, nLocalVertices, identify);
+    setup(nLocalElements, nLocalVertices);
 
     logInfo() << "Read vertex coordinates";
     m_meshReader.readVertices(geometryData.data());
@@ -91,17 +56,12 @@ template <typename T> class SerialMeshFile : public FullStorageMeshData {
     m_meshReader.readGroups(groupData.data());
 
     logInfo() << "Read boundary conditions";
-    std::vector<int> preBoundaryData(nLocalElements * (vertexSize() + 1));
-    m_meshReader.readBoundaries(preBoundaryData.data());
+    constexpr std::size_t Faces = 4;
+    std::vector<int> faces(nLocalElements * Faces);
+    m_meshReader.readBoundaries(faces.data());
     for (std::size_t i = 0; i < nLocalElements; ++i) {
-      for (int j = 0; j < (vertexSize() + 1); ++j) {
-        setBoundary(i, j, preBoundaryData[(vertexSize() + 1) * i + j]);
-      }
-    }
-
-    if constexpr (T::SupportsIdentify) {
-      if (identify) {
-        m_meshReader.readIdentify(identifyData.data());
+      for (std::size_t j = 0; j < Faces; ++j) {
+        setBoundary(i, static_cast<int>(j), faces[Faces * i + j]);
       }
     }
   }
